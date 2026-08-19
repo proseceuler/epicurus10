@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, PageHeader, Button, Input, Select } from '@/components/ui';
-import { Key, Database, Download, Check, Cpu } from 'lucide-react';
+import { Key, Database, Download, Check, Cpu, Smartphone } from 'lucide-react';
 import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
 
 const AI_MODELS = [
@@ -74,7 +74,10 @@ export default function SettingsPage() {
       />
 
       <div className="space-y-4">
+        <InstallTip />
+
         {/* API Keys */}
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Key className="w-5 h-5 text-zinc-400" />
@@ -132,5 +135,36 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function InstallTip() {
+  const [installed, setInstalled] = useState(true);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      // iOS Safari
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    setInstalled(standalone);
+  }, []);
+
+  if (installed) return null;
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Smartphone className="w-5 h-5 text-zinc-400" />
+        <h3 className="font-semibold text-zinc-800">Install epicure</h3>
+      </div>
+      <p className="text-sm text-zinc-500">
+        Add epicure to your home screen for a full-screen, app-like experience.
+      </p>
+      <ul className="mt-3 space-y-1.5 text-xs text-zinc-500">
+        <li><span className="text-zinc-700 font-medium">iPhone / iPad:</span> Share → “Add to Home Screen”.</li>
+        <li><span className="text-zinc-700 font-medium">Android Chrome:</span> ⋮ menu → “Add to Home screen” / “Install app”.</li>
+        <li><span className="text-zinc-700 font-medium">Desktop:</span> install icon in the address bar.</li>
+      </ul>
+    </Card>
   );
 }

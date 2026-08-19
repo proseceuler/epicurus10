@@ -74,7 +74,10 @@ export default function SettingsPage() {
       />
 
       <div className="space-y-4">
+        <InstallTip />
+
         {/* API Keys */}
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Key className="w-5 h-5 text-zinc-400" />

@@ -294,7 +294,7 @@ export default function HabitsPage() {
           <div className="min-w-max">
             {/* Header row */}
             <div className="flex items-end border-b border-zinc-200/50">
-              <div className="sticky left-0 z-20 glass w-32 sm:w-44 shrink-0 px-3 py-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+              <div className="sticky left-0 z-20 glass-sticky w-32 sm:w-44 shrink-0 px-3 py-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 Habit
               </div>
               <div className="flex gap-[3px] px-2 py-2">
@@ -310,7 +310,7 @@ export default function HabitsPage() {
             {/* Habit rows */}
             {habitStats.map(({ habit, completed, goal, left, pct, streak, bestStreak }) => (
               <div key={habit.id} className="flex items-center border-b border-zinc-200/40 group">
-                <div className="sticky left-0 z-20 glass w-32 sm:w-44 shrink-0 px-3 py-2 min-w-0">
+                <div className="sticky left-0 z-20 glass-sticky w-32 sm:w-44 shrink-0 px-3 py-2 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-sm shrink-0">{habit.emoji}</span>
                     <span className="text-xs text-zinc-800 truncate">{habit.name}</span>

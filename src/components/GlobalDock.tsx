@@ -217,16 +217,16 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
         </div>
       )}
 
-      {/* Single FAB */}
+      {/* Single center FAB */}
       <button
         onClick={() => setSheetOpen((v) => !v)}
         aria-label="Quick tools"
-        className="fixed right-4 z-[55] w-14 h-14 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
+        className="fixed left-1/2 -translate-x-1/2 z-[55] w-16 h-16 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
         style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        <Plus className={`w-6 h-6 transition-transform duration-200 ${sheetOpen ? 'rotate-45' : ''}`} />
+        <Plus className={`w-7 h-7 transition-transform duration-200 ${sheetOpen ? 'rotate-45' : ''}`} />
         {pomodoro.isRunning && (
-          <span className="absolute -top-1 -left-1 px-1.5 py-0.5 rounded-full bg-zinc-900 text-white text-[10px] tabular-nums">
+          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-900 text-white text-[10px] tabular-nums">
             {timeStr}
           </span>
         )}

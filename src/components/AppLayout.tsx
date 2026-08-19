@@ -60,7 +60,10 @@ export function usePageState(): [PageId, (p: PageId) => void] {
 }
 
 export default function AppLayout({ page, navigate, children }: { page: PageId; navigate: (p: PageId) => void; children: ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 1024;
+  });
 
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard';
 
@@ -77,26 +80,35 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-zinc-200/25 rounded-full blur-3xl" />
       </div>
 
-      {/* Mobile overlay */}
+      {/* Overlay when sidebar open on any screen */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-zinc-900/30 backdrop-blur-sm z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-zinc-900/30 backdrop-blur-sm z-30" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Floating sidebar */}
       <aside className={`fixed top-4 left-4 bottom-4 w-60 z-40 transition-transform duration-300 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-[280px] lg:translate-x-0'
+        sidebarOpen ? 'translate-x-0' : '-translate-x-[280px]'
       }`}>
         <div className="glass-dark glass-shadow-lg rounded-3xl h-full flex flex-col overflow-hidden">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-5 h-16 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
-              <img
-                src="https://cdn-icons-png.flaticon.com/512/3582/3582676.png"
-                alt="epicure"
-                className="w-5 h-5 invert"
-              />
+          {/* Logo + close */}
+          <div className="flex items-center justify-between gap-3 px-5 h-16 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                <img
+                  src="https://cdn-icons-png.flaticon.com/512/3582/3582676.png"
+                  alt="epicure"
+                  className="w-5 h-5 invert"
+                />
+              </div>
+              <span className="font-bold text-lg text-white truncate">epicure</span>
             </div>
-            <span className="font-bold text-lg text-white">epicure</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 shrink-0"
+              title="Close sidebar"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Nav */}
@@ -150,15 +162,16 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="lg:pl-72 flex flex-col min-h-screen relative z-10">
-        {/* Floating header */}
+      {/* Main content — always full width, no persistent left padding */}
+      <div className="flex flex-col min-h-screen relative z-10">
+        {/* Floating header with hamburger always visible */}
         <header className="sticky top-2 lg:top-4 z-20 px-3 lg:px-6 mb-2">
           <div className="glass glass-shadow rounded-xl lg:rounded-2xl h-10 lg:h-14 flex items-center justify-between px-2 lg:px-4">
             <div className="flex items-center gap-2 lg:gap-3">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-200/50"
+                className="p-1.5 rounded-lg hover:bg-zinc-200/50"
+                title="Toggle sidebar"
               >
                 {sidebarOpen ? <X className="w-4 h-4 text-zinc-700" /> : <Menu className="w-4 h-4 text-zinc-700" />}
               </button>
@@ -168,7 +181,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-4 lg:px-6 pb-24 pt-2">
+        <main className="flex-1 px-4 lg:px-6 pb-28 pt-2">
           {children}
         </main>
       </div>

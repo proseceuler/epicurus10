@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type Habit, type HabitCompletion, type WellnessLog } from '@/lib/types';
-import { Button, Input } from '@/components/ui';
+import { Card, PageHeader, Button } from '@/components/ui';
 import {
-  Plus, Trash2, Check, Flame, Trophy, Moon, Smile,
+  Plus, Trash2, Check, Flame, Trophy, Smile,
 } from 'lucide-react';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DEFAULT_HABITS = [
   { name: 'Woke up at 05:00', emoji: '⏰', goal_target: 30 },
   { name: 'Gym', emoji: '💪', goal_target: 25 },
@@ -22,6 +22,21 @@ interface DayInfo {
   weekNum: number;
 }
 
+/** Guard against duplicated rows (double seeding / repeat fetches). */
+function dedupeHabits(list: Habit[]): Habit[] {
+  const seenId = new Set<string>();
+  const seenName = new Set<string>();
+  const out: Habit[] = [];
+  for (const h of list) {
+    const nameKey = (h.name ?? '').trim().toLowerCase();
+    if (seenId.has(h.id) || seenName.has(nameKey)) continue;
+    seenId.add(h.id);
+    seenName.add(nameKey);
+    out.push(h);
+  }
+  return out;
+}
+
 export default function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
@@ -31,6 +46,7 @@ export default function HabitsPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [showAddForm, setShowAddForm] = useState(false);
   const [newHabit, setNewHabit] = useState({ name: '', emoji: '✅', goal: '30' });
+  const seededRef = useRef(false);
 
   const loadData = useCallback(async () => {
     const [{ data: hData }, { data: cData }, { data: wData }] = await Promise.all([
@@ -39,15 +55,19 @@ export default function HabitsPage() {
       supabase.from('wellness_log').select('*'),
     ]);
     if (hData) {
-      const habitsData = hData as Habit[];
-      if (habitsData.length === 0) {
-        const inserts = await Promise.all(
-          DEFAULT_HABITS.map((h) =>
-            supabase.from('habits').insert({ name: h.name, emoji: h.emoji, goal_target: h.goal_target, color: 'zinc' }).select().single()
-          )
-        );
-        const valid = inserts.filter((r) => r.data).map((r) => r.data as Habit);
-        setHabits(valid);
+      const habitsData = dedupeHabits(hData as Habit[]);
+      if (habitsData.length === 0 && !seededRef.current) {
+        seededRef.current = true;
+        const inserts: Habit[] = [];
+        for (const h of DEFAULT_HABITS) {
+          const { data } = await supabase
+            .from('habits')
+            .insert({ name: h.name, emoji: h.emoji, goal_target: h.goal_target, color: 'zinc' })
+            .select()
+            .single();
+          if (data) inserts.push(data as Habit);
+        }
+        setHabits(dedupeHabits(inserts));
       } else {
         setHabits(habitsData);
       }
@@ -59,56 +79,23 @@ export default function HabitsPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Build calendar grid: figure out which week each day belongs to
-  // using a Monday-first week system
-  const { monthDays, weeks, weekdayHeaders } = useMemo(() => {
+  const { monthDays, weeks } = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    const firstDay = new Date(selectedYear, selectedMonth, 1);
-    const firstDow = firstDay.getDay(); // 0=Sun
-    const firstWeekdayIdx = firstDow === 0 ? 6 : firstDow - 1; // Mon=0
+    const firstDow = new Date(selectedYear, selectedMonth, 1).getDay();
+    const firstWeekdayIdx = firstDow === 0 ? 6 : firstDow - 1;
 
-    // Build leading empty slots + day slots
-    const slots: (DayInfo | null)[] = [];
-    for (let i = 0; i < firstWeekdayIdx; i++) slots.push(null);
+    const md: DayInfo[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(selectedYear, selectedMonth, d);
       const dow = date.getDay();
       const weekdayIdx = dow === 0 ? 6 : dow - 1;
-      const slotIdx = slots.length;
-      const weekNum = Math.floor(slotIdx / 7);
-      slots.push({ day: d, dateStr: date.toISOString().split('T')[0], weekdayIdx, weekNum });
+      const weekNum = Math.floor((firstWeekdayIdx + d - 1) / 7);
+      const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      md.push({ day: d, dateStr, weekdayIdx, weekNum });
     }
-    // Pad trailing
-    while (slots.length % 7 !== 0) slots.push(null);
-
-    const numWeeks = slots.length / 7;
-    const weekArr = Array.from({ length: numWeeks }, (_, i) => i);
-
-    // Build header: for each week, show weekday labels with day numbers
-    const headers = weekArr.map((weekIdx) => {
-      const weekSlots = slots.slice(weekIdx * 7, weekIdx * 7 + 7);
-      return WEEKDAY_LABELS.map((wd, i) => {
-        const slot = weekSlots[i];
-        return { label: wd, day: slot?.day ?? null, dateStr: slot?.dateStr ?? null };
-      });
-    });
-
-    // monthDays: all non-null slots
-    const md = slots.filter((s): s is DayInfo => s !== null);
-
-    return { monthDays: md, weeks: weekArr, weekdayHeaders: headers };
+    const numWeeks = md.length ? md[md.length - 1].weekNum + 1 : 0;
+    return { monthDays: md, weeks: Array.from({ length: numWeeks }, (_, i) => i) };
   }, [selectedYear, selectedMonth]);
-
-  // Build per-week day arrays for rendering
-  const weekDayArrays = useMemo(() => {
-    return weeks.map((weekIdx) => {
-      const days = monthDays.filter((d) => d.weekNum === weekIdx);
-      // Fill to 7 slots aligned by weekdayIdx
-      const arr: (DayInfo | null)[] = Array(7).fill(null);
-      days.forEach((d) => { arr[d.weekdayIdx] = d; });
-      return arr;
-    });
-  }, [weeks, monthDays]);
 
   const isDone = (habitId: string, dateStr: string) =>
     completions.some((c) => c.habit_id === habitId && c.completion_date === dateStr);
@@ -126,7 +113,6 @@ export default function HabitsPage() {
     }
   };
 
-  // Per-habit stats for this month
   const habitStats = habits.map((habit) => {
     const monthCompletions = monthDays.filter((d) => isDone(habit.id, d.dateStr)).length;
     const goal = habit.goal_target;
@@ -150,7 +136,7 @@ export default function HabitsPage() {
   const weeklyProgress = weeks.map((weekIdx) => {
     const weekDays = monthDays.filter((d) => d.weekNum === weekIdx);
     const count = weekDays.filter((d) => habits.some((h) => isDone(h.id, d.dateStr))).length;
-    return { week: weekIdx + 1, count, max: weekDays.length * habits.length };
+    return { week: weekIdx + 1, count, max: weekDays.length * Math.max(habits.length, 1) };
   });
 
   const leaderboard = habits.map((habit) => {
@@ -173,17 +159,13 @@ export default function HabitsPage() {
     }
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayWellness = getWellnessForDay(todayStr);
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  })();
 
-  const moodData = monthDays.map((d) => {
-    const w = getWellnessForDay(d.dateStr);
-    return w?.mood ?? 0;
-  });
-  const sleepData = monthDays.map((d) => {
-    const w = getWellnessForDay(d.dateStr);
-    return w?.sleep_hours ?? 0;
-  });
+  const moodData = monthDays.map((d) => getWellnessForDay(d.dateStr)?.mood ?? 0);
+  const sleepData = monthDays.map((d) => getWellnessForDay(d.dateStr)?.sleep_hours ?? 0);
 
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
@@ -194,7 +176,7 @@ export default function HabitsPage() {
       color: 'zinc',
     }).select().single();
     if (data) {
-      setHabits([...habits, data as Habit]);
+      setHabits(dedupeHabits([...habits, data as Habit]));
       setNewHabit({ name: '', emoji: '✅', goal: '30' });
       setShowAddForm(false);
     }
@@ -216,193 +198,177 @@ export default function HabitsPage() {
   const donutOffset = donutCircumference * (1 - overallPct / 100);
 
   return (
-    <div className="bg-zinc-900 rounded-3xl p-4 lg:p-6 text-zinc-200">
-      {/* Top Header */}
-      <div className="flex flex-col lg:flex-row gap-4 mb-6">
-        <div className="flex items-center gap-3 shrink-0">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="px-3 py-2 bg-zinc-800 text-zinc-200 rounded-lg text-sm border border-zinc-700"
-          >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            className="px-3 py-2 bg-zinc-800 text-zinc-200 rounded-lg text-sm border border-zinc-700"
-          >
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
-            ))}
-          </select>
-        </div>
+    <div className="pb-28">
+      <PageHeader
+        title="Habit Tracker"
+        subtitle={`${habits.length} habits · ${MONTHS[selectedMonth]} ${selectedYear}`}
+        action={
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="glass-input rounded-xl px-3 py-2 text-sm text-zinc-800"
+            >
+              {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="glass-input rounded-xl px-3 py-2 text-sm text-zinc-800"
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        }
+      />
 
-        <div className="flex gap-4 flex-1 min-w-0">
-          <div className="flex-1 bg-zinc-800 rounded-xl p-3 min-w-0">
-            <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Daily Progress ({monthDays.length} days)</p>
-            <div className="flex items-end gap-[2px] h-12">
-              {dailyProgress.map((d) => {
-                const h = d.max > 0 ? (d.count / d.max) * 100 : 0;
-                return (
-                  <div key={d.day} className="flex-1 rounded-sm transition-all min-w-[3px]"
-                    style={{ height: `${Math.max(h, 2)}%`, backgroundColor: d.count > 0 ? '#e4e4e7' : '#3f3f46' }}
-                  />
-                );
-              })}
-            </div>
+      {/* Top stats — stack on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <Card className="p-4 min-w-0">
+          <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Daily Progress ({monthDays.length} days)</p>
+          <div className="flex items-end gap-[2px] h-14">
+            {dailyProgress.map((d) => {
+              const h = d.max > 0 ? (d.count / d.max) * 100 : 0;
+              return (
+                <div
+                  key={d.day}
+                  className={`flex-1 rounded-sm min-w-[3px] transition-all ${d.count > 0 ? 'bg-zinc-800' : 'bg-zinc-300/50'}`}
+                  style={{ height: `${Math.max(h, 3)}%` }}
+                />
+              );
+            })}
           </div>
-          <div className="flex-1 bg-zinc-800 rounded-xl p-3 min-w-0">
-            <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Weekly Trend</p>
-            <div className="flex items-end gap-1 h-12">
-              {weeklyProgress.map((w) => {
-                const h = w.max > 0 ? (w.count / w.max) * 100 : 0;
-                return (
-                  <div key={w.week} className="flex-1 rounded-sm transition-all min-w-[8px]"
-                    style={{ height: `${Math.max(h, 5)}%`, backgroundColor: w.count > 0 ? '#a1a1aa' : '#3f3f46' }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        </Card>
 
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="bg-zinc-800 rounded-xl p-3 space-y-1">
-            <div className="flex items-center justify-between gap-4 text-xs">
-              <span className="text-zinc-400">Goal</span>
-              <span className="text-zinc-200 font-semibold">{totalGoal}</span>
+        <Card className="p-4 min-w-0">
+          <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Weekly Trend</p>
+          <div className="flex items-end gap-1.5 h-14">
+            {weeklyProgress.map((w) => {
+              const h = w.max > 0 ? (w.count / w.max) * 100 : 0;
+              return (
+                <div
+                  key={w.week}
+                  className={`flex-1 rounded-md min-w-[8px] ${w.count > 0 ? 'bg-zinc-600' : 'bg-zinc-300/50'}`}
+                  style={{ height: `${Math.max(h, 5)}%` }}
+                />
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card className="p-4 flex items-center justify-between gap-4 min-w-0 sm:col-span-2 lg:col-span-1">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center justify-between gap-6 text-xs">
+              <span className="text-zinc-500">Goal</span>
+              <span className="text-zinc-800 font-semibold">{totalGoal}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 text-xs">
-              <span className="text-zinc-400">Completed</span>
-              <span className="text-white font-semibold">{totalCompleted}</span>
+            <div className="flex items-center justify-between gap-6 text-xs">
+              <span className="text-zinc-500">Completed</span>
+              <span className="text-zinc-900 font-semibold">{totalCompleted}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 text-xs">
-              <span className="text-zinc-400">Left</span>
-              <span className="text-zinc-300 font-semibold">{totalLeft}</span>
+            <div className="flex items-center justify-between gap-6 text-xs">
+              <span className="text-zinc-500">Left</span>
+              <span className="text-zinc-700 font-semibold">{totalLeft}</span>
             </div>
           </div>
-          <div className="relative w-24 h-24 shrink-0">
+          <div className="relative w-20 h-20 shrink-0">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r={donutRadius} fill="none" stroke="#3f3f46" strokeWidth="8" />
-              <circle cx="50" cy="50" r={donutRadius} fill="none" stroke="#e4e4e7" strokeWidth="8"
+              <circle cx="50" cy="50" r={donutRadius} fill="none" stroke="rgba(24,24,27,0.12)" strokeWidth="8" />
+              <circle cx="50" cy="50" r={donutRadius} fill="none" stroke="#18181b" strokeWidth="8"
                 strokeLinecap="round" strokeDasharray={donutCircumference} strokeDashoffset={donutOffset}
                 style={{ transition: 'stroke-dashoffset 0.5s' }}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold text-white">{Math.round(overallPct)}%</span>
+              <span className="text-base font-bold text-zinc-900">{Math.round(overallPct)}%</span>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Main Habit Grid */}
-      <div className="bg-zinc-800 rounded-2xl overflow-hidden mb-6">
+      {/* Habit grid */}
+      <Card className="overflow-hidden mb-4">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-            <thead>
-              <tr className="border-b border-zinc-700">
-                <th className="sticky left-0 z-10 bg-zinc-800 px-3 py-2 text-left text-xs text-zinc-400 uppercase tracking-wider" style={{ width: '140px', minWidth: '140px' }}>
-                  Habit
-                </th>
-                {weeks.map((weekIdx) => (
-                  <th key={weekIdx} className="px-1 pb-0 text-center" style={{ width: `${7 * 28 + 12}px` }}>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Week {weekIdx + 1}</div>
-                    <div className="flex gap-[2px] justify-center">
-                      {weekdayHeaders[weekIdx].map((hdr, i) => (
-                        <div key={i} className="w-6 text-[9px] text-zinc-500 text-center leading-tight">
-                          <div>{hdr.label}</div>
-                          <div className={hdr.day ? 'text-zinc-400' : 'text-zinc-700'}>{hdr.day ?? ''}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </th>
+          <div className="min-w-max">
+            {/* Header row */}
+            <div className="flex items-end border-b border-zinc-200/50">
+              <div className="sticky left-0 z-20 glass w-32 sm:w-44 shrink-0 px-3 py-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                Habit
+              </div>
+              <div className="flex gap-[3px] px-2 py-2">
+                {monthDays.map((d) => (
+                  <div key={d.dateStr} className="w-7 text-center leading-tight">
+                    <div className="text-[9px] text-zinc-400">{WEEKDAY_LABELS[d.weekdayIdx]}</div>
+                    <div className={`text-[10px] ${d.dateStr === todayStr ? 'text-zinc-900 font-bold' : 'text-zinc-500'}`}>{d.day}</div>
+                  </div>
                 ))}
-                <th className="px-3 py-2 text-right text-xs text-zinc-400 uppercase tracking-wider sticky right-0 z-10 bg-zinc-800" style={{ width: '180px', minWidth: '180px' }}>
-                  Analysis
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {habitStats.map(({ habit, completed, goal, left, pct, streak, bestStreak }) => (
-                <tr key={habit.id} className="border-b border-zinc-700/50 group">
-                  <td className="sticky left-0 z-10 bg-zinc-800 px-3 py-2 group-hover:bg-zinc-700/30">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{habit.emoji}</span>
-                      <span className="text-xs text-zinc-200 truncate">{habit.name}</span>
+              </div>
+            </div>
+
+            {/* Habit rows */}
+            {habitStats.map(({ habit, completed, goal, left, pct, streak, bestStreak }) => (
+              <div key={habit.id} className="flex items-center border-b border-zinc-200/40 group">
+                <div className="sticky left-0 z-20 glass w-32 sm:w-44 shrink-0 px-3 py-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm shrink-0">{habit.emoji}</span>
+                    <span className="text-xs text-zinc-800 truncate">{habit.name}</span>
+                    <button
+                      onClick={() => deleteHabit(habit.id)}
+                      aria-label={`Delete ${habit.name}`}
+                      className="ml-auto text-zinc-300 hover:text-zinc-600 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-400">
+                    <span className="flex items-center gap-0.5"><Flame className="w-2.5 h-2.5" />{streak}</span>
+                    <span className="hidden sm:inline">best {bestStreak}</span>
+                    <span className="text-zinc-600 font-semibold">{completed}/{goal}</span>
+                    <span className="hidden sm:inline">L{left}</span>
+                  </div>
+                  <div className="h-1 w-full bg-zinc-200/70 rounded-full overflow-hidden mt-1">
+                    <div className="h-full bg-zinc-800 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+
+                <div className="flex gap-[3px] px-2 py-2">
+                  {monthDays.map((d) => {
+                    const done = isDone(habit.id, d.dateStr);
+                    const isToday = d.dateStr === todayStr;
+                    return (
                       <button
-                        onClick={() => deleteHabit(habit.id)}
-                        className="text-zinc-600 hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        key={d.dateStr}
+                        onClick={() => toggleCompletion(habit.id, d.dateStr)}
+                        aria-label={`${habit.name} on ${d.dateStr}`}
+                        className={`w-7 h-7 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                          done ? 'bg-zinc-900 text-white' : 'bg-zinc-200/60 text-zinc-400 hover:bg-zinc-300/70'
+                        } ${isToday ? 'ring-1 ring-zinc-500' : ''}`}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        {done && <Check className="w-3.5 h-3.5" />}
                       </button>
-                    </div>
-                  </td>
-                  {weekDayArrays.map((weekDays, weekIdx) => (
-                    <td key={weekIdx} className="px-1 py-1">
-                      <div className="flex gap-[2px] justify-center">
-                        {weekDays.map((dayInfo, i) => {
-                          if (!dayInfo) return <div key={i} className="w-6 h-6" />;
-                          const done = isDone(habit.id, dayInfo.dateStr);
-                          const isToday = dayInfo.dateStr === todayStr;
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => toggleCompletion(habit.id, dayInfo.dateStr)}
-                              className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
-                                done
-                                  ? 'bg-zinc-200 text-zinc-900'
-                                  : 'bg-zinc-700/50 text-zinc-500 hover:bg-zinc-600/50'
-                              } ${isToday ? 'ring-1 ring-zinc-400' : ''}`}
-                            >
-                              {done && <Check className="w-3 h-3" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  ))}
-                  <td className="px-3 py-2 sticky right-0 z-10 bg-zinc-800 group-hover:bg-zinc-700/30">
-                    <div className="text-right">
-                      <div className="flex items-center justify-end gap-2 text-[10px] text-zinc-500">
-                        <span className="flex items-center gap-0.5"><Flame className="w-2.5 h-2.5" />{streak}</span>
-                        <span>best: {bestStreak}</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-2 text-xs mt-0.5">
-                        <span className="text-zinc-400">G:{goal}</span>
-                        <span className="text-white font-bold">{completed}</span>
-                        <span className="text-zinc-300">L:{left}</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <div className="h-1.5 w-20 bg-zinc-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-zinc-300 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[9px] text-zinc-400 tabular-nums w-7 text-right">{Math.round(pct)}%</span>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {showAddForm ? (
-          <div className="p-3 flex items-center gap-2 border-t border-zinc-700">
+          <div className="p-3 flex flex-wrap items-center gap-2 border-t border-zinc-200/50">
             <input
               value={newHabit.emoji}
               onChange={(e) => setNewHabit({ ...newHabit, emoji: e.target.value })}
-              className="w-10 px-1 py-1.5 bg-zinc-700 rounded-lg text-sm text-center text-zinc-200 border border-zinc-600 focus:outline-none focus:border-zinc-400"
-              placeholder="emoji"
+              className="w-12 px-1 py-2 glass-input rounded-xl text-sm text-center text-zinc-800"
+              placeholder="✅"
             />
             <input
               value={newHabit.name}
               onChange={(e) => setNewHabit({ ...newHabit, name: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && addHabit()}
-              className="flex-1 px-2 py-1.5 bg-zinc-700 rounded-lg text-sm text-zinc-200 border border-zinc-600 focus:outline-none focus:border-zinc-400"
+              className="flex-1 min-w-[140px] px-3 py-2 glass-input rounded-xl text-sm text-zinc-800"
               placeholder="Habit name"
               autoFocus
             />
@@ -411,8 +377,8 @@ export default function HabitsPage() {
               onChange={(e) => setNewHabit({ ...newHabit, goal: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && addHabit()}
               type="number"
-              className="w-12 px-1 py-1.5 bg-zinc-700 rounded-lg text-sm text-center text-zinc-200 border border-zinc-600 focus:outline-none focus:border-zinc-400"
-              placeholder="Goal"
+              className="w-16 px-2 py-2 glass-input rounded-xl text-sm text-center text-zinc-800"
+              placeholder="30"
             />
             <Button onClick={addHabit} size="sm">Add</Button>
             <Button onClick={() => setShowAddForm(false)} variant="ghost" size="sm">Cancel</Button>
@@ -420,49 +386,44 @@ export default function HabitsPage() {
         ) : (
           <button
             onClick={() => setShowAddForm(true)}
-            className="w-full p-3 flex items-center justify-center gap-2 text-sm text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/30 transition-all border-t border-zinc-700"
+            className="w-full p-3 flex items-center justify-center gap-2 text-sm text-zinc-500 hover:text-zinc-800 hover:bg-white/40 transition-all border-t border-zinc-200/50"
           >
             <Plus className="w-4 h-4" /> Add Habit
           </button>
         )}
-      </div>
+      </Card>
 
       {/* Wellness + Leaderboard */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-zinc-800 rounded-2xl p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 p-4 min-w-0">
           <div className="flex items-center gap-2 mb-3">
-            <Smile className="w-4 h-4 text-zinc-400" />
-            <h3 className="text-sm font-semibold text-zinc-200">Daily Wellness — {MONTHS[selectedMonth]}</h3>
+            <Smile className="w-4 h-4 text-zinc-500" />
+            <h3 className="text-sm font-semibold text-zinc-800">Daily Wellness — {MONTHS[selectedMonth]}</h3>
           </div>
 
-          {/* Daily mood/sleep dropdowns for each day of the month */}
           <div className="overflow-x-auto mb-4">
             <div className="flex gap-1 min-w-max pb-2">
               {monthDays.map((d) => {
                 const w = getWellnessForDay(d.dateStr);
                 const isToday = d.dateStr === todayStr;
                 return (
-                  <div key={d.dateStr} className={`flex flex-col items-center gap-1 p-1.5 rounded-lg ${isToday ? 'bg-zinc-700/40 ring-1 ring-zinc-500' : ''}`}>
-                    <span className="text-[9px] text-zinc-500">{d.day}</span>
+                  <div key={d.dateStr} className={`flex flex-col items-center gap-1 p-1.5 rounded-lg ${isToday ? 'bg-white/60 ring-1 ring-zinc-400' : ''}`}>
+                    <span className="text-[9px] text-zinc-400">{d.day}</span>
                     <select
                       value={w?.mood ?? ''}
                       onChange={(e) => updateWellness(d.dateStr, 'mood', parseInt(e.target.value) || 0)}
-                      className="w-10 px-0.5 py-0.5 bg-zinc-700 rounded text-[10px] text-zinc-200 border border-zinc-600 focus:outline-none focus:border-zinc-400 cursor-pointer"
+                      className="w-11 px-0.5 py-1 glass-input rounded-lg text-[10px] text-zinc-800 cursor-pointer"
                     >
                       <option value="">—</option>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                     <select
                       value={w?.sleep_hours ?? ''}
                       onChange={(e) => updateWellness(d.dateStr, 'sleep_hours', parseFloat(e.target.value) || 0)}
-                      className="w-10 px-0.5 py-0.5 bg-zinc-700 rounded text-[10px] text-zinc-200 border border-zinc-600 focus:outline-none focus:border-zinc-400 cursor-pointer"
+                      className="w-11 px-0.5 py-1 glass-input rounded-lg text-[10px] text-zinc-800 cursor-pointer"
                     >
                       <option value="">—</option>
-                      {[3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((n) => (
-                        <option key={n} value={n}>{n}h</option>
-                      ))}
+                      {[3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((n) => <option key={n} value={n}>{n}h</option>)}
                     </select>
                   </div>
                 );
@@ -470,37 +431,37 @@ export default function HabitsPage() {
             </div>
           </div>
 
-          <div className="bg-zinc-900 rounded-xl p-3">
+          <div className="glass rounded-xl p-3">
             <div className="flex items-center gap-4 mb-2">
-              <span className="flex items-center gap-1 text-[10px] text-zinc-400">
-                <span className="w-3 h-0.5 bg-zinc-300 rounded" /> Mood (1-10)
+              <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <span className="w-3 h-0.5 bg-zinc-800 rounded" /> Mood (1-10)
               </span>
-              <span className="flex items-center gap-1 text-[10px] text-zinc-400">
-                <span className="w-3 h-0.5 bg-zinc-500 rounded" style={{ borderTop: '1px dashed #71717a' }} /> Sleep (hrs)
+              <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <span className="w-3 h-0.5 bg-zinc-400 rounded" /> Sleep (hrs)
               </span>
             </div>
             <DualAxisChart moodData={moodData} sleepData={sleepData} days={monthDays.length} />
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-zinc-800 rounded-2xl p-4">
+        <Card className="p-4 min-w-0">
           <div className="flex items-center gap-2 mb-3">
-            <Trophy className="w-4 h-4 text-zinc-400" />
-            <h3 className="text-sm font-semibold text-zinc-200">Top 10 Habits</h3>
+            <Trophy className="w-4 h-4 text-zinc-500" />
+            <h3 className="text-sm font-semibold text-zinc-800">Top 10 Habits</h3>
           </div>
           <div className="space-y-2">
             {leaderboard.map((entry, i) => (
-              <div key={entry.habit.id} className="flex items-center gap-2 text-sm">
-                <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${
-                  i === 0 ? 'bg-zinc-200 text-zinc-900' : i < 3 ? 'bg-zinc-400 text-zinc-900' : 'bg-zinc-700 text-zinc-400'
+              <div key={entry.habit.id} className="flex items-center gap-2 text-sm min-w-0">
+                <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
+                  i === 0 ? 'bg-zinc-900 text-white' : i < 3 ? 'bg-zinc-500 text-white' : 'bg-zinc-200/70 text-zinc-600'
                 }`}>{i + 1}</span>
-                <span className="text-sm">{entry.habit.emoji}</span>
-                <span className="flex-1 text-zinc-300 truncate text-xs">{entry.habit.name}</span>
-                <span className="text-zinc-400 text-xs tabular-nums">{entry.count}x</span>
+                <span className="text-sm shrink-0">{entry.habit.emoji}</span>
+                <span className="flex-1 text-zinc-700 truncate text-xs">{entry.habit.name}</span>
+                <span className="text-zinc-500 text-xs tabular-nums shrink-0">{entry.count}x</span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="mt-4 flex items-center gap-1 overflow-x-auto pb-1">
@@ -508,8 +469,8 @@ export default function HabitsPage() {
           <button
             key={m}
             onClick={() => setSelectedMonth(i)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-              selectedMonth === i ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50'
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+              selectedMonth === i ? 'bg-zinc-900 text-white' : 'glass glass-hover text-zinc-600'
             }`}
           >
             {m.slice(0, 3)}
@@ -523,15 +484,14 @@ export default function HabitsPage() {
 function getStreak(habitId: string, completions: HabitCompletion[]): number {
   const dates = completions
     .filter((c) => c.habit_id === habitId)
-    .map((c) => c.completion_date)
-    .sort((a, b) => b.localeCompare(a));
+    .map((c) => c.completion_date);
 
   let streak = 0;
   const today = new Date();
   for (let i = 0; i < 365; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dStr = d.toISOString().split('T')[0];
+    const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (dates.includes(dStr)) streak++;
     else if (i > 0) break;
   }
@@ -581,12 +541,12 @@ function DualAxisChart({ moodData, sleepData, days }: { moodData: number[]; slee
       {[0, 0.5, 1].map((t) => (
         <line key={t} x1={padding} x2={width - padding}
           y1={padding + chartH * t} y2={padding + chartH * t}
-          stroke="#3f3f46" strokeWidth="0.5" />
+          stroke="rgba(24,24,27,0.12)" strokeWidth="0.5" />
       ))}
-      <polyline points={moodPoints.join(' ')} fill="none" stroke="#e4e4e7" strokeWidth="1.5" />
-      <polyline points={sleepPoints.join(' ')} fill="none" stroke="#71717a" strokeWidth="1.5" strokeDasharray="3,2" />
-      <text x={4} y={padding + 4} fontSize="8" fill="#a1a1aa">Mood</text>
-      <text x={4} y={height - 4} fontSize="8" fill="#71717a">Sleep</text>
+      <polyline points={moodPoints.join(' ')} fill="none" stroke="#18181b" strokeWidth="1.5" />
+      <polyline points={sleepPoints.join(' ')} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="3,2" />
+      <text x={4} y={padding + 4} fontSize="8" fill="#71717a">Mood</text>
+      <text x={4} y={height - 4} fontSize="8" fill="#a1a1aa">Sleep</text>
     </svg>
   );
 }

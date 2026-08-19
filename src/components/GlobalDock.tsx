@@ -4,9 +4,10 @@ import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
 import ScientificCalculator from '@/components/ScientificCalculator';
 import DictionaryWidget from '@/components/DictionaryWidget';
+import QuickImportModal from '@/components/QuickImportModal';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
-  GripHorizontal, X, StickyNote, Bot,
+  GripHorizontal, X, StickyNote, Bot, Sparkles,
 } from 'lucide-react';
 
 type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote';
@@ -18,6 +19,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
   const [dictDetached, setDictDetached] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
@@ -60,6 +62,8 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
 
   return (
     <>
+      <QuickImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+
       {/* Floating Pomodoro Widget */}
       {pomodoro.isFloating && pomodoro.isRunning && <FloatingPomodoro />}
 
@@ -93,6 +97,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
               <DockButton icon={Bot} label="Ask AI" onClick={() => { setActiveTab('main'); navigate('assistant'); }} />
               <DockButton icon={StickyNote} label="Quick Note" onClick={() => openTab('quicknote')} />
               <DockButton icon={Plus} label="Quick Task" onClick={() => openTab('quicktask')} />
+              <DockButton icon={Sparkles} label="Quick Import" onClick={() => setImportOpen(true)} />
               <div className="w-px h-8 bg-zinc-300/40 mx-0.5" />
               <DockButton
                 icon={Timer}

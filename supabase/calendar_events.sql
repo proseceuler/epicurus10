@@ -31,3 +31,7 @@ create policy "calendar_events open access"
   using (true) with check (true);
 
 create index if not exists calendar_events_start_idx on public.calendar_events (start_date);
+
+-- Required for the AI Announcement Importer upsert (onConflict: 'title,start_date')
+create unique index if not exists calendar_events_title_start_key
+  on public.calendar_events (title, start_date);

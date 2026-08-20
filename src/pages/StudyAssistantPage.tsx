@@ -416,16 +416,24 @@ export default function StudyAssistantPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <PageHeader
-        title="Study Assistant"
-        subtitle={activeMode.hint}
-        action={
-          <div className="flex items-center gap-2">
+    <div className="max-w-4xl mx-auto relative min-h-[calc(100vh-8rem)] flex flex-col">
+      {/* Top bar: model + clear — only when chatting */}
+      {visibleMessages.length > 0 && (
+        <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-zinc-900 flex items-center justify-center shrink-0">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-zinc-800 truncate">{activeMode.label}</p>
+              <p className="text-[11px] text-zinc-500 truncate">{activeMode.hint}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="glass-input rounded-xl px-3 py-2 text-xs text-zinc-700 max-w-[240px]"
+              className="glass-input rounded-xl px-3 py-2 text-xs text-zinc-700 max-w-[200px]"
             >
               {FREE_MODELS.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -433,47 +441,27 @@ export default function StudyAssistantPage() {
                 </option>
               ))}
             </select>
+            {searchAllowed && (
+              <button
+                onClick={() => setWebSearchOn((v) => !v)}
+                title={tavilyKey ? 'Toggle live web search' : 'Add a Tavily API key in Settings'}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                  searchActive ? 'bg-zinc-900 text-white' : 'glass glass-hover text-zinc-500'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                {searchActive ? 'Web' : 'Web off'}
+              </button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => setMessages(() => [])}>
-              <Trash2 className="w-3.5 h-3.5" /> Clear
+              <Trash2 className="w-3.5 h-3.5" />
             </Button>
           </div>
-        }
-      />
-
-      {/* Mode switcher */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {MODES.map((m) => {
-          const Icon = m.icon;
-          const active = m.id === mode;
-          return (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                active ? 'bg-zinc-900 text-white shadow-sm' : 'glass glass-hover text-zinc-600'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {m.label}
-            </button>
-          );
-        })}
-        {searchAllowed && (
-          <button
-            onClick={() => setWebSearchOn((v) => !v)}
-            title={tavilyKey ? 'Toggle live web search' : 'Add a Tavily API key in Settings'}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-              searchActive ? 'bg-zinc-900 text-white shadow-sm' : 'glass glass-hover text-zinc-500'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            Web search {searchActive ? 'on' : tavilyKey ? 'off' : '— no key'}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {!apiKey && (
-        <Card className="p-4 mb-4 flex items-start gap-3">
+        <Card className="p-4 mb-4 flex items-start gap-3 shrink-0">
           <Key className="w-4 h-4 text-zinc-500 mt-0.5 shrink-0" />
           <p className="text-sm text-zinc-600">
             No OpenRouter API key found. Open <span className="font-medium">Settings</span> and paste your key to start
@@ -482,168 +470,313 @@ export default function StudyAssistantPage() {
         </Card>
       )}
 
-      <Card className="flex flex-col h-[calc(100vh-330px)] min-h-[420px] overflow-hidden">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-          {visibleMessages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center gap-3 px-6">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-900 flex items-center justify-center">
-                <Bot className="w-6 h-6 text-white" />
+      {/* ── Claude-style empty state ── */}
+      {visibleMessages.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-900 flex items-center justify-center mb-5 shadow-lg">
+            <Bot className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-serif text-zinc-800 tracking-tight mb-8 text-center">
+            What shall we think through?
+          </h1>
+
+          {/* Main input card — Claude style */}
+          <div className="w-full max-w-2xl glass glass-shadow-lg rounded-2xl p-1.5 mb-6">
+            <div className="rounded-xl bg-white/40 px-4 pt-3 pb-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                rows={3}
+                placeholder={listening ? 'Listening… speak now' : 'How can I help you today?'}
+                className="w-full bg-transparent text-sm text-zinc-800 placeholder-zinc-400 resize-none focus:outline-none min-h-[72px]"
+              />
+              {image && (
+                <div className="flex items-center gap-2 mb-2">
+                  <img src={image} alt="Attachment preview" className="w-12 h-12 rounded-lg object-cover" />
+                  <button onClick={() => setImage(null)} className="p-1 rounded-lg hover:bg-zinc-200/60">
+                    <X className="w-4 h-4 text-zinc-500" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-200/50">
+                <div className="flex items-center gap-1.5">
+                  {/* Chat / mode indicator */}
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-zinc-100 text-zinc-600">
+                    <Bot className="w-3 h-3" />
+                    {activeMode.label}
+                  </span>
+                  {visionModel && (
+                    <>
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) pickImage(file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        onClick={() => fileRef.current?.click()}
+                        title="Attach an image"
+                        className="w-8 h-8 rounded-lg hover:bg-zinc-200/60 flex items-center justify-center"
+                      >
+                        <ImageIcon className="w-4 h-4 text-zinc-500" />
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="text-[11px] text-zinc-500 bg-transparent border-0 focus:outline-none max-w-[140px] cursor-pointer"
+                  >
+                    {FREE_MODELS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label.split('—')[0].trim()}
+                      </option>
+                    ))}
+                  </select>
+                  {speechSupported && (
+                    <button
+                      onClick={toggleListening}
+                      title={listening ? 'Stop voice input' : 'Voice mode'}
+                      aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        listening ? 'bg-zinc-900 animate-pulse text-white' : 'hover:bg-zinc-200/60 text-zinc-500'
+                      }`}
+                    >
+                      {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </button>
+                  )}
+                  {streaming ? (
+                    <button
+                      onClick={stop}
+                      className="w-8 h-8 rounded-lg bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center"
+                      title="Stop generating"
+                    >
+                      <Square className="w-3.5 h-3.5 text-zinc-700" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={send}
+                      disabled={!input.trim() && !image}
+                      className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 flex items-center justify-center"
+                      title="Send"
+                    >
+                      <Send className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-sm font-medium text-zinc-700">{activeMode.label}</p>
-              <p className="text-xs text-zinc-500 max-w-sm">{activeMode.hint}</p>
-              <button
-                onClick={() => setInput(activeMode.starter)}
-                className="text-xs text-zinc-600 glass glass-hover rounded-xl px-3 py-2"
-              >
-                Try: {activeMode.starter.trim().slice(0, 60) || 'paste your text'}
+            </div>
+          </div>
+
+          {/* Suggestion chips — Claude style */}
+          <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl">
+            {MODES.map((m) => {
+              const Icon = m.icon;
+              const active = m.id === mode;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setMode(m.id);
+                    if (!input) setInput(m.starter);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium transition-all ${
+                    active
+                      ? 'bg-zinc-900 text-white shadow-sm'
+                      : 'glass glass-hover text-zinc-600'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {m.label.replace(' Assistant', '').replace(' Agent', '').replace(' Coach', '').replace(' Helper', '')}
+                </button>
+              );
+            })}
+          </div>
+
+          {error && <p className="mt-4 text-xs text-rose-600 text-center">{error}</p>}
+        </div>
+      ) : (
+        /* ── Active chat view ── */
+        <Card className="flex flex-col flex-1 min-h-[420px] overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+            {visibleMessages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    m.role === 'user' ? 'bg-zinc-900 text-white whitespace-pre-wrap' : 'text-zinc-800 min-w-0'
+                  }`}
+                >
+                  {m.image && (
+                    <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />
+                  )}
+
+                  {m.actions?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {m.actions.map((a, ai) => (
+                        <span
+                          key={ai}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium ${
+                            a.ok ? 'bg-zinc-200/70 text-zinc-600' : 'bg-rose-100 text-rose-600'
+                          }`}
+                        >
+                          {a.name === 'web_search' ? <Globe className="w-3 h-3" /> : a.ok ? <Check className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
+                          {a.name.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {m.searches?.map((s, si) => (
+                    <div key={si} className="glass rounded-xl p-3 mb-2 space-y-2">
+                      <p className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> Sources for “{s.query}”
+                      </p>
+                      {s.error && <p className="text-[11px] text-rose-600">{s.error}</p>}
+                      {s.results.map((r, ri) => (
+                        <a
+                          key={ri}
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-lg px-2 py-1.5 hover:bg-white/60 transition-colors"
+                        >
+                          <p className="text-xs font-medium text-zinc-800 flex items-center gap-1">
+                            {r.title}
+                            <ExternalLink className="w-3 h-3 text-zinc-400" />
+                          </p>
+                          <p className="text-[11px] text-zinc-500 line-clamp-2">{r.snippet}</p>
+                        </a>
+                      ))}
+                    </div>
+                  ))}
+
+                  {m.role === 'assistant' ? (
+                    m.content ? (
+                      <Markdown content={m.content} />
+                    ) : streaming && i === visibleMessages.length - 1 ? (
+                      toolStatus ? `Running ${toolStatus}…` : 'Thinking…'
+                    ) : null
+                  ) : (
+                    m.content
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {error && <p className="px-4 pb-2 text-xs text-rose-600">{error}</p>}
+
+          {image && (
+            <div className="px-4 pb-2 flex items-center gap-2">
+              <img src={image} alt="Attachment preview" className="w-12 h-12 rounded-lg object-cover" />
+              <button onClick={() => setImage(null)} className="p-1 rounded-lg hover:bg-zinc-200/60">
+                <X className="w-4 h-4 text-zinc-500" />
               </button>
             </div>
           )}
 
-          {visibleMessages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  m.role === 'user' ? 'bg-zinc-900 text-white whitespace-pre-wrap' : 'text-zinc-800 min-w-0'
+          {/* Mode chips row while chatting */}
+          <div className="px-3 pt-2 flex flex-wrap gap-1.5 border-t border-white/40">
+            {MODES.map((m) => {
+              const Icon = m.icon;
+              const active = m.id === mode;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                    active ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-200/50'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />
+                  {m.label.replace(' Assistant', '').replace(' Agent', '').replace(' Coach', '').replace(' Helper', '')}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="p-3 flex items-end gap-2">
+            {visionModel && (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) pickImage(file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  title="Attach an image"
+                  className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center shrink-0"
+                >
+                  <ImageIcon className="w-4 h-4 text-zinc-600" />
+                </button>
+              </>
+            )}
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={2}
+              placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.label}… (Enter to send)`}
+              className="glass-input flex-1 rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 resize-none"
+            />
+            {speechSupported && (
+              <button
+                onClick={toggleListening}
+                title={listening ? 'Stop voice input' : 'Voice mode'}
+                aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                  listening ? 'bg-zinc-900 animate-pulse' : 'glass glass-hover'
                 }`}
               >
-                {m.image && (
-                  <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />
-                )}
-
-                {m.actions?.length ? (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {m.actions.map((a, ai) => (
-                      <span
-                        key={ai}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium ${
-                          a.ok ? 'bg-zinc-200/70 text-zinc-600' : 'bg-rose-100 text-rose-600'
-                        }`}
-                      >
-                        {a.name === 'web_search' ? <Globe className="w-3 h-3" /> : a.ok ? <Check className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
-                        {a.name.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {m.searches?.map((s, si) => (
-                  <div key={si} className="glass rounded-xl p-3 mb-2 space-y-2">
-                    <p className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1">
-                      <Globe className="w-3 h-3" /> Sources for “{s.query}”
-                    </p>
-                    {s.error && <p className="text-[11px] text-rose-600">{s.error}</p>}
-                    {s.results.map((r, ri) => (
-                      <a
-                        key={ri}
-                        href={r.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block rounded-lg px-2 py-1.5 hover:bg-white/60 transition-colors"
-                      >
-                        <p className="text-xs font-medium text-zinc-800 flex items-center gap-1">
-                          {r.title}
-                          <ExternalLink className="w-3 h-3 text-zinc-400" />
-                        </p>
-                        <p className="text-[11px] text-zinc-500 line-clamp-2">{r.snippet}</p>
-                      </a>
-                    ))}
-                  </div>
-                ))}
-
-                {m.role === 'assistant' ? (
-                  m.content ? (
-                    <Markdown content={m.content} />
-                  ) : streaming && i === visibleMessages.length - 1 ? (
-                    toolStatus ? `Running ${toolStatus}…` : 'Thinking…'
-                  ) : null
-                ) : (
-                  m.content
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {error && <p className="px-4 pb-2 text-xs text-rose-600">{error}</p>}
-
-        {image && (
-          <div className="px-4 pb-2 flex items-center gap-2">
-            <img src={image} alt="Attachment preview" className="w-12 h-12 rounded-lg object-cover" />
-            <button onClick={() => setImage(null)} className="p-1 rounded-lg hover:bg-zinc-200/60">
-              <X className="w-4 h-4 text-zinc-500" />
-            </button>
-          </div>
-        )}
-
-        <div className="border-t border-white/40 p-3 flex items-end gap-2">
-          {visionModel && (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) pickImage(file);
-                  e.target.value = '';
-                }}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                title="Attach an image"
-                className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center shrink-0"
-              >
-                <ImageIcon className="w-4 h-4 text-zinc-600" />
+                {listening ? <MicOff className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4 text-zinc-600" />}
               </button>
-            </>
-          )}
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={2}
-            placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.label}… (Enter to send, Shift+Enter for a new line)`}
-            className="glass-input flex-1 rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 resize-none"
-          />
-          {speechSupported && (
-            <button
-              onClick={toggleListening}
-              title={listening ? 'Stop voice input' : 'Voice input'}
-              aria-label={listening ? 'Stop voice input' : 'Start voice input'}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                listening ? 'bg-zinc-900 animate-pulse' : 'glass glass-hover'
-              }`}
-            >
-              {listening ? <MicOff className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4 text-zinc-600" />}
-            </button>
-          )}
-          {streaming ? (
-            <button
-              onClick={stop}
-              className="w-10 h-10 rounded-xl bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center shrink-0"
-              title="Stop generating"
-            >
-              <Square className="w-4 h-4 text-zinc-700" />
-            </button>
-          ) : (
-            <button
-              onClick={send}
-              disabled={!input.trim() && !image}
-              className="w-10 h-10 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 flex items-center justify-center shrink-0"
-              title="Send"
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
-          )}
-        </div>
-      </Card>
+            )}
+            {streaming ? (
+              <button
+                onClick={stop}
+                className="w-10 h-10 rounded-xl bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center shrink-0"
+                title="Stop generating"
+              >
+                <Square className="w-4 h-4 text-zinc-700" />
+              </button>
+            ) : (
+              <button
+                onClick={send}
+                disabled={!input.trim() && !image}
+                className="w-10 h-10 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 flex items-center justify-center shrink-0"
+                title="Send"
+              >
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

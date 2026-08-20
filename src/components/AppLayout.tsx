@@ -69,7 +69,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [currentLabel]);
 
   return (
-    <div className="min-h-screen bg-zinc-100 relative overflow-x-hidden">
+    <div className="min-h-screen bg-zinc-100 relative">
       {/* Ambient background blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-zinc-300/20 rounded-full blur-3xl" />
@@ -151,7 +151,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </aside>
 
       {/* Main content — offset for sidebar on desktop, aligned at top-4 */}
-      <div className="flex flex-col min-h-screen relative z-10 lg:pl-[17rem] pt-4 pr-4 pb-4">
+      <div className="flex flex-col min-h-screen relative lg:pl-[17rem] pt-4 pr-4 pb-4">
         {/* Floating header — mobile/tablet only */}
         <header className="sticky top-4 z-20 px-3 lg:hidden mb-2">
           <div className="glass glass-shadow rounded-xl h-10 flex items-center justify-between px-2">

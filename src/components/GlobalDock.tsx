@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
@@ -112,7 +113,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
 
   const showRow = !tool || tool === 'calculator' || tool === 'dictionary';
 
-  return (
+  const ui = (
     <>
       <QuickImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
@@ -265,6 +266,11 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
       </button>
     </>
   );
+
+  // Portal to body so position:fixed is always viewport-relative
+  // (avoids being trapped by layout overflow/transform ancestors)
+  if (typeof document === 'undefined') return null;
+  return createPortal(ui, document.body);
 }
 
 function DockBtn({

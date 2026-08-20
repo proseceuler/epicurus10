@@ -69,7 +69,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [currentLabel]);
 
   return (
-    <div className="min-h-screen bg-zinc-100 relative overflow-hidden">
+    <div className="min-h-screen bg-zinc-100 relative overflow-x-hidden">
       {/* Ambient background blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-zinc-300/20 rounded-full blur-3xl" />

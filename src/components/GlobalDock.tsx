@@ -7,10 +7,18 @@ import DictionaryWidget from '@/components/DictionaryWidget';
 import QuickImportModal from '@/components/QuickImportModal';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
-  GripHorizontal, StickyNote, Bot, Sparkles, ArrowLeft, Send,
+  GripHorizontal, StickyNote, Bot, Sparkles, ArrowLeft, Send, X,
+  Pin,
 } from 'lucide-react';
 
 type Tool = null | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote' | 'pomodoro';
+
+interface StickyNoteWin {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+}
 
 export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void }) {
   const pomodoro = usePomodoro();
@@ -19,6 +27,8 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [stickyWins, setStickyWins] = useState<StickyNoteWin[]>([]);
+  const [noteSaved, setNoteSaved] = useState(false);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
@@ -47,20 +57,48 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
     if (next === 'pomodoro') pomodoro.setDockOpen(true);
   };
 
-  const addQuickNote = async () => {
-    if (!quickNote.trim()) return;
-    const title = quickNote.trim().split('\n')[0].slice(0, 60);
+  const saveQuickNote = async (text: string): Promise<void> => {
+    if (!text.trim()) return;
+    const title = text.trim().split('\n')[0].slice(0, 60);
     await supabase.from('notes').insert({
       title: title || 'Untitled',
-      content: quickNote.trim(),
+      content: text.trim(),
       folder: 'Quick Capture',
       tags: ['sticky'],
       pinned: true,
     });
+  };
+
+  const addQuickNote = async () => {
+    await saveQuickNote(quickNote);
     setQuickNote('');
     setTool(null);
     setExpanded(false);
     navigate('notes');
+  };
+
+  const detachStickyNote = () => {
+    const id = Date.now();
+    setStickyWins((wins) => [...wins, { id, text: quickNote, x: 120, y: 120 }]);
+    setQuickNote('');
+    setTool(null);
+  };
+
+  const updateStickyText = (id: number, text: string) => {
+    setStickyWins((wins) => wins.map((w) => (w.id === id ? { ...w, text } : w)));
+  };
+
+  const closeStickyWin = (id: number) => {
+    setStickyWins((wins) => wins.filter((w) => w.id !== id));
+  };
+
+  const saveStickyWin = async (id: number) => {
+    const win = stickyWins.find((w) => w.id === id);
+    if (!win) return;
+    await saveQuickNote(win.text);
+    setStickyWins((wins) => wins.filter((w) => w.id !== id));
+    setNoteSaved(true);
+    setTimeout(() => setNoteSaved(false), 1500);
   };
 
   const addQuickTask = async () => {
@@ -87,15 +125,34 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
         <DictionaryWidget detached onDetach={() => {}} onSnapBack={collapse} onClose={collapse} />
       )}
 
+      {/* Detached sticky note windows */}
+      {stickyWins.map((win) => (
+        <FloatingStickyNote
+          key={win.id}
+          text={win.text}
+          pos={{ x: win.x, y: win.y }}
+          onTextChange={(t) => updateStickyText(win.id, t)}
+          onClose={() => closeStickyWin(win.id)}
+          onSave={() => saveStickyWin(win.id)}
+          onDrag={(x, y) => setStickyWins((wins) => wins.map((w) => (w.id === win.id ? { ...w, x, y } : w)))}
+        />
+      ))}
+
+      {noteSaved && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[70] glass glass-shadow-lg rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 animate-fade-in">
+          Saved to Notes
+        </div>
+      )}
+
       {/* Outside-click catcher — only when showing the main tool row */}
       {expanded && showRow && (
         <div className="fixed inset-0 z-40" onClick={collapse} />
       )}
 
-      {/* Expanded dock */}
+      {/* Expanded dock — morph animation from FAB */}
       {expanded && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 z-50 glass glass-shadow-lg rounded-2xl px-3 py-2.5 flex items-center gap-1.5"
+          className="dock-morph fixed left-1/2 -translate-x-1/2 z-50 glass glass-shadow-lg rounded-2xl px-3 py-2 flex items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto"
           style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -124,7 +181,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 onChange={(e) => setQuickTask(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addQuickTask()}
                 placeholder="Add a task…"
-                className="flex-1 glass-input rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 min-w-[180px]"
+                className="flex-1 glass-input rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 min-w-[140px] max-w-[260px]"
                 autoFocus
               />
               <button
@@ -141,15 +198,25 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 onChange={(e) => setQuickNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addQuickNote(); }}
                 placeholder="Jot something down… (Ctrl+Enter to save)"
-                className="flex-1 bg-amber-50/80 border border-amber-200/60 rounded-xl px-3 py-2 text-sm text-amber-950 placeholder-amber-400/70 resize-none h-20 min-w-[220px] focus:outline-none"
+                className="flex-1 bg-amber-50/80 border border-amber-200/60 rounded-xl px-3 py-2 text-sm text-amber-950 placeholder-amber-400/70 resize-none h-20 min-w-[180px] max-w-[300px] focus:outline-none"
                 autoFocus
               />
-              <button
-                onClick={addQuickNote}
-                className="px-3 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 shrink-0 flex items-center gap-1.5"
-              >
-                <Send className="w-3.5 h-3.5" /> Save
-              </button>
+              <div className="flex gap-1.5 shrink-0">
+                <button
+                  onClick={detachStickyNote}
+                  disabled={!quickNote.trim()}
+                  className="px-2.5 py-2 rounded-xl glass glass-hover text-xs text-zinc-600 disabled:opacity-40 flex items-center gap-1"
+                  title="Detach into a floating note"
+                >
+                  <Pin className="w-3.5 h-3.5" /> Detach
+                </button>
+                <button
+                  onClick={addQuickNote}
+                  className="px-3 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" /> Save
+                </button>
+              </div>
             </InlinePanel>
           ) : tool === 'pomodoro' ? (
             <InlinePanel onBack={backToRow} icon={Timer} title="Focus Timer">
@@ -216,7 +283,7 @@ function DockBtn({
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+      className={`relative flex flex-col items-center justify-center gap-0.5 px-2.5 py-1.5 rounded-xl transition-all shrink-0 ${
         active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-white/40'
       }`}
     >
@@ -262,6 +329,81 @@ function InlinePanel({
         {title}
       </div>
       {children}
+    </div>
+  );
+}
+
+function FloatingStickyNote({
+  text,
+  pos,
+  onTextChange,
+  onClose,
+  onSave,
+  onDrag,
+}: {
+  text: string;
+  pos: { x: number; y: number };
+  onTextChange: (t: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+  onDrag: (x: number, y: number) => void;
+}) {
+  const draggingRef = useRef(false);
+  const offsetRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      onDrag(e.clientX - offsetRef.current.x, e.clientY - offsetRef.current.y);
+    };
+    const onUp = () => { draggingRef.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [onDrag]);
+
+  const onDragStart = (e: React.MouseEvent) => {
+    draggingRef.current = true;
+    offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+  };
+
+  return (
+    <div
+      className="fixed z-[60] w-64 rounded-2xl overflow-hidden shadow-xl border border-amber-200/60 bg-amber-50/95 backdrop-blur-sm"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <div
+        className="flex items-center justify-between px-3 py-1.5 bg-amber-100/80 cursor-move border-b border-amber-200/60"
+        onMouseDown={onDragStart}
+      >
+        <div className="flex items-center gap-1.5 text-amber-700">
+          <GripHorizontal className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-semibold">Sticky Note</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onSave}
+            className="w-6 h-6 rounded-md hover:bg-amber-200/60 flex items-center justify-center text-amber-700"
+            title="Save to Notes"
+          >
+            <Send className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 rounded-md hover:bg-amber-200/60 flex items-center justify-center text-amber-700"
+            title="Close"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => onTextChange(e.target.value)}
+        placeholder="Type here…"
+        className="w-full bg-transparent px-3 py-2.5 text-sm text-amber-950 placeholder-amber-400/70 resize-none h-40 focus:outline-none"
+        autoFocus
+      />
     </div>
   );
 }

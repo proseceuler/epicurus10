@@ -275,3 +275,36 @@
     background: rgb(255, 255, 255);
     box-shadow: inset -1px 0 0 rgba(24, 24, 27, 0.06);
   }
+
+  /* Dock morph animation — expands from the FAB circle */
+  @keyframes dockMorph {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, 20px) scale(0.3);
+      border-radius: 9999px;
+    }
+    60% {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1.05);
+      border-radius: 1rem;
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+      border-radius: 1rem;
+    }
+  }
+
+  .dock-morph {
+    animation: dockMorph 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: bottom center;
+  }
+
+  @keyframes fadeInDown {
+    0% { opacity: 0; transform: translate(-50%, -10px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeInDown 0.3s ease-out forwards;
+  }

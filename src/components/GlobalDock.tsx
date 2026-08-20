@@ -7,14 +7,14 @@ import DictionaryWidget from '@/components/DictionaryWidget';
 import QuickImportModal from '@/components/QuickImportModal';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
-  GripHorizontal, X, StickyNote, Bot, Sparkles,
+  GripHorizontal, StickyNote, Bot, Sparkles, ArrowLeft, Send,
 } from 'lucide-react';
 
 type Tool = null | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote' | 'pomodoro';
 
 export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void }) {
   const pomodoro = usePomodoro();
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [tool, setTool] = useState<Tool>(null);
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
@@ -24,14 +24,25 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
   const seconds = pomodoro.timeLeft % 60;
   const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-  const closeTool = () => {
+  const collapse = () => {
+    if (tool === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
+    if (tool === 'pomodoro') pomodoro.setDockOpen(false);
+    setTool(null);
+    setExpanded(false);
+  };
+
+  const backToRow = () => {
     if (tool === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
     if (tool === 'pomodoro') pomodoro.setDockOpen(false);
     setTool(null);
   };
 
   const pickTool = (next: Exclude<Tool, null>) => {
-    setSheetOpen(false);
+    if (next === 'calculator' || next === 'dictionary') {
+      setTool(next);
+      setExpanded(false);
+      return;
+    }
     setTool(next);
     if (next === 'pomodoro') pomodoro.setDockOpen(true);
   };
@@ -43,11 +54,12 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
       title: title || 'Untitled',
       content: quickNote.trim(),
       folder: 'Quick Capture',
-      tags: [],
-      pinned: false,
+      tags: ['sticky'],
+      pinned: true,
     });
     setQuickNote('');
     setTool(null);
+    setExpanded(false);
     navigate('notes');
   };
 
@@ -56,191 +68,201 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
     await supabase.from('todos').insert({ title: quickTask.trim(), priority: 'not_urgent_important' });
     setQuickTask('');
     setTool(null);
+    setExpanded(false);
     navigate('todos');
   };
 
-  const TOOLS: { id: string; label: string; icon: typeof Calculator; run: () => void }[] = [
-    { id: 'calculator', label: 'Calculator', icon: Calculator, run: () => pickTool('calculator') },
-    { id: 'dictionary', label: 'Dictionary', icon: BookOpen, run: () => pickTool('dictionary') },
-    { id: 'ai', label: 'Ask AI', icon: Bot, run: () => { setSheetOpen(false); navigate('assistant'); } },
-    { id: 'note', label: 'Quick Note', icon: StickyNote, run: () => pickTool('quicknote') },
-    { id: 'task', label: 'Quick Task', icon: Plus, run: () => pickTool('quicktask') },
-    { id: 'import', label: 'Quick Import', icon: Sparkles, run: () => { setSheetOpen(false); setImportOpen(true); } },
-    { id: 'focus', label: 'Focus', icon: Timer, run: () => pickTool('pomodoro') },
-  ];
+  const showRow = !tool || tool === 'calculator' || tool === 'dictionary';
 
   return (
     <>
       <QuickImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
-      {/* Floating Pomodoro Widget */}
       {pomodoro.isFloating && pomodoro.isRunning && <FloatingPomodoro />}
 
-      {/* Floating tool windows */}
       {tool === 'calculator' && (
-        <ScientificCalculator detached onDetach={() => {}} onSnapBack={closeTool} onClose={closeTool} />
+        <ScientificCalculator detached onDetach={() => {}} onSnapBack={collapse} onClose={collapse} />
       )}
       {tool === 'dictionary' && (
-        <DictionaryWidget detached onDetach={() => {}} onSnapBack={closeTool} onClose={closeTool} />
+        <DictionaryWidget detached onDetach={() => {}} onSnapBack={collapse} onClose={collapse} />
       )}
 
-      {/* Quick capture / focus panels */}
-      {(tool === 'quicknote' || tool === 'quicktask' || tool === 'pomodoro') && (
+      {/* Outside-click catcher — only when showing the main tool row */}
+      {expanded && showRow && (
+        <div className="fixed inset-0 z-40" onClick={collapse} />
+      )}
+
+      {/* Expanded dock */}
+      {expanded && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-zinc-900/30 backdrop-blur-sm p-3"
-          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
-          onClick={closeTool}
+          className="fixed left-1/2 -translate-x-1/2 z-50 glass glass-shadow-lg rounded-2xl px-3 py-2.5 flex items-center gap-1.5"
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="glass glass-shadow-lg rounded-2xl w-full max-w-md p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {tool === 'quicknote' && (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">
-                    <StickyNote className="w-4 h-4 text-zinc-500" /> Quick Note
-                  </h3>
-                  <CloseBtn onClick={closeTool} />
+          {showRow ? (
+            <>
+              <DockBtn icon={Calculator} label="Calc" onClick={() => pickTool('calculator')} />
+              <DockBtn icon={BookOpen} label="Dict" onClick={() => pickTool('dictionary')} />
+              <DockBtn icon={StickyNote} label="Note" onClick={() => pickTool('quicknote')} />
+              <DockBtn icon={Plus} label="Task" onClick={() => pickTool('quicktask')} />
+              <Divider />
+              <DockBtn icon={Bot} label="Ask AI" onClick={() => { setExpanded(false); navigate('assistant'); }} />
+              <DockBtn icon={Sparkles} label="Import" onClick={() => { setExpanded(false); setImportOpen(true); }} />
+              <Divider />
+              <DockBtn
+                icon={Timer}
+                label="Focus"
+                active={pomodoro.isRunning}
+                badge={pomodoro.isRunning ? timeStr : undefined}
+                onClick={() => pickTool('pomodoro')}
+              />
+            </>
+          ) : tool === 'quicktask' ? (
+            <InlinePanel onBack={backToRow} icon={Plus} title="Quick Task">
+              <input
+                value={quickTask}
+                onChange={(e) => setQuickTask(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addQuickTask()}
+                placeholder="Add a task…"
+                className="flex-1 glass-input rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 min-w-[180px]"
+                autoFocus
+              />
+              <button
+                onClick={addQuickTask}
+                className="px-3 py-2 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 shrink-0"
+              >
+                Add
+              </button>
+            </InlinePanel>
+          ) : tool === 'quicknote' ? (
+            <InlinePanel onBack={backToRow} icon={StickyNote} title="Sticky Note" amber>
+              <textarea
+                value={quickNote}
+                onChange={(e) => setQuickNote(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addQuickNote(); }}
+                placeholder="Jot something down… (Ctrl+Enter to save)"
+                className="flex-1 bg-amber-50/80 border border-amber-200/60 rounded-xl px-3 py-2 text-sm text-amber-950 placeholder-amber-400/70 resize-none h-20 min-w-[220px] focus:outline-none"
+                autoFocus
+              />
+              <button
+                onClick={addQuickNote}
+                className="px-3 py-2 rounded-xl bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 shrink-0 flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" /> Save
+              </button>
+            </InlinePanel>
+          ) : tool === 'pomodoro' ? (
+            <InlinePanel onBack={backToRow} icon={Timer} title="Focus Timer">
+              <div className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-zinc-900 tabular-nums leading-none">{timeStr}</div>
+                  <div className="text-[10px] text-zinc-400 capitalize mt-0.5">{pomodoro.sessionType.replace('_', ' ')}</div>
                 </div>
-                <textarea
-                  value={quickNote}
-                  onChange={(e) => setQuickNote(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addQuickNote(); }}
-                  placeholder="Quick capture a note… (Ctrl+Enter to save)"
-                  className="w-full glass-input rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 h-28 resize-none"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2 mt-3">
-                  <button onClick={closeTool} className="px-3 py-2 rounded-xl text-sm text-zinc-500 hover:bg-zinc-200/50">Cancel</button>
-                  <button onClick={addQuickNote} className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800">Save</button>
-                </div>
-              </>
-            )}
-
-            {tool === 'quicktask' && (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-zinc-500" /> Quick Task
-                  </h3>
-                  <CloseBtn onClick={closeTool} />
-                </div>
-                <input
-                  value={quickTask}
-                  onChange={(e) => setQuickTask(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addQuickTask()}
-                  placeholder="Quick add task…"
-                  className="w-full glass-input rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2 mt-3">
-                  <button onClick={closeTool} className="px-3 py-2 rounded-xl text-sm text-zinc-500 hover:bg-zinc-200/50">Cancel</button>
-                  <button onClick={addQuickTask} className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800">Add</button>
-                </div>
-              </>
-            )}
-
-            {tool === 'pomodoro' && (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">
-                    <Timer className="w-4 h-4 text-zinc-500" /> Focus Timer
-                  </h3>
-                  <CloseBtn onClick={closeTool} />
-                </div>
-                <div className="text-center py-2">
-                  <div className="text-4xl font-bold text-zinc-900 tabular-nums">{timeStr}</div>
-                  <div className="text-xs text-zinc-400 capitalize mt-1">{pomodoro.sessionType.replace('_', ' ')}</div>
-                </div>
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  {pomodoro.isRunning ? (
-                    <button onClick={pomodoro.pause} className="w-11 h-11 rounded-xl bg-zinc-900 text-white flex items-center justify-center hover:bg-zinc-800">
-                      <Pause className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button onClick={pomodoro.start} className="w-11 h-11 rounded-xl bg-zinc-900 text-white flex items-center justify-center hover:bg-zinc-800">
-                      <Play className="w-4 h-4" />
-                    </button>
-                  )}
-                  <button onClick={pomodoro.reset} className="w-11 h-11 rounded-xl glass glass-hover text-zinc-600 flex items-center justify-center">
-                    <Square className="w-3.5 h-3.5" />
+                {pomodoro.isRunning ? (
+                  <button onClick={pomodoro.pause} className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center hover:bg-zinc-800">
+                    <Pause className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => { setTool(null); navigate('pomodoro'); }}
-                    className="px-3 h-11 rounded-xl glass glass-hover text-sm text-zinc-600"
-                  >
-                    Open page
+                ) : (
+                  <button onClick={pomodoro.start} className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center hover:bg-zinc-800">
+                    <Play className="w-4 h-4" />
                   </button>
-                </div>
-              </>
-            )}
-          </div>
+                )}
+                <button onClick={pomodoro.reset} className="w-9 h-9 rounded-xl glass glass-hover text-zinc-600 flex items-center justify-center">
+                  <Square className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => { setTool(null); setExpanded(false); navigate('pomodoro'); }}
+                  className="px-2.5 py-2 rounded-xl glass glass-hover text-xs text-zinc-600 shrink-0"
+                >
+                  Open
+                </button>
+              </div>
+            </InlinePanel>
+          ) : null}
         </div>
       )}
 
-      {/* Quick tools bottom sheet */}
-      {sheetOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/30 backdrop-blur-sm"
-          onClick={() => setSheetOpen(false)}
-        >
-          <div
-            className="glass glass-shadow-lg rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md sm:mb-6 p-4"
-            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-zinc-800">Quick tools</h3>
-              <CloseBtn onClick={() => setSheetOpen(false)} />
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {TOOLS.map((t) => {
-                const Icon = t.icon;
-                const active = t.id === 'focus' && pomodoro.isRunning;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={t.run}
-                    className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl transition-all ${
-                      active ? 'bg-zinc-900 text-white' : 'glass glass-hover text-zinc-700'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-[11px] font-medium text-center leading-tight">{t.label}</span>
-                    {active && <span className="text-[10px] tabular-nums">{timeStr}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Center FAB — scrolls with page content */}
-      <div className="flex justify-center py-8">
-        <button
-          onClick={() => setSheetOpen((v) => !v)}
-          aria-label="Quick tools"
-          className="w-16 h-16 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
-        >
-        <Plus className={`w-7 h-7 transition-transform duration-200 ${sheetOpen ? 'rotate-45' : ''}`} />
-        {pomodoro.isRunning && (
+      {/* FAB */}
+      <button
+        onClick={() => { if (expanded) collapse(); else setExpanded(true); }}
+        aria-label="Quick tools"
+        className="fixed left-1/2 -translate-x-1/2 z-[55] w-14 h-14 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
+        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
+        <Plus className={`w-6 h-6 transition-transform duration-200 ${expanded ? 'rotate-45' : ''}`} />
+        {pomodoro.isRunning && !expanded && (
           <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-900 text-white text-[10px] tabular-nums">
             {timeStr}
           </span>
         )}
-        </button>
-      </div>
+      </button>
     </>
   );
 }
 
-function CloseBtn({ onClick }: { onClick: () => void }) {
+function DockBtn({
+  icon: Icon,
+  label,
+  onClick,
+  active,
+  badge,
+}: {
+  icon: typeof Calculator;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  badge?: string;
+}) {
   return (
-    <button onClick={onClick} className="w-8 h-8 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center">
-      <X className="w-4 h-4 text-zinc-500" />
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+        active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-white/40'
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="text-[10px] font-medium leading-none">{label}</span>
+      {badge && (
+        <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded-full bg-zinc-900 text-white text-[9px] tabular-nums">
+          {badge}
+        </span>
+      )}
     </button>
+  );
+}
+
+function Divider() {
+  return <div className="w-px h-8 bg-zinc-300/50 mx-0.5 shrink-0" />;
+}
+
+function InlinePanel({
+  onBack,
+  icon: Icon,
+  title,
+  children,
+  amber,
+}: {
+  onBack: () => void;
+  icon: typeof Calculator;
+  title: string;
+  children: React.ReactNode;
+  amber?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-2 rounded-xl p-1 ${amber ? 'bg-amber-100/40' : ''}`}>
+      <button
+        onClick={onBack}
+        className="w-8 h-8 rounded-lg hover:bg-white/40 flex items-center justify-center text-zinc-500 shrink-0"
+        title="Back"
+      >
+        <ArrowLeft className="w-4 h-4" />
+      </button>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 shrink-0">
+        <Icon className="w-4 h-4" />
+        {title}
+      </div>
+      {children}
+    </div>
   );
 }
 

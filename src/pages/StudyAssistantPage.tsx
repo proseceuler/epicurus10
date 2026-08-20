@@ -1,94 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { MODEL_KEY, getDefaultModel, getOpenRouterKey, getTavilyKey, saveKey } from '@/lib/apiKeys';
-import { Card } from '@/components/ui';
 import Markdown from '@/components/Markdown';
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Send, Square, Image as ImageIcon, X, Code as Code2, PenLine, Sigma, FileText, Layers, GraduationCap, Key, Mic, MicOff, Globe, Wrench, ExternalLink, Check } from 'lucide-react';
-
-const FREE_MODELS = [
-  { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest', vision: false },
-  { value: 'nvidia/nemotron-3.5-lightning:free', label: 'Nemotron 3.5 Lightning — fastest', vision: false },
-  { value: 'poolside/laguna-s-2.1:free', label: 'Laguna S 2.1 — great for code', vision: false },
-  { value: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B — vision', vision: true },
-  { value: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', label: 'Nemotron Nano Omni — multimodal reasoning', vision: true },
-];
-
-type ModeId = 'study' | 'coding' | 'writing' | 'math' | 'summarize' | 'flashcards';
-
-const TOOL_PROMPT =
-  '\n\nYou are connected to the student\'s own epicure app and can use tools to read and change their data (tasks, notes, calendar, flashcards, grades, habits, focus timer, baon/expenses). Prefer reading real data with the get_* tools before answering questions about "my" tasks, grades, schedule or spending. When the student asks you to add, log, schedule or start something, actually call the matching tool instead of only describing it, then confirm what you did in one short line. Dates must be YYYY-MM-DD.';
-
-const SEARCH_PROMPT =
-  ' You also have web_search. Call it whenever the answer depends on current, factual or external information you are unsure about, then cite the sources you used by title.';
-
-const MODES: {
-  id: ModeId;
-  label: string;
-  icon: typeof Bot;
-  hint: string;
-  system: string;
-  starter: string;
-}[] = [
-  {
-    id: 'study',
-    label: 'Study Assistant',
-    icon: GraduationCap,
-    hint: 'General academic help for Grade 10 subjects',
-    system:
-      'You are a patient Grade 10 study tutor. Explain concepts clearly with simple language, short paragraphs and concrete examples from the student\'s subjects (Math, Science, English, Filipino, Araling Panlipunan, MAPEH, TLE, ESP). Ask a short clarifying question when the request is vague. Use markdown-style headings and bullet lists. Never just give an answer to graded work without explaining the reasoning.',
-    starter: 'Explain the law of conservation of energy with a real-life example.',
-  },
-  {
-    id: 'coding',
-    label: 'Coding Agent',
-    icon: Code2,
-    hint: 'Code, debugging, explanations and small projects',
-    system:
-      'You are a precise senior software engineer helping a Grade 10 student. Give working, runnable code in fenced code blocks with the language tag, then a short explanation of the key lines. When debugging, first state the likely cause, then the fix. Prefer small, readable solutions over clever ones. Mention edge cases briefly.',
-    starter: 'Write a Python program that checks if a number is prime and explain it.',
-  },
-  {
-    id: 'writing',
-    label: 'Writing Helper',
-    icon: PenLine,
-    hint: 'Essays, paragraphs, grammar and better writing',
-    system:
-      'You are a supportive writing coach. Improve clarity, grammar, structure and tone while keeping the student\'s own voice. When rewriting, show the improved version first, then a short bullet list of what you changed and why. Never write an entire graded essay from scratch without offering an outline and guidance first.',
-    starter: 'Improve this paragraph and tell me what you changed: ',
-  },
-  {
-    id: 'math',
-    label: 'Math Solver',
-    icon: Sigma,
-    hint: 'Step-by-step solutions and explanations',
-    system:
-      'You are a meticulous math tutor. Solve problems step by step, numbering every step and stating the rule or formula used. Show the final answer clearly on its own line as **Answer:** ... Then add one short "Why this works" note. Use plain-text math notation that is easy to read.',
-    starter: 'Solve step by step: 2x² - 5x - 3 = 0',
-  },
-  {
-    id: 'summarize',
-    label: 'Summarizer',
-    icon: FileText,
-    hint: 'Condense notes, lessons or long text',
-    system:
-      'You are a summarizing expert for students. Produce: a one-sentence TL;DR, then 5-8 bullet key points, then a short "Terms to remember" list with quick definitions. Keep every bullet under 20 words. Preserve numbers, dates and names exactly.',
-    starter: 'Summarize these notes:\n\n',
-  },
-  {
-    id: 'flashcards',
-    label: 'Flashcard Generator',
-    icon: Layers,
-    hint: 'Turn topics or notes into flashcards',
-    system:
-      'You generate study flashcards. Output ONLY a numbered list where each item is formatted exactly as:\nQ: <question>\nA: <answer>\nMake 10 cards unless the user asks for a different number. Questions must be short and specific; answers must be one or two sentences. No intro or closing text. If the student asks you to save them, call add_flashcard for each card instead.',
-    starter: 'Make flashcards about the parts of the cell.',
-  },
-];
-
-const SEARCH_MODES: ModeId[] = ['study', 'coding'];
+import { Bot, Key, Globe, ExternalLink, Check, Wrench, Sun, Moon } from 'lucide-react';
+import {
+  MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
+  type ModeId, type SubModeId,
+} from '@/components/assistant/constants';
+import DynamicHeadline from '@/components/assistant/DynamicHeadline';
+import ModeSelector from '@/components/assistant/ModeSelector';
+import ChatInputBar from '@/components/assistant/ChatInputBar';
 
 interface ToolCall {
   id: string;
@@ -112,6 +36,7 @@ const HISTORY_KEY = 'epicure-ai-history';
 export default function StudyAssistantPage() {
   const pomodoro = usePomodoro();
   const [mode, setMode] = useState<ModeId>('study');
+  const [subMode, setSubMode] = useState<SubModeId>('qa');
   const [histories, setHistories] = useState<Record<string, ChatMessage[]>>(() => {
     try {
       return JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
@@ -129,9 +54,9 @@ export default function StudyAssistantPage() {
   const [toolStatus, setToolStatus] = useState('');
   const [error, setError] = useState('');
   const [webSearchOn, setWebSearchOn] = useState(true);
+  const [dark, setDark] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const [listening, setListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -199,6 +124,7 @@ export default function StudyAssistantPage() {
       window.removeEventListener('focus', sync);
     };
   }, []);
+
   const activeMode = MODES.find((m) => m.id === mode)!;
   const messages = histories[mode] ?? [];
   const visibleMessages = messages.filter((m) => m.role !== 'tool');
@@ -257,6 +183,12 @@ export default function StudyAssistantPage() {
     return { role: m.role, content: m.content };
   };
 
+  const handleMode = (m: ModeId) => {
+    setMode(m);
+    const def = MODES.find((x) => x.id === m)!;
+    setInput(def.starter);
+  };
+
   const send = async () => {
     const text = input.trim();
     if ((!text && !image) || streaming) return;
@@ -277,8 +209,10 @@ export default function StudyAssistantPage() {
     abortRef.current = controller;
 
     const tools: ToolDef[] = [...DATA_TOOLS, ...(searchActive ? [SEARCH_TOOL] : [])];
+    const subModeSystem = activeMode.subModes && subMode ? activeMode.subModes.find((s) => s.id === subMode)?.system ?? '' : '';
     const system =
       activeMode.system +
+      (subModeSystem ? '\n\n' + subModeSystem : '') +
       TOOL_PROMPT +
       (searchActive ? SEARCH_PROMPT : '') +
       `\n\nToday's date is ${new Date().toLocaleDateString('en-CA')}.`;
@@ -411,323 +345,186 @@ export default function StudyAssistantPage() {
     }
   };
 
+  const themeClass = dark ? 'sa-dark' : 'sa-light';
+  const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
+
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className={`${themeClass} min-h-[calc(100vh-2rem)] rounded-2xl flex flex-col`}>
+      {/* Theme toggle */}
+      <div className="flex justify-end p-3">
+        <button
+          onClick={() => setDark((v) => !v)}
+          className="sa-icon-btn w-8 h-8 flex items-center justify-center"
+          title="Toggle theme"
+        >
+          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+      </div>
+
       {!apiKey && (
-        <Card className="p-4 mb-4 flex items-start gap-3">
-          <Key className="w-4 h-4 text-zinc-500 mt-0.5 shrink-0" />
-          <p className="text-sm text-zinc-600">
-            No OpenRouter API key found. Open <span className="font-medium">Settings</span> and paste your key to start
-            chatting. All models listed here are free tiers.
+        <div className="mx-4 mb-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--sa-surface)] border border-[var(--sa-border)]">
+          <Key className="w-4 h-4 text-[var(--sa-text-dim)] mt-0.5 shrink-0" />
+          <p className="text-xs text-[var(--sa-text-muted)]">
+            No OpenRouter API key found. Open <span className="font-medium text-[var(--sa-text)]">Settings</span> and paste your key to start chatting. All models listed here are free tiers.
           </p>
-        </Card>
+        </div>
       )}
 
       {visibleMessages.length === 0 ? (
-        /* Claude-like empty state */
-        <div className="flex flex-col items-center pt-12 pb-6">
-          <div className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center mb-5">
-            <Bot className="w-7 h-7 text-white" />
+        /* ===== Idle / empty state ===== */
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+          {/* Centered icon */}
+          <div className="w-14 h-14 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-6">
+            <Bot className="w-7 h-7 text-[var(--sa-text)]" />
           </div>
-          <h2 className="text-xl font-semibold text-zinc-800 mb-6">What shall we think through?</h2>
 
-          {/* Large input card */}
-          <div className="w-full max-w-2xl">
-            <Card className="p-3">
-              {image && (
-                <div className="mb-2 flex items-center gap-2">
-                  <img src={image} alt="Attachment preview" className="w-12 h-12 rounded-lg object-cover" />
-                  <button onClick={() => setImage(null)} className="p-1 rounded-lg hover:bg-zinc-200/60">
-                    <X className="w-4 h-4 text-zinc-500" />
-                  </button>
-                </div>
-              )}
-              {error && <p className="px-1 pb-2 text-xs text-rose-600">{error}</p>}
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-                rows={3}
-                placeholder="How can I help you today?"
-                className="w-full bg-transparent rounded-xl px-2 py-2 text-sm text-zinc-800 placeholder-zinc-400 resize-none focus:outline-none"
-                autoFocus
-              />
-              <div className="flex items-center justify-between mt-1">
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="glass-input rounded-lg px-2 py-1.5 text-[11px] text-zinc-600 max-w-[200px]"
-                  >
-                    {FREE_MODELS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  {visionModel && (
-                    <>
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) pickImage(file);
-                          e.target.value = '';
-                        }}
-                      />
-                      <button
-                        onClick={() => fileRef.current?.click()}
-                        title="Attach an image"
-                        className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center shrink-0"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5 text-zinc-500" />
-                      </button>
-                    </>
-                  )}
-                  {speechSupported && (
-                    <button
-                      onClick={toggleListening}
-                      title={listening ? 'Stop voice input' : 'Voice input'}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                        listening ? 'bg-zinc-900 animate-pulse' : 'glass glass-hover'
-                      }`}
-                    >
-                      {listening ? <MicOff className="w-3.5 h-3.5 text-white" /> : <Mic className="w-3.5 h-3.5 text-zinc-500" />}
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={send}
-                  disabled={!input.trim() && !image}
-                  className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 flex items-center justify-center shrink-0 transition-all"
-                  title="Send"
-                >
-                  <Send className="w-4 h-4 text-white" />
-                </button>
-              </div>
-            </Card>
+          {/* Dynamic headline */}
+          <DynamicHeadline mode={mode} />
 
-            {/* Suggestion chips */}
-            <div className="flex flex-wrap gap-2 mt-5 justify-center">
-              {MODES.map((m) => {
-                const Icon = m.icon;
-                const active = m.id === mode;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => { setMode(m.id); setInput(m.starter); }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                      active ? 'bg-zinc-900 text-white shadow-sm' : 'glass glass-hover text-zinc-600'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {m.label}
-                  </button>
-                );
-              })}
-            </div>
-            {searchAllowed && (
-              <div className="flex justify-center mt-2">
-                <button
-                  onClick={() => setWebSearchOn((v) => !v)}
-                  title={tavilyKey ? 'Toggle live web search' : 'Add a Tavily API key in Settings'}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                    searchActive ? 'bg-zinc-900 text-white shadow-sm' : 'glass glass-hover text-zinc-500'
-                  }`}
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  Web search {searchActive ? 'on' : tavilyKey ? 'off' : '— no key'}
-                </button>
-              </div>
-            )}
+          {/* Input bar */}
+          <div className="mt-8 w-full flex flex-col items-center gap-5">
+            <ChatInputBar
+              input={input}
+              onInput={setInput}
+              onSend={send}
+              onStop={stop}
+              streaming={streaming}
+              models={FREE_MODELS}
+              model={model}
+              onModelChange={setModel}
+              visionModel={visionModel}
+              speechSupported={speechSupported}
+              listening={listening}
+              onToggleListening={toggleListening}
+              onPickImage={pickImage}
+              image={image}
+              onClearImage={() => setImage(null)}
+              placeholder="How can I help you today?"
+            />
+
+            {/* Mode pills + web search */}
+            <ModeSelector
+              mode={mode}
+              subMode={subMode}
+              onMode={handleMode}
+              onSubMode={setSubMode}
+              searchActive={searchActive}
+              searchAllowed={searchAllowed}
+              searchLabel={searchLabel}
+              onToggleSearch={() => setWebSearchOn((v) => !v)}
+            />
           </div>
+
+          {error && <p className="mt-4 text-xs text-rose-500">{error}</p>}
         </div>
       ) : (
-      <Card className="flex flex-col h-[calc(100vh-330px)] min-h-[420px] overflow-hidden">
-        {/* Mode chips above composer while in a conversation */}
-        <div className="flex flex-wrap gap-1.5 p-2.5 border-b border-white/40">
-          {MODES.map((m) => {
-            const Icon = m.icon;
-            const active = m.id === mode;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                  active ? 'bg-zinc-900 text-white' : 'glass glass-hover text-zinc-500'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                {m.label}
-              </button>
-            );
-          })}
-          {searchAllowed && (
-            <button
-              onClick={() => setWebSearchOn((v) => !v)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                searchActive ? 'bg-zinc-900 text-white' : 'glass glass-hover text-zinc-500'
-              }`}
-            >
-              <Globe className="w-3 h-3" />
-              {searchActive ? 'on' : 'off'}
-            </button>
-          )}
-        </div>
-
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-          {visibleMessages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  m.role === 'user' ? 'bg-zinc-900 text-white whitespace-pre-wrap' : 'text-zinc-800 min-w-0'
-                }`}
-              >
-                {m.image && (
-                  <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />
-                )}
-
-                {m.actions?.length ? (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {m.actions.map((a, ai) => (
-                      <span
-                        key={ai}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium ${
-                          a.ok ? 'bg-zinc-200/70 text-zinc-600' : 'bg-rose-100 text-rose-600'
-                        }`}
-                      >
-                        {a.name === 'web_search' ? <Globe className="w-3 h-3" /> : a.ok ? <Check className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
-                        {a.name.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {m.searches?.map((s, si) => (
-                  <div key={si} className="glass rounded-xl p-3 mb-2 space-y-2">
-                    <p className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1">
-                      <Globe className="w-3 h-3" /> Sources for “{s.query}”
-                    </p>
-                    {s.error && <p className="text-[11px] text-rose-600">{s.error}</p>}
-                    {s.results.map((r, ri) => (
-                      <a
-                        key={ri}
-                        href={r.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block rounded-lg px-2 py-1.5 hover:bg-white/60 transition-colors"
-                      >
-                        <p className="text-xs font-medium text-zinc-800 flex items-center gap-1">
-                          {r.title}
-                          <ExternalLink className="w-3 h-3 text-zinc-400" />
-                        </p>
-                        <p className="text-[11px] text-zinc-500 line-clamp-2">{r.snippet}</p>
-                      </a>
-                    ))}
-                  </div>
-                ))}
-
-                {m.role === 'assistant' ? (
-                  m.content ? (
-                    <Markdown content={m.content} />
-                  ) : streaming && i === visibleMessages.length - 1 ? (
-                    toolStatus ? `Running ${toolStatus}…` : 'Thinking…'
-                  ) : null
-                ) : (
-                  m.content
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {error && <p className="px-4 pb-2 text-xs text-rose-600">{error}</p>}
-
-        {image && (
-          <div className="px-4 pb-2 flex items-center gap-2">
-            <img src={image} alt="Attachment preview" className="w-12 h-12 rounded-lg object-cover" />
-            <button onClick={() => setImage(null)} className="p-1 rounded-lg hover:bg-zinc-200/60">
-              <X className="w-4 h-4 text-zinc-500" />
-            </button>
+        /* ===== Active conversation state ===== */
+        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0">
+          {/* Mode pills bar */}
+          <div className="py-3 border-b border-[var(--sa-border)]">
+            <ModeSelector
+              mode={mode}
+              subMode={subMode}
+              onMode={(m) => setMode(m)}
+              onSubMode={setSubMode}
+              searchActive={searchActive}
+              searchAllowed={searchAllowed}
+              searchLabel={searchLabel}
+              onToggleSearch={() => setWebSearchOn((v) => !v)}
+            />
           </div>
-        )}
 
-        <div className="border-t border-white/40 p-3 flex items-end gap-2">
-          {visionModel && (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) pickImage(file);
-                  e.target.value = '';
-                }}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                title="Attach an image"
-                className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center shrink-0"
-              >
-                <ImageIcon className="w-4 h-4 text-zinc-600" />
-              </button>
-            </>
-          )}
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={2}
-            placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.label}… (Enter to send, Shift+Enter for a new line)`}
-            className="glass-input flex-1 rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 resize-none"
-          />
-          {speechSupported && (
-            <button
-              onClick={toggleListening}
-              title={listening ? 'Stop voice input' : 'Voice input'}
-              aria-label={listening ? 'Stop voice input' : 'Start voice input'}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                listening ? 'bg-zinc-900 animate-pulse' : 'glass glass-hover'
-              }`}
-            >
-              {listening ? <MicOff className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4 text-zinc-600" />}
-            </button>
-          )}
-          {streaming ? (
-            <button
-              onClick={stop}
-              className="w-10 h-10 rounded-xl bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center shrink-0"
-              title="Stop generating"
-            >
-              <Square className="w-4 h-4 text-zinc-700" />
-            </button>
-          ) : (
-            <button
-              onClick={send}
-              disabled={!input.trim() && !image}
-              className="w-10 h-10 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 flex items-center justify-center shrink-0"
-              title="Send"
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
-          )}
+          {/* Chat messages */}
+          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-4 space-y-4">
+            {visibleMessages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    m.role === 'user'
+                      ? 'sa-chat-bubble-user whitespace-pre-wrap'
+                      : 'sa-chat-bubble-assistant min-w-0'
+                  }`}
+                >
+                  {m.image && (
+                    <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />
+                  )}
+
+                  {m.actions?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {m.actions.map((a, ai) => (
+                        <span
+                          key={ai}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-[var(--sa-surface)] text-[var(--sa-text-muted)]"
+                        >
+                          {a.name === 'web_search' ? <Globe className="w-3 h-3" /> : a.ok ? <Check className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
+                          {a.name.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {m.searches?.map((s, si) => (
+                    <div key={si} className="rounded-xl p-3 mb-2 space-y-2 bg-[var(--sa-surface)] border border-[var(--sa-border)]">
+                      <p className="text-[11px] font-semibold text-[var(--sa-text-muted)] flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> Sources for "{s.query}"
+                      </p>
+                      {s.error && <p className="text-[11px] text-rose-500">{s.error}</p>}
+                      {s.results.map((r, ri) => (
+                        <a
+                          key={ri}
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-lg px-2 py-1.5 hover:bg-[var(--sa-surface-hover)] transition-colors"
+                        >
+                          <p className="text-xs font-medium text-[var(--sa-text)] flex items-center gap-1">
+                            {r.title}
+                            <ExternalLink className="w-3 h-3 text-[var(--sa-text-dim)]" />
+                          </p>
+                          <p className="text-[11px] text-[var(--sa-text-dim)] line-clamp-2">{r.snippet}</p>
+                        </a>
+                      ))}
+                    </div>
+                  ))}
+
+                  {m.role === 'assistant' ? (
+                    m.content ? (
+                      <Markdown content={m.content} />
+                    ) : streaming && i === visibleMessages.length - 1 ? (
+                      <span className="text-[var(--sa-text-dim)]">{toolStatus ? `Running ${toolStatus}…` : 'Thinking…'}</span>
+                    ) : null
+                  ) : (
+                    m.content
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {error && <p className="px-1 pb-2 text-xs text-rose-500">{error}</p>}
+
+          {/* Composer */}
+          <div className="pt-3 border-t border-[var(--sa-border)]">
+            <ChatInputBar
+              input={input}
+              onInput={setInput}
+              onSend={send}
+              onStop={stop}
+              streaming={streaming}
+              models={FREE_MODELS}
+              model={model}
+              onModelChange={setModel}
+              visionModel={visionModel}
+              speechSupported={speechSupported}
+              listening={listening}
+              onToggleListening={toggleListening}
+              onPickImage={pickImage}
+              image={image}
+              onClearImage={() => setImage(null)}
+              placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.agentName}… (Enter to send, Shift+Enter for new line)`}
+            />
+          </div>
         </div>
-      </Card>
       )}
     </div>
   );

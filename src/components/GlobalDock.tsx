@@ -8,7 +8,7 @@ import QuickImportModal from '@/components/QuickImportModal';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
   GripHorizontal, StickyNote, Bot, Sparkles, ArrowLeft, Send, X,
-  Pin,
+  Pin, Wrench,
 } from 'lucide-react';
 
 type Tool = null | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote' | 'pomodoro';
@@ -152,7 +152,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
       {/* Expanded dock — morph animation from FAB */}
       {expanded && (
         <div
-          className="dock-morph fixed left-1/2 -translate-x-1/2 z-50 glass glass-shadow-lg rounded-2xl px-3 py-2 flex items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto"
+          className="dock-morph fixed left-1/2 -translate-x-1/2 z-50 glass glass-shadow-lg rounded-2xl px-2 py-2 flex items-center gap-1 max-w-[calc(100vw-2rem)] overflow-x-auto"
           style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -256,7 +256,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
         className="fixed left-1/2 -translate-x-1/2 z-[55] w-14 h-14 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
         style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        <Plus className={`w-6 h-6 transition-transform duration-200 ${expanded ? 'rotate-45' : ''}`} />
+        <Wrench className={`w-5 h-5 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
         {pomodoro.isRunning && !expanded && (
           <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-900 text-white text-[10px] tabular-nums">
             {timeStr}

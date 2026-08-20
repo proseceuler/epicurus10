@@ -84,6 +84,17 @@ function NotesTab() {
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
+  // Open folder requested by global sticky-note tool
+  useEffect(() => {
+    try {
+      const folder = sessionStorage.getItem('epicure-open-folder');
+      if (folder) {
+        setActiveFolder(folder);
+        sessionStorage.removeItem('epicure-open-folder');
+      }
+    } catch {}
+  }, []);
+
   const folders = ['All', ...new Set(notes.map((n) => n.folder).filter(Boolean))];
   const allTags = [...new Set(notes.flatMap((n) => n.tags || []))];
 
@@ -156,20 +167,31 @@ function NotesTab() {
               <span className="text-sm font-semibold text-zinc-700">Folders</span>
             </div>
             <div className="space-y-1">
-              {folders.map((folder) => (
-                <button
-                  key={folder}
-                  onClick={() => setActiveFolder(folder)}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                    activeFolder === folder ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
-                  }`}
-                >
-                  {folder}
-                  <span className="text-xs ml-1 opacity-50">
-                    ({folder === 'All' ? notes.length : notes.filter((n) => n.folder === folder).length})
-                  </span>
-                </button>
-              ))}
+              {folders.map((folder) => {
+                const isQuick = folder === 'Quick Capture';
+                const active = activeFolder === folder;
+                return (
+                  <button
+                    key={folder}
+                    onClick={() => setActiveFolder(folder)}
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1.5 ${
+                      active
+                        ? isQuick
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-zinc-900 text-white'
+                        : isQuick
+                          ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                          : 'text-zinc-600 hover:bg-zinc-100'
+                    }`}
+                  >
+                    {isQuick && <StickyNote className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="truncate">{folder}</span>
+                    <span className="text-xs ml-auto opacity-50">
+                      ({folder === 'All' ? notes.length : notes.filter((n) => n.folder === folder).length})
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </Card>
 
@@ -180,17 +202,27 @@ function NotesTab() {
                 <span className="text-sm font-semibold text-zinc-700">Tags</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                    className={`px-2 py-0.5 rounded-md text-xs transition-all ${
-                      activeTag === tag ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
+                {allTags.map((tag) => {
+                  const isSticky = tag === 'sticky';
+                  const active = activeTag === tag;
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => setActiveTag(active ? null : tag)}
+                      className={`px-2 py-0.5 rounded-md text-xs transition-all ${
+                        active
+                          ? isSticky
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-zinc-900 text-white'
+                          : isSticky
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      }`}
+                    >
+                      {isSticky ? '📌 sticky' : `#${tag}`}
+                    </button>
+                  );
+                })}
               </div>
             </Card>
           )}

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { MODEL_KEY, getDefaultModel, getOpenRouterKey, getTavilyKey, saveKey } from '@/lib/apiKeys';
-import { PageHeader, Card, Button } from '@/components/ui';
+import { Card } from '@/components/ui';
 import Markdown from '@/components/Markdown';
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Send, Square, Trash2, Image as ImageIcon, X, Code as Code2, PenLine, Sigma, FileText, Layers, GraduationCap, Key, Mic, MicOff, Globe, Wrench, ExternalLink, Check } from 'lucide-react';
+import { Bot, Send, Square, Image as ImageIcon, X, Code as Code2, PenLine, Sigma, FileText, Layers, GraduationCap, Key, Mic, MicOff, Globe, Wrench, ExternalLink, Check } from 'lucide-react';
 
 const FREE_MODELS = [
   { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest', vision: false },
@@ -413,29 +413,6 @@ export default function StudyAssistantPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <PageHeader
-        title="Study Assistant"
-        subtitle={activeMode.hint}
-        action={
-          <div className="flex items-center gap-2">
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="glass-input rounded-xl px-3 py-2 text-xs text-zinc-700 max-w-[240px]"
-            >
-              {FREE_MODELS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <Button variant="secondary" size="sm" onClick={() => setMessages(() => [])}>
-              <Trash2 className="w-3.5 h-3.5" /> Clear
-            </Button>
-          </div>
-        }
-      />
-
       {!apiKey && (
         <Card className="p-4 mb-4 flex items-start gap-3">
           <Key className="w-4 h-4 text-zinc-500 mt-0.5 shrink-0" />
@@ -452,8 +429,7 @@ export default function StudyAssistantPage() {
           <div className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center mb-5">
             <Bot className="w-7 h-7 text-white" />
           </div>
-          <h2 className="text-xl font-semibold text-zinc-800 mb-1">What shall we think through?</h2>
-          <p className="text-sm text-zinc-500 mb-6">{activeMode.hint}</p>
+          <h2 className="text-xl font-semibold text-zinc-800 mb-6">What shall we think through?</h2>
 
           {/* Large input card */}
           <div className="w-full max-w-2xl">

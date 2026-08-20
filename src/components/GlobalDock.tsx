@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { createPortal } from 'react-dom';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
@@ -286,7 +287,7 @@ function DockBtn({
   active?: boolean;
   badge?: string;
 }) {
-  return (
+  const ui = (
     <button
       onClick={onClick}
       className={`relative flex flex-col items-center justify-center gap-0.5 px-2.5 py-1.5 rounded-xl transition-all shrink-0 ${
@@ -439,6 +440,11 @@ function FloatingPomodoro() {
     draggingRef.current = true;
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
   };
+
+  // Portal to body so position:fixed is always viewport-relative
+  // (avoids being trapped by layout overflow/transform ancestors)
+  if (typeof document === 'undefined') return null;
+  return createPortal(ui, document.body);
 
   return (
     <div

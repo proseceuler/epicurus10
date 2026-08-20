@@ -217,20 +217,21 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
         </div>
       )}
 
-      {/* Single center FAB */}
-      <button
-        onClick={() => setSheetOpen((v) => !v)}
-        aria-label="Quick tools"
-        className="fixed left-1/2 -translate-x-1/2 z-[55] w-16 h-16 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
-        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
-      >
+      {/* Center FAB — scrolls with page content */}
+      <div className="flex justify-center py-8">
+        <button
+          onClick={() => setSheetOpen((v) => !v)}
+          aria-label="Quick tools"
+          className="w-16 h-16 rounded-full glass glass-shadow-lg flex items-center justify-center text-zinc-800 active:scale-95 transition-transform"
+        >
         <Plus className={`w-7 h-7 transition-transform duration-200 ${sheetOpen ? 'rotate-45' : ''}`} />
         {pomodoro.isRunning && (
           <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-900 text-white text-[10px] tabular-nums">
             {timeStr}
           </span>
         )}
-      </button>
+        </button>
+      </div>
     </>
   );
 }

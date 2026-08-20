@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { createPortal } from 'react-dom';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';

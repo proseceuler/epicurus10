@@ -202,22 +202,31 @@
      Keeping translateZ(0)/isolation/overflow:hidden since those guard
      against the separate corner-artifacting bug regardless. */
   .glass {
+    /* PATCH: dropped `isolation: isolate` + `transform: translateZ(0)`.
+       Those two together force this element into its own isolated
+       compositing layer, which is what was stopping backdrop-filter from
+       picking up externally-injected fixed backgrounds (e.g. a Stylus
+       userstyle wallpaper). `overflow: hidden` alone still clips the
+       corner-radius artifact the isolation was originally added for —
+       test that the white streak bug is really gone before shipping this.
+       If the streak comes back, try the clip-path variant commented below
+       instead of re-adding isolation/transform. */
     position: relative;
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    isolation: isolate;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.25);
+    /* Fallback if overflow:hidden alone isn't enough to kill the streak
+       and you don't want isolation back:
+       overflow: visible;
+       clip-path: inset(0 round 1rem);
+       -webkit-clip-path: inset(0 round 1rem);
+    */
   }
 
   .glass-dark {
     position: relative;
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    isolation: isolate;
     overflow: hidden;
     background: rgba(24, 24, 27, 0.75);
     backdrop-filter: blur(20px) saturate(180%);
@@ -266,4 +275,3 @@
     background: rgb(255, 255, 255);
     box-shadow: inset -1px 0 0 rgba(24, 24, 27, 0.06);
   }
-

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, PageHeader, Button, Input, Select } from '@/components/ui';
 import { Key, Database, Download, Check, Cpu, Smartphone } from 'lucide-react';
-import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
+import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, SAPLING_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getSaplingKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
 
 const AI_MODELS = [
   { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest (free)' },
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [openRouterKey, setOpenRouterKey] = useState(() => getOpenRouterKey());
   const [mwKey, setMwKey] = useState(() => getMwKey());
   const [tavilyKey, setTavilyKey] = useState(() => getTavilyKey());
+  const [saplingKey, setSaplingKey] = useState(() => getSaplingKey());
   const [defaultModel, setDefaultModel] = useState(() => getDefaultModel() || AI_MODELS[0].value);
   const [saved, setSaved] = useState(false);
 
@@ -35,6 +36,10 @@ export default function SettingsPage() {
   const updateTavily = (v: string) => {
     setTavilyKey(v);
     saveKey(TAVILY_KEY, v.trim());
+  };
+  const updateSapling = (v: string) => {
+    setSaplingKey(v);
+    saveKey(SAPLING_KEY, v.trim());
   };
   const updateModel = (v: string) => {
     setDefaultModel(v);
@@ -100,6 +105,11 @@ export default function SettingsPage() {
               <p className="text-xs text-zinc-400 mt-1">
                 Enables live web search in Study Assistant and Coding Agent modes. Get a free key at tavily.com — saved as you type.
               </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 mb-1 block">Sapling API Key</label>
+              <Input type="password" value={saplingKey} onChange={updateSapling} placeholder="sapling-..." />
+              <p className="text-xs text-zinc-400 mt-1">Used by Quintilian AI-check (AI content detector). Get a key at sapling.ai — saved as you type.</p>
             </div>
           </div>
         </Card>

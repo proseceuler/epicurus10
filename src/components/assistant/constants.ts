@@ -18,7 +18,6 @@ export interface ModeDef {
   starter: string;
   fontClass: string;
   headlines: Record<string, string[]>;
-  suggestions: string[];
   hasSubMode?: boolean;
   subModes?: { id: SubModeId; label: string; icon: typeof GraduationCap; system: string }[];
 }
@@ -82,11 +81,6 @@ export const MODES: ModeDef[] = [
     system:
       'You are a patient Grade 10 study tutor. Explain concepts clearly with simple language, short paragraphs and concrete examples from the student\'s subjects (Math, Science, English, Filipino, Araling Panlipunan, MAPEH, TLE, ESP). Ask a short clarifying question when the request is vague. Use markdown-style headings and bullet lists. Never just give an answer to graded work without explaining the reasoning.',
     starter: 'Explain the law of conservation of energy with a real-life example.',
-    suggestions: [
-      'Explain photosynthesis like I\'m 10 years old',
-      'What\'s the difference between weather and climate?',
-      'Help me understand the water cycle with examples',
-    ],
     headlines: {
       morning: ['Good morning. What shall we learn today?', 'Morning! Ready to explore something new?', 'What topic is on your mind this morning?'],
       afternoon: ['What shall we learn today?', 'Ready to dive into a topic?', 'What are we studying this afternoon?'],
@@ -103,11 +97,6 @@ export const MODES: ModeDef[] = [
     system:
       'You are a precise senior software engineer helping a Grade 10 student. Give working, runnable code in fenced code blocks with the language tag, then a short explanation of the key lines. When debugging, first state the likely cause, then the fix. Prefer small, readable solutions over clever ones. Mention edge cases briefly.',
     starter: 'Write a Python program that checks if a number is prime and explain it.',
-    suggestions: [
-      'Write a Python function to reverse a string',
-      'Explain how a for loop works in JavaScript',
-      'Debug: my code prints undefined instead of the value',
-    ],
     hasSubMode: true,
     subModes: [
       { id: 'qa', label: 'Q&A', icon: BookOpen, system: 'Answer coding questions clearly with short code examples.' },
@@ -125,15 +114,10 @@ export const MODES: ModeDef[] = [
     label: 'Math Solver',
     agentName: 'Gauss',
     icon: Sigma,
-    fontClass: 'sa-font-grotesk',
+    fontClass: 'sa-font-default',
     system:
       'You are a meticulous math tutor. Solve problems step by step, numbering every step and stating the rule or formula used. Show the final answer clearly on its own line as **Answer:** ... Then add one short "Why this works" note. Use plain-text math notation that is easy to read.',
     starter: 'Solve step by step: 2x² - 5x - 3 = 0',
-    suggestions: [
-      'Solve: 3x + 7 = 22',
-      'Factor x² - 9x + 20',
-      'What\'s the derivative of x³?',
-    ],
     headlines: {
       morning: ['Good morning. What are we solving?', 'Morning! What problem needs solving?', 'What are we calculating this morning?'],
       afternoon: ['What are we solving?', 'What problem needs solving?', 'What are we calculating this afternoon?'],
@@ -146,15 +130,10 @@ export const MODES: ModeDef[] = [
     label: 'Flashcards & Quizzer',
     agentName: 'Mimir',
     icon: Layers,
-    fontClass: 'sa-font-outfit',
+    fontClass: 'sa-font-rounded',
     system:
       'You generate study flashcards. Output ONLY a numbered list where each item is formatted exactly as:\nQ: <question>\nA: <answer>\nMake 10 cards unless the user asks for a different number. Questions must be short and specific; answers must be one or two sentences. No intro or closing text. If the student asks you to save them, call add_flashcard for each card instead.',
     starter: 'Make flashcards about the parts of the cell.',
-    suggestions: [
-      'Make flashcards about the planets in the solar system',
-      'Quiz me on Philippine history terms',
-      'Create flashcards for biology cell division',
-    ],
     headlines: {
       morning: ['Good morning. Ready to quiz yourself?', 'Morning! What are we memorizing?', 'What topic shall we turn into flashcards?'],
       afternoon: ['Ready to quiz yourself?', 'What are we memorizing?', 'What topic shall we turn into flashcards?'],
@@ -171,11 +150,6 @@ export const MODES: ModeDef[] = [
     system:
       'You are a supportive writing coach. Improve clarity, grammar, structure and tone while keeping the student\'s own voice. When rewriting, show the improved version first, then a short bullet list of what you changed and why. Never write an entire graded essay from scratch without offering an outline and guidance first.',
     starter: 'Improve this paragraph and tell me what you changed: ',
-    suggestions: [
-      'Improve this paragraph and tell me what you changed: ',
-      'Help me write a strong opening for my essay about climate change',
-      'Check this sentence for grammar and tone',
-    ],
     headlines: {
       morning: ['Good morning. What shall we write today?', 'Morning! What needs refining?', 'What are we writing this morning?'],
       afternoon: ['What shall we write today?', 'What needs refining?', 'What are we writing this afternoon?'],
@@ -188,15 +162,10 @@ export const MODES: ModeDef[] = [
     label: 'Summarizer',
     agentName: 'Sancho',
     icon: FileText,
-    fontClass: 'sa-font-default',
+    fontClass: 'sa-font-serif',
     system:
       'You are a summarizing expert for students. Produce: a one-sentence TL;DR, then 5-8 bullet key points, then a short "Terms to remember" list with quick definitions. Keep every bullet under 20 words. Preserve numbers, dates and names exactly.',
     starter: 'Summarize these notes:\n\n',
-    suggestions: [
-      'Summarize this article about the water cycle',
-      'Give me key points from my biology notes',
-      'Summarize the causes of World War II',
-    ],
     headlines: {
       morning: ['Good morning. What should I condense?', 'Morning! What needs summarizing?', 'What are we condensing this morning?'],
       afternoon: ['What should I condense?', 'What needs summarizing?', 'What are we condensing this afternoon?'],
@@ -213,11 +182,6 @@ export const MODES: ModeDef[] = [
     system:
       'You are a research assistant for a Grade 10 student. Find relevant, credible sources using web_search when needed. Present findings with proper citations (author, title, URL, date accessed). Distinguish between primary and secondary sources. Suggest search terms when the student is unsure where to start.',
     starter: 'Help me research the causes of the Philippine Revolution.',
-    suggestions: [
-      'Find credible sources about climate change effects',
-      'Research the history of the internet with citations',
-      'Help me find primary sources about the EDSA Revolution',
-    ],
     headlines: {
       morning: ['Good morning. What are we researching today?', 'Morning! What topic needs sources?', 'What are we investigating this morning?'],
       afternoon: ['What are we researching today?', 'What topic needs sources?', 'What are we investigating this afternoon?'],

@@ -20,10 +20,6 @@ export default function ChatInputBar({
   image,
   onClearImage,
   placeholder,
-  searchActive,
-  searchAllowed,
-  searchLabel,
-  onToggleSearch,
 }: {
   input: string;
   onInput: (v: string) => void;
@@ -41,10 +37,6 @@ export default function ChatInputBar({
   image: string | null;
   onClearImage: () => void;
   placeholder: string;
-  searchActive: boolean;
-  searchAllowed: boolean;
-  searchLabel: string;
-  onToggleSearch: () => void;
 }) {
   const [plusOpen, setPlusOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -177,17 +169,6 @@ export default function ChatInputBar({
                 title={listening ? 'Stop voice input' : 'Voice input'}
               >
                 {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
-            )}
-
-            {searchAllowed && (
-              <button
-                onClick={onToggleSearch}
-                className={`sa-search-pill mr-1 ${searchActive ? 'sa-search-pill-active' : ''}`}
-                title={searchLabel}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{searchLabel}</span>
               </button>
             )}
 

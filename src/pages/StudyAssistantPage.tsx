@@ -14,7 +14,6 @@ import DynamicHeadline from '@/components/assistant/DynamicHeadline';
 import ModeSelector from '@/components/assistant/ModeSelector';
 import ChatInputBar from '@/components/assistant/ChatInputBar';
 import QuintilianAiCheck from '@/components/assistant/QuintilianAiCheck';
-import WeissSourcePanel from '@/components/assistant/WeissSourcePanel';
 
 interface ToolCall {
   id: string;
@@ -347,7 +346,7 @@ export default function StudyAssistantPage() {
     }
   };
 
-  const themeClass = dark ? 'sa-dark' : 'sa-light';
+  const themeClass = 'sa-dark';
   const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
 
   return (
@@ -402,6 +401,7 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder="How can I help you today?"
+              showWeissSources={mode === 'research'}
             />
 
             {/* Mode pills + web search */}
@@ -417,7 +417,6 @@ export default function StudyAssistantPage() {
             />
 
             {mode === 'writing' && <QuintilianAiCheck text={input} />}
-            {mode === 'research' && <WeissSourcePanel query={input} />}
           </div>
 
           {error && <p className="mt-4 text-xs text-rose-500">{error}</p>}
@@ -438,7 +437,6 @@ export default function StudyAssistantPage() {
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
             {mode === 'writing' && <QuintilianAiCheck text={input} />}
-            {mode === 'research' && <WeissSourcePanel query={input} />}
           </div>
 
           {/* Chat messages */}
@@ -529,6 +527,7 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.agentName}… (Enter to send, Shift+Enter for new line)`}
+              showWeissSources={mode === 'research'}
             />
           </div>
         </div>

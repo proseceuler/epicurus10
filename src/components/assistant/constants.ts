@@ -99,8 +99,7 @@ export const MODES: ModeDef[] = [
     starter: 'Write a Python program that checks if a number is prime and explain it.',
     hasSubMode: true,
     subModes: [
-      { id: 'qa', label: 'Q&A', icon: BookOpen, system: 'Answer coding questions clearly with short code examples.' },
-      { id: 'testing', label: 'Code Testing', icon: FlaskConical, system: 'Write test cases and run through edge cases for the given code.' },
+      { id: 'testing', label: 'Turing', icon: FlaskConical, system: 'Write test cases and run through edge cases for the given code. Be precise and thorough.' },
     ],
     headlines: {
       morning: ['Good morning. What are we building today?', 'Morning. What code can I help with?', 'What are we coding this morning?'],

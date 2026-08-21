@@ -24,7 +24,7 @@ export default function DynamicHeadline({ mode }: { mode: ModeId }) {
       className={`sa-headline-transition sa-font-default text-2xl sm:text-3xl text-center ${fontClass} ${
         fading ? 'sa-headline-fade-out' : 'sa-headline-fade-in'
       }`}
-      style={{ fontWeight: 600, letterSpacing: '-0.02em' }}
+      style={{ fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.2 }}
     >
       {text}
     </h2>
@@ -34,9 +34,9 @@ export default function DynamicHeadline({ mode }: { mode: ModeId }) {
 const MODES_FONT: Record<ModeId, string> = {
   study: 'sa-font-rounded',
   coding: 'sa-font-mono',
-  math: 'sa-font-default',
-  flashcards: 'sa-font-rounded',
+  math: 'sa-font-grotesk',
+  flashcards: 'sa-font-outfit',
   writing: 'sa-font-serif',
-  summarize: 'sa-font-serif',
+  summarize: 'sa-font-default',
   research: 'sa-font-editorial',
 };

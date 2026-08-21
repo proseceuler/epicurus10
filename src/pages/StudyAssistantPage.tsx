@@ -54,7 +54,7 @@ export default function StudyAssistantPage() {
   const [toolStatus, setToolStatus] = useState('');
   const [error, setError] = useState('');
   const [webSearchOn, setWebSearchOn] = useState(true);
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => localStorage.getItem('epicure-assistant-theme') !== 'light');
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -139,6 +139,10 @@ export default function StudyAssistantPage() {
   useEffect(() => {
     saveKey(MODEL_KEY, model);
   }, [model]);
+
+  useEffect(() => {
+    localStorage.setItem('epicure-assistant-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -382,7 +386,7 @@ export default function StudyAssistantPage() {
           <DynamicHeadline mode={mode} />
 
           {/* Input bar */}
-          <div className="mt-8 w-full flex flex-col items-center gap-5">
+          <div className="mt-8 w-full max-w-4xl mx-auto flex flex-col items-center gap-5">
             <ChatInputBar
               input={input}
               onInput={setInput}
@@ -400,18 +404,19 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder="How can I help you today?"
+              searchActive={searchActive}
+              searchAllowed={searchAllowed}
+              searchLabel={searchLabel}
+              onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
 
-            {/* Mode pills + web search */}
+            {/* Mode pills */}
             <ModeSelector
               mode={mode}
               subMode={subMode}
               onMode={handleMode}
               onSubMode={setSubMode}
-              searchActive={searchActive}
-              searchAllowed={searchAllowed}
-              searchLabel={searchLabel}
-              onToggleSearch={() => setWebSearchOn((v) => !v)}
+              onSuggestion={(text) => setInput(text)}
             />
           </div>
 
@@ -419,7 +424,8 @@ export default function StudyAssistantPage() {
         </div>
       ) : (
         /* ===== Active conversation state ===== */
-        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0">
+        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0" style={{ marginBottom: '5rem' }}>
+          <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col min-h-0">
           {/* Mode pills bar */}
           <div className="py-3 border-b border-[var(--sa-border)]">
             <ModeSelector
@@ -427,10 +433,7 @@ export default function StudyAssistantPage() {
               subMode={subMode}
               onMode={(m) => setMode(m)}
               onSubMode={setSubMode}
-              searchActive={searchActive}
-              searchAllowed={searchAllowed}
-              searchLabel={searchLabel}
-              onToggleSearch={() => setWebSearchOn((v) => !v)}
+              onSuggestion={(text) => setInput(text)}
             />
           </div>
 
@@ -522,7 +525,12 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.agentName}… (Enter to send, Shift+Enter for new line)`}
+              searchActive={searchActive}
+              searchAllowed={searchAllowed}
+              searchLabel={searchLabel}
+              onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+          </div>
           </div>
         </div>
       )}

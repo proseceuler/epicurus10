@@ -2,13 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { getOpenRouterKey, getDefaultModel } from '@/lib/apiKeys';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
-import { Bot, Send, Check, X, Loader2 } from 'lucide-react';
+import { Bot, Send, Check, X, Loader2, GripHorizontal } from 'lucide-react';
 
 interface ProposedAction {
   id: string;
   description: string;
-  /** Structured hint from the model, if any */
-  kind?: string;
 }
 
 interface CodsworthMessage {
@@ -19,29 +17,25 @@ interface CodsworthMessage {
 
 const SCOPE_PROMPTS: Partial<Record<PageId, string>> = {
   todos:
-    'You are Codsworth, a tidy task-organizing assistant for a To-Do List. You can suggest task priority (Eisenhower-style: urgent/important), catch duplicate or near-duplicate tasks, and suggest reordering. When you propose a concrete change, end your reply with a single line starting with "ACTION:" describing exactly what you propose (e.g. "ACTION: Merge Buy milk and Get milk from store into one task" or "ACTION: Delete todo id=..."). Otherwise just answer conversationally. You will be given the live task list as JSON context.',
+    'You are Codsworth, a tidy task-organizing assistant for a To-Do List. When you propose a concrete change, end with a line "ACTION: ...". Live task list is provided as JSON.',
   kanban:
-    'You are Codsworth, a tidy task-organizing assistant for a Kanban Board. You can suggest which column a card belongs in, flag stale cards, and suggest tidying columns. When you propose a concrete change, end your reply with a single line starting with "ACTION:". Otherwise just answer conversationally. Live board data is provided as JSON context.',
+    'You are Codsworth for a Kanban Board. End concrete proposals with "ACTION: ...". Live board data is JSON context.',
   calendar:
-    'You are Codsworth, a scheduling assistant for a Calendar. You flag scheduling conflicts among deadlines and suggest resolutions. When you propose a concrete change, end your reply with a single line starting with "ACTION:". Otherwise just answer conversationally. Live events are provided as JSON context.',
+    'You are Codsworth for a Calendar. Flag conflicts; end concrete proposals with "ACTION: ...".',
   notes:
-    'You are Codsworth, a note-tidying assistant for Notes & Ideas. You dedupe and reorganize notes and tighten wording. When you propose a concrete change, end your reply with a single line starting with "ACTION:". Otherwise just answer conversationally. Live notes are provided as JSON context.',
+    'You are Codsworth for Notes & Ideas. Dedupe/reorganize; end concrete proposals with "ACTION: ...".',
 };
 
 type Item = Record<string, unknown> & { id?: string; title?: string; content?: string };
 
 async function loadPageItems(page: PageId): Promise<Item[]> {
-  if (page === 'todos') {
-    const { data } = await supabase.from('todos').select('*').order('created_at', { ascending: false }).limit(80);
+  if (page === 'todos' || page === 'calendar') {
+    const q = supabase.from('todos').select('*').order('created_at', { ascending: false }).limit(80);
+    const { data } = page === 'calendar' ? await q.not('due_date', 'is', null) : await q;
     return (data as Item[]) || [];
   }
   if (page === 'kanban') {
     const { data } = await supabase.from('kanban_tasks').select('*').order('created_at', { ascending: false }).limit(80);
-    return (data as Item[]) || [];
-  }
-  if (page === 'calendar') {
-    // calendar may use calendar events or todos with due_date — try common tables
-    const { data } = await supabase.from('todos').select('*').not('due_date', 'is', null).order('due_date', { ascending: true }).limit(80);
     return (data as Item[]) || [];
   }
   if (page === 'notes') {
@@ -51,107 +45,66 @@ async function loadPageItems(page: PageId): Promise<Item[]> {
   return [];
 }
 
-/** Best-effort apply of confirmed ACTION text against live data. */
 async function applyAction(page: PageId, description: string, items: Item[]): Promise<string> {
   const desc = description.toLowerCase();
+  const matched = items.filter((it) => {
+    const title = String(it.title || it.content || '').toLowerCase();
+    return title.length > 2 && desc.includes(title.slice(0, Math.min(title.length, 24)));
+  });
 
-  // Merge / delete duplicates on todos or notes
   if (desc.includes('merge') || desc.includes('duplicate') || desc.includes('dedupe') || desc.includes('delete')) {
-    // Find two items whose titles appear in the description
-    const matched = items.filter((it) => {
-      const title = String(it.title || it.content || '').toLowerCase();
-      return title.length > 2 && desc.includes(title.slice(0, Math.min(title.length, 24)));
-    });
-
-    if (page === 'todos' || page === 'calendar') {
-      if (matched.length >= 2) {
-        // Keep first, delete the rest
-        const keep = matched[0];
-        for (const m of matched.slice(1)) {
-          if (m.id) await supabase.from('todos').delete().eq('id', m.id);
-        }
-        return `Merged into “${keep.title || keep.id}” and removed ${matched.length - 1} duplicate(s).`;
+    if ((page === 'todos' || page === 'calendar') && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('todos').delete().eq('id', m.id);
       }
-      // Explicit id= in action
-      const idMatch = description.match(/id[=:\s]+([a-zA-Z0-9-]+)/);
-      if (idMatch && desc.includes('delete')) {
-        await supabase.from('todos').delete().eq('id', idMatch[1]);
-        return `Deleted task ${idMatch[1]}.`;
-      }
+      return `Merged into “${matched[0].title}”; removed ${matched.length - 1} duplicate(s).`;
     }
-
-    if (page === 'notes') {
-      if (matched.length >= 2) {
-        const keep = matched[0];
-        for (const m of matched.slice(1)) {
-          if (m.id) await supabase.from('notes').delete().eq('id', m.id);
-        }
-        return `Kept “${keep.title || keep.id}” and removed ${matched.length - 1} duplicate note(s).`;
+    if (page === 'notes' && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('notes').delete().eq('id', m.id);
       }
+      return `Kept “${matched[0].title}”; removed ${matched.length - 1} note(s).`;
     }
-
-    if (page === 'kanban') {
-      if (matched.length >= 2) {
-        for (const m of matched.slice(1)) {
-          if (m.id) await supabase.from('kanban_tasks').delete().eq('id', m.id);
-        }
-        return `Removed ${matched.length - 1} duplicate card(s).`;
+    if (page === 'kanban' && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('kanban_tasks').delete().eq('id', m.id);
       }
-      // Move card: "move X to done/doing/todo"
-      const col = desc.includes('done') ? 'done' : desc.includes('doing') || desc.includes('progress') ? 'doing' : desc.includes('todo') || desc.includes('backlog') ? 'todo' : null;
-      if (col && matched[0]?.id) {
-        await supabase.from('kanban_tasks').update({ column: col, status: col }).eq('id', matched[0].id);
-        return `Moved “${matched[0].title}” toward ${col}.`;
-      }
+      return `Removed ${matched.length - 1} duplicate card(s).`;
     }
   }
 
-  // Priority updates on todos
-  if (page === 'todos' && (desc.includes('priority') || desc.includes('urgent') || desc.includes('important'))) {
-    const matched = items.find((it) => {
-      const title = String(it.title || '').toLowerCase();
-      return title.length > 2 && desc.includes(title.slice(0, Math.min(title.length, 24)));
-    });
+  if (page === 'todos' && matched[0]?.id && (desc.includes('priority') || desc.includes('urgent'))) {
     let priority = 'not_urgent_important';
     if (desc.includes('urgent') && desc.includes('not important')) priority = 'urgent_not_important';
     else if (desc.includes('urgent')) priority = 'urgent_important';
-    else if (desc.includes('not important') || desc.includes('neither')) priority = 'not_urgent_not_important';
-    if (matched?.id) {
-      await supabase.from('todos').update({ priority }).eq('id', matched.id);
-      return `Updated priority on “${matched.title}” to ${priority.replace(/_/g, ' ')}.`;
-    }
+    await supabase.from('todos').update({ priority }).eq('id', matched[0].id);
+    return `Updated priority on “${matched[0].title}”.`;
   }
 
-  return 'Noted. I could not map that ACTION to a concrete row — try naming the exact task title.';
+  return 'Noted. Could not map that ACTION to a concrete row — name the exact task title.';
 }
 
 export default function CodsworthPanel({
   page,
   onClose,
-  items: itemsProp,
-  onItemsChange,
 }: {
   page: PageId;
   onClose: () => void;
-  /** Optional live list from the page; if omitted we load from Supabase. */
-  items?: Item[];
-  /** Optional callback so the page can refresh its local state after a mutation. */
-  onItemsChange?: () => void;
 }) {
   const [messages, setMessages] = useState<CodsworthMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<Item[]>(itemsProp || []);
+  const [items, setItems] = useState<Item[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Draggable like DictionaryWidget
+  const [pos, setPos] = useState({ x: Math.max(24, window.innerWidth / 2 - 160), y: Math.max(80, window.innerHeight - 480) });
+  const draggingRef = useRef(false);
+  const offsetRef = useRef({ x: 0, y: 0 });
+
   const refreshItems = useCallback(async () => {
-    if (itemsProp) {
-      setItems(itemsProp);
-      return;
-    }
-    const data = await loadPageItems(page);
-    setItems(data);
-  }, [page, itemsProp]);
+    setItems(await loadPageItems(page));
+  }, [page]);
 
   useEffect(() => {
     refreshItems();
@@ -160,6 +113,30 @@ export default function CodsworthPanel({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      setPos({
+        x: Math.min(window.innerWidth - 80, Math.max(0, e.clientX - offsetRef.current.x)),
+        y: Math.min(window.innerHeight - 80, Math.max(0, e.clientY - offsetRef.current.y)),
+      });
+    };
+    const onUp = () => {
+      draggingRef.current = false;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const onDragStart = (e: React.MouseEvent) => {
+    draggingRef.current = true;
+    offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+  };
 
   async function send() {
     const text = input.trim();
@@ -172,7 +149,7 @@ export default function CodsworthPanel({
     if (!key) {
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: 'No OpenRouter API key found — add one in Settings to chat with Codsworth.' },
+        { role: 'assistant', content: 'No OpenRouter API key found — add one in Settings.' },
       ]);
       return;
     }
@@ -187,8 +164,6 @@ export default function CodsworthPanel({
         priority: it.priority,
         completed: it.completed,
         column: it.column || it.status,
-        folder: it.folder,
-        due_date: it.due_date,
       }));
 
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -200,9 +175,9 @@ export default function CodsworthPanel({
             {
               role: 'system',
               content:
-                (SCOPE_PROMPTS[page] || 'You are Codsworth, a helpful organizing assistant.') +
-                '\n\nCurrent page data (JSON):\n' +
-                JSON.stringify(snapshot, null, 0),
+                (SCOPE_PROMPTS[page] || 'You are Codsworth.') +
+                '\n\nCurrent page data:\n' +
+                JSON.stringify(snapshot),
             },
             ...nextMessages.map((m) => ({ role: m.role, content: m.content })),
           ],
@@ -230,36 +205,44 @@ export default function CodsworthPanel({
   async function resolveAction(id: string, confirmed: boolean) {
     const msg = messages.find((m) => m.action?.id === id);
     if (!msg?.action) return;
-
     let suffix = '\n\n✕ Cancelled.';
     if (confirmed) {
       try {
         const result = await applyAction(page, msg.action.description, items);
         suffix = `\n\n✓ Applied. ${result}`;
         await refreshItems();
-        onItemsChange?.();
       } catch (err) {
-        suffix = `\n\n✕ Failed: ${err instanceof Error ? err.message : 'unknown error'}`;
+        suffix = `\n\n✕ Failed: ${err instanceof Error ? err.message : 'error'}`;
       }
     }
-
     setMessages((m) =>
       m.map((row) =>
-        row.action?.id === id
-          ? { ...row, content: row.content + suffix, action: undefined }
-          : row
+        row.action?.id === id ? { ...row, content: row.content + suffix, action: undefined } : row
       )
     );
   }
 
   return (
-    <div className="fixed bottom-24 left-1/2 z-50 flex w-80 max-h-[28rem] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+    <div
+      className="fixed z-[60] flex w-80 max-h-[28rem] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      {/* Drag handle — same idea as Dictionary */}
+      <div
+        className="flex cursor-move items-center justify-between border-b border-zinc-100 bg-zinc-50 px-3 py-2.5"
+        onMouseDown={onDragStart}
+      >
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-800">
+          <GripHorizontal className="h-4 w-4 text-zinc-400" />
           <Bot className="h-4 w-4 text-zinc-700" />
           Codsworth
         </div>
-        <button type="button" onClick={onClose} className="text-zinc-400 hover:text-zinc-700">
+        <button
+          type="button"
+          onClick={onClose}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="text-zinc-400 hover:text-zinc-700"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -267,7 +250,7 @@ export default function CodsworthPanel({
       <div ref={scrollRef} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3 text-sm">
         {messages.length === 0 && (
           <p className="text-xs text-zinc-400">
-            I can help organize this page — try &quot;prioritize my tasks&quot; or &quot;find duplicates.&quot;
+            Organize this page — try &quot;find duplicates.&quot;
             {items.length > 0 ? ` (${items.length} items loaded)` : ''}
           </p>
         )}

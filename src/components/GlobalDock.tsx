@@ -279,7 +279,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
             </div>
           )}
 
-          {/* FAB row — Plus + Codsworth (Codsworth only on tasks pages) */}
+          {/* FAB row — Plus; Codsworth splits out on tasks pages (mitosis) */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -311,15 +311,17 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
 
             {showCodsworth && (
               <button
+                key="codsworth-fab"
                 type="button"
                 onClick={() => setCodsworthOpen((v) => !v)}
                 aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
                 className={
-                  codsworthOpen
+                  (codsworthOpen
                     ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
+                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
+                  ' codsworth-split-in'
                 }
-                title="Codsworth"
+                title="Codsworth — drag the panel header to move it"
               >
                 <Bot className="h-5 w-5" />
               </button>

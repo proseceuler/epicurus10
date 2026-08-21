@@ -24,7 +24,9 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
   const pomodoro = usePomodoro();
   const [open, setOpen] = useState(false);
   const [codsworthOpen, setCodsworthOpen] = useState(false);
-  const showCodsworth = TASKS_PAGES.includes(page);
+  const onTasksPage = TASKS_PAGES.includes(page);
+  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
+  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
   const [activeTab, setActiveTab] = useState<DockTab>('main');
   const [calcDetached, setCalcDetached] = useState(false);
   const [dictDetached, setDictDetached] = useState(false);
@@ -32,9 +34,23 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
 
+  // Mitosis in on tasks pages; reverse merge when leaving
   useEffect(() => {
-    if (!showCodsworth) setCodsworthOpen(false);
-  }, [showCodsworth]);
+    if (onTasksPage) {
+      setCodsworthLeaving(false);
+      setCodsworthVisible(true);
+    } else {
+      setCodsworthOpen(false);
+      if (codsworthVisible) {
+        setCodsworthLeaving(true);
+        const t = setTimeout(() => {
+          setCodsworthVisible(false);
+          setCodsworthLeaving(false);
+        }, 320);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [onTasksPage]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
@@ -111,7 +127,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
         />
       )}
 
-      {showCodsworth && codsworthOpen && (
+      {codsworthVisible && codsworthOpen && (
         <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
       )}
 
@@ -309,7 +325,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
               )}
             </button>
 
-            {showCodsworth && (
+            {codsworthVisible && (
               <button
                 key="codsworth-fab"
                 type="button"
@@ -319,7 +335,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                   (codsworthOpen
                     ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
                     : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
-                  ' codsworth-split-in'
+                   (codsworthLeaving ? ' codsworth-split-out' : ' codsworth-split-in')
                 }
                 title="Codsworth — drag the panel header to move it"
               >

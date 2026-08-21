@@ -5,6 +5,7 @@ import type { PageId } from '@/components/AppLayout';
 import ScientificCalculator from '@/components/ScientificCalculator';
 import DictionaryWidget from '@/components/DictionaryWidget';
 import QuickImportModal from '@/components/QuickImportModal';
+import CodsworthPanel from '@/components/CodsworthPanel';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
   GripHorizontal, X, StickyNote, Bot, Sparkles,
@@ -12,20 +13,28 @@ import {
 
 type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote';
 
+const TASKS_PAGES: PageId[] = ['todos', 'kanban', 'calendar', 'notes'];
+
 /**
  * Global dock — same bar height/padding as the original epicure dock.
  * Collapsed: FAB with +. Expanded: horizontal tool bar above the FAB.
  * No portal, no full-screen overlay — plain fixed positioning like the old dock.
  */
-export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void }) {
+export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) => void; page: PageId }) {
   const pomodoro = usePomodoro();
   const [open, setOpen] = useState(false);
+  const [codsworthOpen, setCodsworthOpen] = useState(false);
+  const showCodsworth = TASKS_PAGES.includes(page);
   const [activeTab, setActiveTab] = useState<DockTab>('main');
   const [calcDetached, setCalcDetached] = useState(false);
   const [dictDetached, setDictDetached] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showCodsworth) setCodsworthOpen(false);
+  }, [showCodsworth]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
@@ -100,6 +109,10 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
             setActiveTab('main');
           }}
         />
+      )}
+
+      {showCodsworth && codsworthOpen && (
+        <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
       )}
 
       {/* Same anchor as the old dock: fixed bottom-4 center */}
@@ -294,6 +307,23 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
               </span>
             )}
           </button>
+
+          {/* Codsworth — Tasks-section-only mini chatbot toggle */}
+          {showCodsworth && (
+            <button
+              type="button"
+              onClick={() => setCodsworthOpen((v) => !v)}
+              aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
+              className={
+                codsworthOpen
+                  ? 'relative flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition-transform active:scale-95'
+                  : 'relative flex h-11 w-11 items-center justify-center rounded-full glass glass-shadow-lg text-emerald-700 transition-transform active:scale-95'
+              }
+              title="Codsworth"
+            >
+              <Bot className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
     </>

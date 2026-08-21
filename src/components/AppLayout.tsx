@@ -175,7 +175,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </div>
 
       {/* Global bottom dock */}
-      <GlobalDock navigate={navigate} />
+      <GlobalDock navigate={navigate} page={page} />
     </div>
   );
 }

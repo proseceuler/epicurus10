@@ -93,7 +93,7 @@ export const MODES: ModeDef[] = [
     label: 'Coding Agent',
     agentName: 'Dahl',
     icon: Code2,
-    fontClass: 'sa-font-mono',
+    fontClass: 'sa-font-pixel',
     system:
       'You are a precise senior software engineer helping a Grade 10 student. Give working, runnable code in fenced code blocks with the language tag, then a short explanation of the key lines. When debugging, first state the likely cause, then the fix. Prefer small, readable solutions over clever ones. Mention edge cases briefly.',
     starter: 'Write a Python program that checks if a number is prime and explain it.',

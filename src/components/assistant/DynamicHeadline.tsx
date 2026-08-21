@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { getHeadline, MODES, type ModeId } from './constants';
 
-/** Per-mode headline fonts (only the headline swaps; body/input unchanged). */
-const MODES_FONT: Record<ModeId, string> = {
-  study: 'sa-font-jakarta',       // Arrodes — Plus Jakarta Sans
-  coding: 'sa-font-mono',         // Dahl — Geist Mono
-  math: 'sa-font-grotesk',        // Gauss — Space Grotesk
-  flashcards: 'sa-font-outfit',   // Mimir — Outfit
-  writing: 'sa-font-instrument',  // Quintilian — Instrument Serif
-  summarize: 'sa-font-inter',     // Sancho — Inter
-  research: 'sa-font-plex',       // Weiss — IBM Plex Sans
+/** CSS class + explicit family so the swap is visible even if other rules fight it. */
+const MODE_FONT: Record<ModeId, { className: string; family: string }> = {
+  study: { className: 'sa-font-jakarta', family: "'Plus Jakarta Sans', system-ui, sans-serif" },
+  coding: { className: 'sa-font-pixel', family: "'Pixelify Sans', 'JetBrains Mono', monospace" },
+  math: { className: 'sa-font-grotesk', family: "'Space Grotesk', system-ui, sans-serif" },
+  flashcards: { className: 'sa-font-outfit', family: "'Outfit', system-ui, sans-serif" },
+  writing: { className: 'sa-font-instrument', family: "'Instrument Serif', Georgia, serif" },
+  summarize: { className: 'sa-font-inter', family: "'Inter', system-ui, sans-serif" },
+  research: { className: 'sa-font-plex', family: "'IBM Plex Sans', system-ui, sans-serif" },
 };
 
 export default function DynamicHeadline({ mode }: { mode: ModeId }) {
@@ -28,16 +28,23 @@ export default function DynamicHeadline({ mode }: { mode: ModeId }) {
     return () => clearTimeout(t);
   }, [mode, displayMode]);
 
-  // Prefer fontClass from mode def when present; fall back to map
-  const def = MODES.find((m) => m.id === displayMode);
-  const fontClass = def?.fontClass || MODES_FONT[displayMode] || 'sa-font-default';
+  const font = MODE_FONT[displayMode] ?? MODE_FONT.study;
+  // Keep constants.fontClass in sync when present
+  const defClass = MODES.find((m) => m.id === displayMode)?.fontClass;
+  const className = defClass === 'sa-font-mono' ? 'sa-font-pixel' : font.className;
 
   return (
     <h2
-      className={`sa-headline-transition text-2xl sm:text-3xl text-center ${fontClass} ${
+      key={displayMode}
+      className={`sa-headline-transition text-2xl sm:text-3xl text-center ${className} ${
         fading ? 'sa-headline-fade-out' : 'sa-headline-fade-in'
       }`}
-      style={{ fontWeight: 600, letterSpacing: '-0.02em' }}
+      style={{
+        fontFamily: font.family,
+        fontWeight: 600,
+        letterSpacing: displayMode === 'coding' ? '0.02em' : '-0.02em',
+        fontStyle: displayMode === 'writing' ? 'italic' : 'normal',
+      }}
     >
       {text}
     </h2>

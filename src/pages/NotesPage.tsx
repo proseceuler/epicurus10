@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Note } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
 import { Plus, Search, Pin, PinOff, Trash2, Folder, Tag, BookOpen, FileText, Check, StickyNote, Pen } from 'lucide-react';
+import OrpheusTextarea from '@/components/OrpheusTextarea';
 import Whiteboard from '@/components/Whiteboard';
 
 type Tab = 'notes' | 'scratchpad' | 'whiteboard';
@@ -240,9 +241,9 @@ function NotesTab() {
                       <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>Cancel</Button>
                     </div>
                   </div>
-                  <textarea
+                  <OrpheusTextarea
                     value={selectedNote.content}
-                    onChange={(e) => setSelectedNote({ ...selectedNote, content: e.target.value })}
+                    onChange={(v) => setSelectedNote({ ...selectedNote, content: v })}
                     className="w-full h-96 px-3 py-2 glass-input rounded-xl text-sm text-zinc-700 font-mono"
                     placeholder="Write in markdown..."
                   />
@@ -295,9 +296,9 @@ function NotesTab() {
               <h3 className="font-semibold text-zinc-800 mb-4">New Note</h3>
               <div className="space-y-3">
                 <Input value={newTitle} onChange={setNewTitle} placeholder="Note title" />
-                <textarea
+                <OrpheusTextarea
                   value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
+                  onChange={setNewContent}
                   className="w-full h-64 px-3 py-2 glass-input rounded-xl text-sm text-zinc-700 font-mono"
                   placeholder="Write in markdown..."
                 />
@@ -418,13 +419,11 @@ function ScratchpadTab() {
       </div>
 
       <Card className="p-0 overflow-hidden">
-        <textarea
+        <OrpheusTextarea
           value={content}
-          onChange={handleChange}
-          autoFocus
+          onChange={(v) => handleChange({ target: { value: v } } as React.ChangeEvent<HTMLTextAreaElement>)}
           placeholder="Start typing anything — ideas, reminders, formulas, quick notes..."
           className="w-full min-h-[60vh] p-6 text-sm text-zinc-800 placeholder-zinc-400 resize-none focus:outline-none leading-relaxed bg-transparent"
-          style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
         />
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-200/40 text-xs text-zinc-400">
           <span>{wordCount} words · {charCount} characters</span>

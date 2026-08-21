@@ -13,6 +13,8 @@ import {
 import DynamicHeadline from '@/components/assistant/DynamicHeadline';
 import ModeSelector from '@/components/assistant/ModeSelector';
 import ChatInputBar from '@/components/assistant/ChatInputBar';
+import QuintilianAiCheck from '@/components/assistant/QuintilianAiCheck';
+import WeissSourcePanel from '@/components/assistant/WeissSourcePanel';
 
 interface ToolCall {
   id: string;
@@ -413,6 +415,9 @@ export default function StudyAssistantPage() {
               searchLabel={searchLabel}
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
+            {mode === 'research' && <WeissSourcePanel query={input} />}
           </div>
 
           {error && <p className="mt-4 text-xs text-rose-500">{error}</p>}
@@ -432,6 +437,8 @@ export default function StudyAssistantPage() {
               searchLabel={searchLabel}
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
+            {mode === 'research' && <WeissSourcePanel query={input} />}
           </div>
 
           {/* Chat messages */}

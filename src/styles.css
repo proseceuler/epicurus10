@@ -1,5 +1,5 @@
 @import "tailwindcss" source(none);
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap');
 @source "../src";
 @import "tw-animate-css";
 
@@ -342,15 +342,26 @@
     color: var(--sa-text);
   }
 
-  /* Headline font classes per mode */
-  .sa-font-jakarta { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }        /* Arrodes — Study Assistant */
-  .sa-font-mono { font-family: 'Geist Mono', 'JetBrains Mono', 'Menlo', monospace; letter-spacing: -0.01em; } /* Dahl — Coding Agent */
-  .sa-font-grotesk { font-family: 'Space Grotesk', system-ui, sans-serif; }             /* Gauss — Math Solver */
-  .sa-font-outfit { font-family: 'Outfit', system-ui, sans-serif; }                     /* Mimir — Flashcards & Quizzer */
-  .sa-font-instrument { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; } /* Quintilian — Writing Helper */
-  .sa-font-inter { font-family: 'Inter', system-ui, sans-serif; }                       /* Sancho — Summarizer */
-  .sa-font-plex { font-family: 'IBM Plex Sans', system-ui, sans-serif; }                /* Weiss — Research & Citations */
+  /* Headline font classes per mode — high specificity so they actually win */
+  h2.sa-font-jakarta, .sa-font-jakarta { font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; font-style: normal; }
+  h2.sa-font-pixel, .sa-font-pixel { font-family: 'Pixelify Sans', 'Geist Mono', 'JetBrains Mono', monospace !important; letter-spacing: 0.02em; font-style: normal; } /* Dahl — Geist Pixel Lines */
+  h2.sa-font-mono, .sa-font-mono { font-family: 'Pixelify Sans', 'JetBrains Mono', monospace !important; letter-spacing: 0.02em; }
+  h2.sa-font-grotesk, .sa-font-grotesk { font-family: 'Space Grotesk', system-ui, sans-serif !important; font-style: normal; }
+  h2.sa-font-outfit, .sa-font-outfit { font-family: 'Outfit', system-ui, sans-serif !important; font-style: normal; }
+  h2.sa-font-instrument, .sa-font-instrument { font-family: 'Instrument Serif', Georgia, serif !important; font-style: italic; }
+  h2.sa-font-inter, .sa-font-inter { font-family: 'Inter', system-ui, sans-serif !important; font-style: normal; }
+  h2.sa-font-plex, .sa-font-plex { font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-style: normal; }
   .sa-font-default { font-family: 'Inter', system-ui, sans-serif; }
+
+  /* FAB mitosis: Codsworth slides out from the Plus */
+  @keyframes codsworth-split {
+    0% { opacity: 0; transform: scale(0.4) translateX(-18px); }
+    60% { opacity: 1; transform: scale(1.06) translateX(0); }
+    100% { opacity: 1; transform: scale(1) translateX(0); }
+  }
+  .codsworth-split-in {
+    animation: codsworth-split 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
 
   /* Headline transition */
   .sa-headline-transition {

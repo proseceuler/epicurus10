@@ -344,7 +344,7 @@
 
   /* Headline font classes per mode */
   .sa-font-jakarta { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }        /* Arrodes — Study Assistant */
-  .sa-font-mono { font-family: 'JetBrains Mono', 'Menlo', monospace; letter-spacing: -0.01em; } /* Dahl — Coding Agent */
+  .sa-font-mono { font-family: 'Geist Mono', 'JetBrains Mono', 'Menlo', monospace; letter-spacing: -0.01em; } /* Dahl — Coding Agent */
   .sa-font-grotesk { font-family: 'Space Grotesk', system-ui, sans-serif; }             /* Gauss — Math Solver */
   .sa-font-outfit { font-family: 'Outfit', system-ui, sans-serif; }                     /* Mimir — Flashcards & Quizzer */
   .sa-font-instrument { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; } /* Quintilian — Writing Helper */
@@ -472,15 +472,18 @@
     background: oklch(0.72 0.12 250 / 0.08);
   }
 
-  /* Input bar */
+  /* Input bar — ONLY element with glass treatment */
   .sa-input-bar {
-    background: var(--sa-surface);
-    border: 1px solid var(--sa-border);
+    background: oklch(0.185 0.006 264 / 0.55);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid oklch(1 0 0 / 0.12);
     border-radius: 1rem;
-    transition: border-color 160ms ease;
+    transition: border-color 160ms ease, background 160ms ease;
   }
   .sa-input-bar:focus-within {
-    border-color: var(--sa-border-hover);
+    border-color: oklch(1 0 0 / 0.2);
+    background: oklch(0.185 0.006 264 / 0.72);
   }
 
   .sa-send-btn {

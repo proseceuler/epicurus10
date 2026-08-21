@@ -5,7 +5,7 @@ import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Key, Globe, ExternalLink, Check, Wrench, Sun, Moon } from 'lucide-react';
+import { Bot, Key, Globe, ExternalLink, Check, Wrench } from 'lucide-react';
 import {
   MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
   type ModeId, type SubModeId,
@@ -55,7 +55,6 @@ export default function StudyAssistantPage() {
   const [toolStatus, setToolStatus] = useState('');
   const [error, setError] = useState('');
   const [webSearchOn, setWebSearchOn] = useState(true);
-  const [dark, setDark] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -346,21 +345,10 @@ export default function StudyAssistantPage() {
     }
   };
 
-  const themeClass = 'sa-dark';
-  const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
+    const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
 
   return (
-    <div className={`${themeClass} min-h-[calc(100vh-2rem)] rounded-2xl flex flex-col`}>
-      {/* Theme toggle */}
-      <div className="flex justify-end p-3">
-        <button
-          onClick={() => setDark((v) => !v)}
-          className="sa-icon-btn w-8 h-8 flex items-center justify-center"
-          title="Toggle theme"
-        >
-          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-      </div>
+    <div className="sa-dark rounded-2xl flex flex-col">
 
       {!apiKey && (
         <div className="mx-4 mb-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--sa-surface)] border border-[var(--sa-border)]">
@@ -373,17 +361,17 @@ export default function StudyAssistantPage() {
 
       {visibleMessages.length === 0 ? (
         /* ===== Idle / empty state ===== */
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+        <div className="flex flex-col items-center px-4 pt-6 pb-4">
           {/* Centered icon */}
-          <div className="w-14 h-14 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-6">
-            <Bot className="w-7 h-7 text-[var(--sa-text)]" />
+          <div className="w-11 h-11 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-4">
+            <Bot className="w-5 h-5 text-[var(--sa-text)]" />
           </div>
 
           {/* Dynamic headline */}
           <DynamicHeadline mode={mode} />
 
-          {/* Input bar */}
-          <div className="mt-8 w-full flex flex-col items-center gap-5">
+          {/* Input bar + modes — kept tight so no long scroll to reach the box */}
+          <div className="mt-5 w-full flex flex-col items-center gap-3">
             <ChatInputBar
               input={input}
               onInput={setInput}

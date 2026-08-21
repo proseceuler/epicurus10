@@ -279,51 +279,52 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
             </div>
           )}
 
-          {/* FAB — only control that toggles the dock */}
-          <button
-            type="button"
-            onClick={() => {
-              if (open) {
-                if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
-                setActiveTab('main');
-                pomodoro.setDockOpen(false);
-                setOpen(false);
-              } else {
-                setOpen(true);
-                setActiveTab('main');
-              }
-            }}
-            aria-label={open ? 'Close tools' : 'Open tools'}
-            className={
-              open
-                ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
-            }
-          >
-            <Plus className={`h-6 w-6 transition-transform duration-200 ${open ? 'rotate-45' : ''}`} />
-            {pomodoro.isRunning && !open && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
-                {timeStr}
-              </span>
-            )}
-          </button>
-
-          {/* Codsworth — Tasks-section-only mini chatbot toggle */}
-          {showCodsworth && (
+          {/* FAB row — Plus + Codsworth (Codsworth only on tasks pages) */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setCodsworthOpen((v) => !v)}
-              aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
+              onClick={() => {
+                if (open) {
+                  if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
+                  setActiveTab('main');
+                  pomodoro.setDockOpen(false);
+                  setOpen(false);
+                } else {
+                  setOpen(true);
+                  setActiveTab('main');
+                }
+              }}
+              aria-label={open ? 'Close tools' : 'Open tools'}
               className={
-                codsworthOpen
-                  ? 'relative flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition-transform active:scale-95'
-                  : 'relative flex h-11 w-11 items-center justify-center rounded-full glass glass-shadow-lg text-emerald-700 transition-transform active:scale-95'
+                open
+                  ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
+                  : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
               }
-              title="Codsworth"
             >
-              <Bot className="h-5 w-5" />
+              <Plus className={`h-6 w-6 transition-transform duration-200 ${open ? 'rotate-45' : ''}`} />
+              {pomodoro.isRunning && !open && (
+                <span className="absolute -right-1 -top-1 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
+                  {timeStr}
+                </span>
+              )}
             </button>
-          )}
+
+            {showCodsworth && (
+              <button
+                type="button"
+                onClick={() => setCodsworthOpen((v) => !v)}
+                aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
+                className={
+                  codsworthOpen
+                    ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
+                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
+                }
+                title="Codsworth"
+              >
+                <Bot className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </>

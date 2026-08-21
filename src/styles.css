@@ -312,20 +312,23 @@
 
   /* ===== Study Assistant — Claude-like dark theme ===== */
 
-  .sa-dark {
-    --sa-bg: oklch(0.145 0.005 264);
-    --sa-surface: oklch(0.185 0.006 264);
-    --sa-surface-hover: oklch(0.215 0.007 264);
-    --sa-text: oklch(0.935 0.003 264);
-    --sa-text-muted: oklch(0.62 0.008 264);
-    --sa-text-dim: oklch(0.48 0.008 264);
-    --sa-border: oklch(1 0 0 / 0.08);
-    --sa-border-hover: oklch(1 0 0 / 0.14);
-    --sa-accent: oklch(0.72 0.12 250);
-    --sa-accent-text: oklch(0.98 0.002 250);
-    background: var(--sa-bg);
+  /* Study Assistant — glass on the app’s light zinc canvas (not solid black) */
+  .sa-glass {
+    --sa-bg: transparent;
+    --sa-surface: rgba(255, 255, 255, 0.55);
+    --sa-surface-hover: rgba(255, 255, 255, 0.72);
+    --sa-text: oklch(0.22 0.02 264);
+    --sa-text-muted: oklch(0.45 0.02 264);
+    --sa-text-dim: oklch(0.55 0.015 264);
+    --sa-border: rgba(24, 24, 27, 0.08);
+    --sa-border-hover: rgba(24, 24, 27, 0.14);
+    --sa-accent: oklch(0.35 0.02 264);
+    --sa-accent-text: oklch(0.98 0.002 264);
+    background: transparent;
     color: var(--sa-text);
   }
+  /* keep .sa-dark as alias so old class names don’t break */
+  .sa-dark { }
 
   .sa-light {
     --sa-bg: oklch(0.985 0.002 264);
@@ -361,6 +364,14 @@
   }
   .codsworth-split-in {
     animation: codsworth-split 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  @keyframes codsworth-merge {
+    0% { opacity: 1; transform: scale(1) translateX(0); }
+    100% { opacity: 0; transform: scale(0.4) translateX(-18px); }
+  }
+  .codsworth-split-out {
+    animation: codsworth-merge 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+    pointer-events: none;
   }
 
   /* Headline transition */
@@ -483,18 +494,19 @@
     background: oklch(0.72 0.12 250 / 0.08);
   }
 
-  /* Input bar — ONLY element with glass treatment */
+  /* Input bar — glass (matches epicure dock/cards) */
   .sa-input-bar {
-    background: oklch(0.185 0.006 264 / 0.55);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid oklch(1 0 0 / 0.12);
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 1rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
     transition: border-color 160ms ease, background 160ms ease;
   }
   .sa-input-bar:focus-within {
-    border-color: oklch(1 0 0 / 0.2);
-    background: oklch(0.185 0.006 264 / 0.72);
+    border-color: rgba(161, 161, 170, 0.5);
+    background: rgba(255, 255, 255, 0.72);
   }
 
   .sa-send-btn {

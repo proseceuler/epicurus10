@@ -61,7 +61,6 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
-@@ -111,7 +127,7 @@
         />
       )}
 
@@ -69,8 +68,6 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
       {codsworthVisible && codsworthOpen && (
         <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
       )}
-
-@@ -309,7 +325,7 @@
               )}
             </button>
 

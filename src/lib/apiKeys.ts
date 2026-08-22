@@ -2,6 +2,7 @@ export const OPENROUTER_KEY = 'epicure-openrouter-key';
 export const MW_KEY = 'epicure-mw-key';
 export const MODEL_KEY = 'epicure-default-model';
 export const TAVILY_KEY = 'epicure-tavily-key';
+export const SAPLING_KEY = 'epicure-sapling-key';
 
 function read(key: string, fallback = '') {
   if (typeof window === 'undefined') return fallback;
@@ -16,6 +17,11 @@ export const getMwKey = () =>
 
 export const getTavilyKey = () =>
   read(TAVILY_KEY, import.meta.env.VITE_TAVILY_API_KEY || '');
+
+export const getSaplingKey = () =>
+  (typeof window !== 'undefined' ? localStorage.getItem(SAPLING_KEY) : null) ||
+  import.meta.env.VITE_SAPLING_API_KEY ||
+  '';
 
 export const getDefaultModel = () => read(MODEL_KEY);
 

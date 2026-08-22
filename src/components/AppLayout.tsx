@@ -1,7 +1,11 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { SUBJECTS, NUM_TERMS } from '@/lib/types';
 import GlobalDock from '@/components/GlobalDock';
-import { LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar, Timer, ChartBar as BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X, Layers, Bot, Settings as SettingsIcon } from 'lucide-react';
+import {
+  LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
+  Timer, ChartBar as BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X,
+  Layers, Bot, Settings as SettingsIcon,
+} from 'lucide-react';
 
 export type PageId =
   | 'dashboard' | 'grades' | 'forecast' | 'classhub'
@@ -61,63 +65,68 @@ export function usePageState(): [PageId, (p: PageId) => void] {
 
 export default function AppLayout({ page, navigate, children }: { page: PageId; navigate: (p: PageId) => void; children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard';
+  const isAssistant = page === 'assistant';
 
   useEffect(() => {
     document.title = `${currentLabel} — epicure`;
   }, [currentLabel]);
 
   return (
-    <div className="min-h-screen bg-zinc-100 relative">
-      {/* Ambient background blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-zinc-300/20 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-zinc-400/15 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-zinc-200/25 rounded-full blur-3xl" />
+    /* Fixed full-viewport shell — no document scrollbar */
+    <div className="relative flex h-screen overflow-hidden bg-zinc-100">
+      {/* Ambient liquid-glass blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-zinc-300/25 blur-3xl" />
+        <div className="absolute -right-40 top-1/3 h-96 w-96 rounded-full bg-zinc-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-white/40 blur-3xl" />
       </div>
 
-      {/* Mobile overlay only */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-zinc-900/30 backdrop-blur-sm z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
-      {/* Sidebar — static on desktop, slide-in on mobile */}
-      <aside className={`fixed top-4 left-4 bottom-4 w-60 z-40 transition-transform duration-300 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-[280px] lg:translate-x-0'
-      }`}>
-        <div className="glass-dark glass-shadow-lg rounded-3xl h-full flex flex-col overflow-hidden">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-5 h-16 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
+      {/* Sidebar */}
+      <aside
+        className={`fixed bottom-4 left-4 top-4 z-40 w-60 transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-[280px] lg:translate-x-0'
+        }`}
+      >
+        <div className="glass-dark glass-shadow-lg flex h-full flex-col overflow-hidden rounded-3xl">
+          <div className="flex h-16 shrink-0 items-center gap-3 px-5">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/10">
               <img
                 src="https://cdn-icons-png.flaticon.com/512/3582/3582676.png"
                 alt="epicure"
-                className="w-5 h-5 invert"
+                className="h-5 w-5 invert"
               />
             </div>
-            <span className="font-bold text-lg text-white">epicure</span>
+            <span className="text-lg font-bold text-white">epicure</span>
           </div>
 
-          {/* Nav */}
-          <nav className="flex-1 overflow-y-auto py-3 px-3">
+          <nav className="flex-1 overflow-y-auto px-3 py-3">
             {GROUPS.map((group) => (
               <div key={group} className="mb-3">
-                <p className="px-3 mb-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">{group}</p>
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{group}</p>
                 {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const active = page === item.id;
                   return (
                     <button
                       key={item.id}
-                      onClick={() => { navigate(item.id); setSidebarOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                        active
-                          ? 'bg-white/15 text-white'
-                          : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                      type="button"
+                      onClick={() => {
+                        navigate(item.id);
+                        setSidebarOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
+                        active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
+                      <Icon className="h-4 w-4 shrink-0" />
                       {item.label}
                     </button>
                   );
@@ -126,56 +135,64 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             ))}
           </nav>
 
-          {/* Footer */}
-          <div className="border-t border-white/5 p-3 shrink-0">
+          <div className="shrink-0 border-t border-white/5 p-3">
             <div className="flex items-center gap-2 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
                 G
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-zinc-200">Grade 10</p>
-                <p className="text-xs text-zinc-500">{SUBJECTS.length} subjects · {NUM_TERMS} terms</p>
+                <p className="text-xs text-zinc-500">
+                  {SUBJECTS.length} subjects · {NUM_TERMS} terms
+                </p>
               </div>
               <button
+                type="button"
                 onClick={() => navigate('settings')}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                  page === 'settings' ? 'bg-white/15 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/10'
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+                  page === 'settings' ? 'bg-white/15 text-white' : 'text-zinc-500 hover:bg-white/10 hover:text-white'
                 }`}
                 title="Settings"
               >
-                <SettingsIcon className="w-4 h-4" />
+                <SettingsIcon className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Main content — offset for sidebar on desktop, aligned at top-4 */}
-      <div className="flex flex-col min-h-screen relative lg:pl-[17rem] pt-4 pr-4 pb-4">
-        {/* Floating header — mobile/tablet only */}
-        <header className="sticky top-4 z-20 px-3 lg:hidden mb-2">
-          <div className="glass glass-shadow rounded-xl h-10 flex items-center justify-between px-2">
+      {/* Main workspace column */}
+      <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden lg:pl-[17rem]">
+        {/* Mobile header */}
+        <header className="z-20 shrink-0 px-3 pt-4 lg:hidden">
+          <div className="glass glass-shadow flex h-10 items-center justify-between rounded-xl px-2">
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-1.5 rounded-lg hover:bg-zinc-200/50"
+                className="rounded-lg p-1.5 hover:bg-zinc-200/50"
                 title="Toggle sidebar"
               >
-                {sidebarOpen ? <X className="w-4 h-4 text-zinc-700" /> : <Menu className="w-4 h-4 text-zinc-700" />}
+                {sidebarOpen ? <X className="h-4 w-4 text-zinc-700" /> : <Menu className="h-4 w-4 text-zinc-700" />}
               </button>
-              <h1 className="text-sm font-semibold text-zinc-800 truncate">{currentLabel}</h1>
+              <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 px-4 lg:px-6 pb-28">
+        {/* Page content — scrolls unless assistant (assistant manages its own panes) */}
+        <main
+          className={
+            isAssistant
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-28 pt-4 lg:px-6'
+              : 'min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-6'
+          }
+        >
           {children}
         </main>
       </div>
 
-      {/* Global bottom dock */}
-      <GlobalDock navigate={navigate} />
+      <GlobalDock navigate={navigate} page={page} />
     </div>
   );
 }

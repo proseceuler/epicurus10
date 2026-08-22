@@ -34,40 +34,37 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const onTasksPage = TASKS_PAGES.includes(page);
-  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
-  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
 
-// Mitosis in on tasks pages; reverse merge when leaving
+  // Mitosis in on tasks pages; reverse merge when leaving
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
+    if (!showCodsworth) setCodsworthOpen(false);
+  }, [showCodsworth]);
     if (onTasksPage) {
       setCodsworthLeaving(false);
       setCodsworthVisible(true);
     } else {
       setCodsworthOpen(false);
-      setCodsworthLeaving(true);
-      timer = setTimeout(() => {
-        setCodsworthVisible(false);
-        setCodsworthLeaving(false);
-      }, 320);
+      if (codsworthVisible) {
+        setCodsworthLeaving(true);
+        const t = setTimeout(() => {
+          setCodsworthVisible(false);
+          setCodsworthLeaving(false);
+        }, 320);
+        return () => clearTimeout(t);
+      }
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
   }, [onTasksPage]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
+ />
       )}
 
       {showCodsworth && codsworthOpen && (
       {codsworthVisible && codsworthOpen && (
         <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
       )}
-              )}
+   )}
             </button>
 
             {showCodsworth && (
@@ -75,8 +72,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
               <button
                 key="codsworth-fab"
                 type="button"
-@@ -319,49 +335,49 @@
-                  (codsworthOpen
+                (codsworthOpen
                     ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
                     : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
                   ' codsworth-split-in'

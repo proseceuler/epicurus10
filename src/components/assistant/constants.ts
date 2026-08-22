@@ -77,7 +77,7 @@ export const MODES: ModeDef[] = [
     label: 'Study Assistant',
     agentName: 'Arrodes',
     icon: GraduationCap,
-    fontClass: 'sa-font-jakarta',
+    fontClass: 'sa-font-rounded',
     system:
       'You are a patient Grade 10 study tutor. Explain concepts clearly with simple language, short paragraphs and concrete examples from the student\'s subjects (Math, Science, English, Filipino, Araling Panlipunan, MAPEH, TLE, ESP). Ask a short clarifying question when the request is vague. Use markdown-style headings and bullet lists. Never just give an answer to graded work without explaining the reasoning.',
     starter: 'Explain the law of conservation of energy with a real-life example.',
@@ -93,13 +93,14 @@ export const MODES: ModeDef[] = [
     label: 'Coding Agent',
     agentName: 'Dahl',
     icon: Code2,
-    fontClass: 'sa-font-pixel',
+    fontClass: 'sa-font-mono',
     system:
       'You are a precise senior software engineer helping a Grade 10 student. Give working, runnable code in fenced code blocks with the language tag, then a short explanation of the key lines. When debugging, first state the likely cause, then the fix. Prefer small, readable solutions over clever ones. Mention edge cases briefly.',
     starter: 'Write a Python program that checks if a number is prime and explain it.',
     hasSubMode: true,
     subModes: [
-      { id: 'testing', label: 'Turing', icon: FlaskConical, system: 'Write test cases and run through edge cases for the given code. Be precise and thorough.' },
+      { id: 'qa', label: 'Q&A', icon: BookOpen, system: 'Answer coding questions clearly with short code examples.' },
+      { id: 'testing', label: 'Code Testing', icon: FlaskConical, system: 'Write test cases and run through edge cases for the given code.' },
     ],
     headlines: {
       morning: ['Good morning. What are we building today?', 'Morning. What code can I help with?', 'What are we coding this morning?'],
@@ -113,7 +114,7 @@ export const MODES: ModeDef[] = [
     label: 'Math Solver',
     agentName: 'Gauss',
     icon: Sigma,
-    fontClass: 'sa-font-grotesk',
+    fontClass: 'sa-font-default',
     system:
       'You are a meticulous math tutor. Solve problems step by step, numbering every step and stating the rule or formula used. Show the final answer clearly on its own line as **Answer:** ... Then add one short "Why this works" note. Use plain-text math notation that is easy to read.',
     starter: 'Solve step by step: 2x² - 5x - 3 = 0',
@@ -129,7 +130,7 @@ export const MODES: ModeDef[] = [
     label: 'Flashcards & Quizzer',
     agentName: 'Mimir',
     icon: Layers,
-    fontClass: 'sa-font-outfit',
+    fontClass: 'sa-font-rounded',
     system:
       'You generate study flashcards. Output ONLY a numbered list where each item is formatted exactly as:\nQ: <question>\nA: <answer>\nMake 10 cards unless the user asks for a different number. Questions must be short and specific; answers must be one or two sentences. No intro or closing text. If the student asks you to save them, call add_flashcard for each card instead.',
     starter: 'Make flashcards about the parts of the cell.',
@@ -145,7 +146,7 @@ export const MODES: ModeDef[] = [
     label: 'Writing Helper',
     agentName: 'Quintilian',
     icon: PenLine,
-    fontClass: 'sa-font-instrument',
+    fontClass: 'sa-font-serif',
     system:
       'You are a supportive writing coach. Improve clarity, grammar, structure and tone while keeping the student\'s own voice. When rewriting, show the improved version first, then a short bullet list of what you changed and why. Never write an entire graded essay from scratch without offering an outline and guidance first.',
     starter: 'Improve this paragraph and tell me what you changed: ',
@@ -161,7 +162,7 @@ export const MODES: ModeDef[] = [
     label: 'Summarizer',
     agentName: 'Sancho',
     icon: FileText,
-    fontClass: 'sa-font-inter',
+    fontClass: 'sa-font-serif',
     system:
       'You are a summarizing expert for students. Produce: a one-sentence TL;DR, then 5-8 bullet key points, then a short "Terms to remember" list with quick definitions. Keep every bullet under 20 words. Preserve numbers, dates and names exactly.',
     starter: 'Summarize these notes:\n\n',
@@ -177,7 +178,7 @@ export const MODES: ModeDef[] = [
     label: 'Research & Citations',
     agentName: 'Weiss',
     icon: BookOpen,
-    fontClass: 'sa-font-plex',
+    fontClass: 'sa-font-editorial',
     system:
       'You are a research assistant for a Grade 10 student. Find relevant, credible sources using web_search when needed. Present findings with proper citations (author, title, URL, date accessed). Distinguish between primary and secondary sources. Suggest search terms when the student is unsure where to start.',
     starter: 'Help me research the causes of the Philippine Revolution.',

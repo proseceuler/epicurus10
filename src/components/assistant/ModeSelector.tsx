@@ -35,7 +35,7 @@ export default function ModeSelector({
               className={`sa-pill ${active ? 'sa-pill-active' : ''}`}
             >
               <Icon className="w-3.5 h-3.5" />
-              {m.agentName}
+              {m.label}
             </button>
           );
         })}

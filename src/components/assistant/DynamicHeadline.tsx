@@ -1,16 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getHeadline, MODES, type ModeId } from './constants';
-
-/** CSS class + explicit family so the swap is visible even if other rules fight it. */
-const MODE_FONT: Record<ModeId, { className: string; family: string }> = {
-  study: { className: 'sa-font-jakarta', family: "'Plus Jakarta Sans', system-ui, sans-serif" },
-  coding: { className: 'sa-font-pixel', family: "'Pixelify Sans', 'JetBrains Mono', monospace" },
-  math: { className: 'sa-font-grotesk', family: "'Space Grotesk', system-ui, sans-serif" },
-  flashcards: { className: 'sa-font-outfit', family: "'Outfit', system-ui, sans-serif" },
-  writing: { className: 'sa-font-instrument', family: "'Instrument Serif', Georgia, serif" },
-  summarize: { className: 'sa-font-inter', family: "'Inter', system-ui, sans-serif" },
-  research: { className: 'sa-font-plex', family: "'IBM Plex Sans', system-ui, sans-serif" },
-};
+import { getHeadline, type ModeId } from './constants';
 
 export default function DynamicHeadline({ mode }: { mode: ModeId }) {
   const [text, setText] = useState(() => getHeadline(mode));
@@ -28,25 +17,26 @@ export default function DynamicHeadline({ mode }: { mode: ModeId }) {
     return () => clearTimeout(t);
   }, [mode, displayMode]);
 
-  const font = MODE_FONT[displayMode] ?? MODE_FONT.study;
-  // Keep constants.fontClass in sync when present
-  const defClass = MODES.find((m) => m.id === displayMode)?.fontClass;
-  const className = defClass === 'sa-font-mono' ? 'sa-font-pixel' : font.className;
+  const fontClass = MODES_FONT[displayMode] ?? 'sa-font-default';
 
   return (
     <h2
-      key={displayMode}
-      className={`sa-headline-transition text-2xl sm:text-3xl text-center ${className} ${
+      className={`sa-headline-transition sa-font-default text-2xl sm:text-3xl text-center ${fontClass} ${
         fading ? 'sa-headline-fade-out' : 'sa-headline-fade-in'
       }`}
-      style={{
-        fontFamily: font.family,
-        fontWeight: 600,
-        letterSpacing: displayMode === 'coding' ? '0.02em' : '-0.02em',
-        fontStyle: displayMode === 'writing' ? 'italic' : 'normal',
-      }}
+      style={{ fontWeight: 600, letterSpacing: '-0.02em' }}
     >
       {text}
     </h2>
   );
 }
+
+const MODES_FONT: Record<ModeId, string> = {
+  study: 'sa-font-rounded',
+  coding: 'sa-font-mono',
+  math: 'sa-font-default',
+  flashcards: 'sa-font-rounded',
+  writing: 'sa-font-serif',
+  summarize: 'sa-font-serif',
+  research: 'sa-font-editorial',
+};

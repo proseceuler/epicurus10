@@ -348,7 +348,7 @@ export default function StudyAssistantPage() {
     const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
 
   return (
-    <div className="sa-glass flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="sa-glass flex flex-col h-[calc(100vh-6.5rem)] min-h-[420px]">
 
       {!apiKey && (
         <div className="mx-4 mb-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--sa-surface)] border border-[var(--sa-border)]">
@@ -361,7 +361,7 @@ export default function StudyAssistantPage() {
 
       {visibleMessages.length === 0 ? (
         /* ===== Idle / empty state ===== */
-        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6">
+        <div className="flex flex-col items-center px-4 pt-6 pb-4">
           {/* Centered icon */}
           <div className="w-11 h-11 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-4">
             <Bot className="w-5 h-5 text-[var(--sa-text)]" />

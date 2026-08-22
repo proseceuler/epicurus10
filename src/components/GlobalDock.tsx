@@ -34,25 +34,29 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const onTasksPage = TASKS_PAGES.includes(page);
+  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
+  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
 
-  // Mitosis in on tasks pages; reverse merge when leaving
+// Mitosis in on tasks pages; reverse merge when leaving
   useEffect(() => {
-    if (!showCodsworth) setCodsworthOpen(false);
-  }, [showCodsworth]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     if (onTasksPage) {
       setCodsworthLeaving(false);
       setCodsworthVisible(true);
     } else {
       setCodsworthOpen(false);
-      if (codsworthVisible) {
-        setCodsworthLeaving(true);
-        const t = setTimeout(() => {
-          setCodsworthVisible(false);
-          setCodsworthLeaving(false);
-        }, 320);
-        return () => clearTimeout(t);
-      }
+      setCodsworthLeaving(true);
+      timer = setTimeout(() => {
+        setCodsworthVisible(false);
+        setCodsworthLeaving(false);
+      }, 320);
     }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [onTasksPage]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);

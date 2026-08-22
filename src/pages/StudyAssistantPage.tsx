@@ -5,7 +5,7 @@ import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Key, Globe, ExternalLink, Check, Wrench, Sun, Moon } from 'lucide-react';
+import { Bot, Key, Globe, ExternalLink, Check, Wrench } from 'lucide-react';
 import {
   MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
   type ModeId, type SubModeId,
@@ -13,6 +13,7 @@ import {
 import DynamicHeadline from '@/components/assistant/DynamicHeadline';
 import ModeSelector from '@/components/assistant/ModeSelector';
 import ChatInputBar from '@/components/assistant/ChatInputBar';
+import QuintilianAiCheck from '@/components/assistant/QuintilianAiCheck';
 
 interface ToolCall {
   id: string;
@@ -54,7 +55,6 @@ export default function StudyAssistantPage() {
   const [toolStatus, setToolStatus] = useState('');
   const [error, setError] = useState('');
   const [webSearchOn, setWebSearchOn] = useState(true);
-  const [dark, setDark] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -345,21 +345,10 @@ export default function StudyAssistantPage() {
     }
   };
 
-  const themeClass = dark ? 'sa-dark' : 'sa-light';
-  const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
+    const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
 
   return (
-    <div className={`${themeClass} min-h-[calc(100vh-2rem)] rounded-2xl flex flex-col`}>
-      {/* Theme toggle */}
-      <div className="flex justify-end p-3">
-        <button
-          onClick={() => setDark((v) => !v)}
-          className="sa-icon-btn w-8 h-8 flex items-center justify-center"
-          title="Toggle theme"
-        >
-          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-      </div>
+    <div className="sa-glass flex h-full min-h-0 flex-col overflow-hidden">
 
       {!apiKey && (
         <div className="mx-4 mb-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--sa-surface)] border border-[var(--sa-border)]">
@@ -372,17 +361,17 @@ export default function StudyAssistantPage() {
 
       {visibleMessages.length === 0 ? (
         /* ===== Idle / empty state ===== */
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6">
           {/* Centered icon */}
-          <div className="w-14 h-14 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-6">
-            <Bot className="w-7 h-7 text-[var(--sa-text)]" />
+          <div className="w-11 h-11 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-4">
+            <Bot className="w-5 h-5 text-[var(--sa-text)]" />
           </div>
 
           {/* Dynamic headline */}
           <DynamicHeadline mode={mode} />
 
-          {/* Input bar */}
-          <div className="mt-8 w-full flex flex-col items-center gap-5">
+          {/* Input bar + modes — kept tight so no long scroll to reach the box */}
+          <div className="mt-5 w-full flex flex-col items-center gap-3">
             <ChatInputBar
               input={input}
               onInput={setInput}
@@ -400,6 +389,7 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder="How can I help you today?"
+              showWeissSources={mode === 'research'}
             />
 
             {/* Mode pills + web search */}
@@ -413,15 +403,17 @@ export default function StudyAssistantPage() {
               searchLabel={searchLabel}
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
           </div>
 
           {error && <p className="mt-4 text-xs text-rose-500">{error}</p>}
         </div>
       ) : (
-        /* ===== Active conversation state ===== */
-        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0">
-          {/* Mode pills bar */}
-          <div className="py-3 border-b border-[var(--sa-border)]">
+        /* ===== Active conversation — Claude layout: top + input fixed, only messages scroll ===== */
+        <div className="flex flex-1 flex-col min-h-0 max-w-3xl w-full mx-auto px-4">
+          {/* Sticky mode pills */}
+          <div className="shrink-0 py-3">
             <ModeSelector
               mode={mode}
               subMode={subMode}
@@ -432,10 +424,11 @@ export default function StudyAssistantPage() {
               searchLabel={searchLabel}
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
           </div>
 
-          {/* Chat messages */}
-          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-4 space-y-4">
+          {/* Scrollable conversation only */}
+          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-3 space-y-4 min-h-0">
             {visibleMessages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
@@ -503,8 +496,8 @@ export default function StudyAssistantPage() {
 
           {error && <p className="px-1 pb-2 text-xs text-rose-500">{error}</p>}
 
-          {/* Composer */}
-          <div className="pt-3 border-t border-[var(--sa-border)]">
+          {/* Composer — fixed at bottom, no divider line */}
+          <div className="shrink-0 pt-2 pb-3">
             <ChatInputBar
               input={input}
               onInput={setInput}
@@ -522,6 +515,7 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.agentName}… (Enter to send, Shift+Enter for new line)`}
+              showWeissSources={mode === 'research'}
             />
           </div>
         </div>

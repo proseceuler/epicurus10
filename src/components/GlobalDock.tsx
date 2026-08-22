@@ -114,7 +114,7 @@ function DockButton({
         active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200/50'
       }`}
       title={label}
-    >
+    
       <Icon className="h-5 w-5" />
       {badge ? (
         <span className="text-[10px] font-bold tabular-nums">{badge}</span>

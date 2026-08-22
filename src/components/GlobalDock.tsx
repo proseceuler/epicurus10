@@ -61,7 +61,6 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
-        />
       )}
 
       {showCodsworth && codsworthOpen && (

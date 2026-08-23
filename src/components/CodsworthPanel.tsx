@@ -1,392 +1,126 @@
-import { useState, useRef, useEffect } from 'react';
-import { usePomodoro } from '@/context/PomodoroContext';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { getOpenRouterKey, getDefaultModel } from '@/lib/apiKeys';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
-import ScientificCalculator from '@/components/ScientificCalculator';
-import DictionaryWidget from '@/components/DictionaryWidget';
-import QuickImportModal from '@/components/QuickImportModal';
-import CodsworthPanel from '@/components/CodsworthPanel';
-import {
-  Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
-  GripHorizontal, X, StickyNote, Bot, Sparkles,
-} from 'lucide-react';
+import { Bot, Send, Check, X, Loader2, GripHorizontal } from 'lucide-react';
 
-type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote';
-
-const TASKS_PAGES: PageId[] = ['todos', 'kanban', 'calendar', 'notes'];
-
-export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) => void; page: PageId }) {
-  const pomodoro = usePomodoro();
-  const [open, setOpen] = useState(false);
-  const [codsworthOpen, setCodsworthOpen] = useState(false);
-  const onTasksPage = TASKS_PAGES.includes(page);
-  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
-  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<DockTab>('main');
-  const [calcDetached, setCalcDetached] = useState(false);
-  const [dictDetached, setDictDetached] = useState(false);
-  const [quickTask, setQuickTask] = useState('');
-  const [quickNote, setQuickNote] = useState('');
-  const [importOpen, setImportOpen] = useState(false);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (onTasksPage) {
-      setCodsworthLeaving(false);
-      setCodsworthVisible(true);
-    } else {
-      setCodsworthOpen(false);
-      setCodsworthLeaving(true);
-      timer = setTimeout(() => {
-        setCodsworthVisible(false);
-        setCodsworthLeaving(false);
-      }, 320);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [onTasksPage]);
-
-  const minutes = Math.floor(pomodoro.timeLeft / 60);
-  const seconds = pomodoro.timeLeft % 60;
-  const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-  const openTab = (tab: DockTab) => {
-    setOpen(true);
-    setActiveTab(tab);
-    if (tab === 'pomodoro') pomodoro.setDockOpen(true);
-    else if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
-  };
-
-  const closeTab = () => {
-    if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
-    setActiveTab('main');
-    pomodoro.setDockOpen(false);
-  };
-
-  const addQuickTask = async () => {
-    if (!quickTask.trim()) return;
-    await supabase.from('todos').insert({ title: quickTask.trim(), priority: 'not_urgent_important' });
-    setQuickTask('');
-    setActiveTab('main');
-    navigate('todos');
-  };
-
-  const addQuickNote = async () => {
-    if (!quickNote.trim()) return;
-    const title = quickNote.trim().split('\n')[0].slice(0, 60);
-    await supabase.from('notes').insert({
-      title: title || 'Untitled',
-      content: quickNote.trim(),
-      folder: 'Quick Capture',
-      tags: ['sticky'],
-      pinned: true,
-    });
-    setQuickNote('');
-    setActiveTab('main');
-    try {
-      sessionStorage.setItem('epicure-open-folder', 'Quick Capture');
-    } catch {
-      /* ignore */
-    }
-    navigate('notes');
-  };
-
-  return (
-    <>
-      <QuickImportModal open={importOpen} onClose={() => setImportOpen(false)} />
-
-      {pomodoro.isFloating && pomodoro.isRunning && <FloatingPomodoro />}
-
-      {activeTab === 'calculator' && calcDetached && (
-        <ScientificCalculator
-          detached
-          onDetach={() => setCalcDetached(true)}
-          onSnapBack={() => setCalcDetached(false)}
-          onClose={() => {
-            setCalcDetached(false);
-            setActiveTab('main');
-          }}
-        />
-      )}
-
-      {activeTab === 'dictionary' && dictDetached && (
-        <DictionaryWidget
-          detached
-          onDetach={() => setDictDetached(true)}
-          onSnapBack={() => setDictDetached(false)}
-          onClose={() => {
-            setDictDetached(false);
-            setActiveTab('main');
-          }}
-        />
-      )}
-
-      {codsworthVisible && codsworthOpen && (
-        <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
-      )}
-
-      <div className="fixed bottom-4 right-4 z-50">
-        <div className="flex flex-row items-end gap-2">
-          {open && (
-            <div className="glass glass-shadow-lg flex items-center gap-1 rounded-2xl px-2 py-2">
-              {activeTab === 'main' && (
-                <>
-                  <DockButton icon={Calculator} label="Calculator" onClick={() => openTab('calculator')} />
-                  <DockButton icon={BookOpen} label="Dictionary" onClick={() => openTab('dictionary')} />
-                  <DockButton icon={StickyNote} label="Sticky Note" onClick={() => openTab('quicknote')} />
-                  <DockButton icon={Plus} label="Quick Task" onClick={() => openTab('quicktask')} />
-                  <div className="mx-0.5 h-8 w-px bg-zinc-300/40" />
-                  <DockButton
-                    icon={Bot}
-                    label="Ask AI"
-                    onClick={() => {
-                      setOpen(false);
-                      navigate('assistant');
-                    }}
-                  />
-                  <DockButton
-                    icon={Sparkles}
-                    label="Import"
-                    onClick={() => {
-                      setOpen(false);
-                      setImportOpen(true);
-                    }}
-                  />
-                  <div className="mx-0.5 h-8 w-px bg-zinc-300/40" />
-                  <DockButton
-                    icon={Timer}
-                    label="Focus"
-                    onClick={() => openTab('pomodoro')}
-                    active={pomodoro.isRunning}
-                    badge={pomodoro.isRunning ? timeStr : undefined}
-                  />
-                </>
-              )}
-
-              {activeTab === 'pomodoro' && (
-                <div className="flex min-w-[280px] items-center gap-2 px-2 py-1">
-                  <div className="flex items-center gap-2">
-                    {pomodoro.isRunning ? (
-                      <button
-                        type="button"
-                        onClick={pomodoro.pause}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white transition-all hover:bg-zinc-800"
-                      >
-                        <Pause className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={pomodoro.start}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white transition-all hover:bg-zinc-800"
-                      >
-                        <Play className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={pomodoro.reset}
-                      className="glass glass-hover flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600"
-                    >
-                      <Square className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <div className="text-2xl font-bold tabular-nums text-zinc-900">{timeStr}</div>
-                    <div className="text-[10px] capitalize text-zinc-400">
-                      {pomodoro.sessionType.replace('_', ' ')}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeTab}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-200/50"
-                  >
-                    <X className="h-4 w-4 text-zinc-500" />
-                  </button>
-                </div>
-              )}
-
-              {activeTab === 'calculator' && !calcDetached && (
-                <div className="relative">
-                  <ScientificCalculator
-                    detached={false}
-                    onDetach={() => setCalcDetached(true)}
-                    onSnapBack={() => setCalcDetached(false)}
-                    onClose={closeTab}
-                  />
-                </div>
-              )}
-
-              {activeTab === 'dictionary' && !dictDetached && (
-                <div className="relative">
-                  <DictionaryWidget
-                    detached={false}
-                    onDetach={() => setDictDetached(true)}
-                    onSnapBack={() => setDictDetached(false)}
-                    onClose={closeTab}
-                  />
-                </div>
-              )}
-
-              {activeTab === 'quicktask' && (
-                <div className="flex min-w-[300px] items-center gap-2 px-2 py-1">
-                  <Plus className="h-5 w-5 shrink-0 text-zinc-400" />
-                  <input
-                    value={quickTask}
-                    onChange={(e) => setQuickTask(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addQuickTask()}
-                    placeholder="Quick add task..."
-                    className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={addQuickTask}
-                    className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white"
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeTab}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"
-                  >
-                    <X className="h-4 w-4 text-zinc-500" />
-                  </button>
-                </div>
-              )}
-
-              {activeTab === 'quicknote' && (
-                <div className="flex min-w-[300px] items-center gap-2 px-2 py-1">
-                  <StickyNote className="h-5 w-5 shrink-0 text-amber-500" />
-                  <input
-                    value={quickNote}
-                    onChange={(e) => setQuickNote(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addQuickNote()}
-                    placeholder="Sticky note..."
-                    className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={addQuickNote}
-                    className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeTab}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"
-                  >
-                    <X className="h-4 w-4 text-zinc-500" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-col-reverse items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (open) {
-                  if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
-                  setActiveTab('main');
-                  pomodoro.setDockOpen(false);
-                  setOpen(false);
-                } else {
-                  setOpen(true);
-                  setActiveTab('main');
-                }
-              }}
-              aria-label={open ? 'Close tools' : 'Open tools'}
-              className={
-                open
-                  ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                  : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
-              }
-            >
-              <Plus className={`h-6 w-6 transition-transform duration-200 ${open ? 'rotate-45' : ''}`} />
-              {pomodoro.isRunning && !open && (
-                <span className="absolute -right-1 -top-1 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
-                  {timeStr}
-                </span>
-              )}
-            </button>
-
-            {codsworthVisible && (
-              <button
-                key="codsworth-fab"
-                type="button"
-                onClick={() => setCodsworthOpen((v) => !v)}
-                aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
-                className={
-                  (codsworthOpen
-                    ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
-                  (codsworthLeaving ? ' codsworth-split-out' : ' codsworth-split-in')
-                }
-                title="Codsworth — drag the panel header to move it"
-              >
-                <Bot className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
+interface ProposedAction {
+  id: string;
+  description: string;
 }
 
-function DockButton({
-  icon: Icon,
-  label,
-  onClick,
-  active,
-  badge,
+interface CodsworthMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  action?: ProposedAction;
+}
+
+const SCOPE_PROMPTS: Partial<Record<PageId, string>> = {
+  todos:
+    'You are Codsworth, a tidy task-organizing assistant for a To-Do List. When you propose a concrete change, end with a line "ACTION: ...". Live task list is provided as JSON.',
+  kanban:
+    'You are Codsworth for a Kanban Board. End concrete proposals with "ACTION: ...". Live board data is JSON context.',
+  calendar:
+    'You are Codsworth for a Calendar. Flag conflicts; end concrete proposals with "ACTION: ...".',
+  notes:
+    'You are Codsworth for Notes & Ideas. Dedupe/reorganize; end concrete proposals with "ACTION: ...".',
+};
+
+type Item = Record<string, unknown> & { id?: string; title?: string; content?: string };
+
+async function loadPageItems(page: PageId): Promise<Item[]> {
+  if (page === 'todos' || page === 'calendar') {
+    const q = supabase.from('todos').select('*').order('created_at', { ascending: false }).limit(80);
+    const { data } = page === 'calendar' ? await q.not('due_date', 'is', null) : await q;
+    return (data as Item[]) || [];
+  }
+  if (page === 'kanban') {
+    const { data } = await supabase.from('kanban_tasks').select('*').order('created_at', { ascending: false }).limit(80);
+    return (data as Item[]) || [];
+  }
+  if (page === 'notes') {
+    const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false }).limit(80);
+    return (data as Item[]) || [];
+  }
+  return [];
+}
+
+async function applyAction(page: PageId, description: string, items: Item[]): Promise<string> {
+  const desc = description.toLowerCase();
+  const matched = items.filter((it) => {
+    const title = String(it.title || it.content || '').toLowerCase();
+    return title.length > 2 && desc.includes(title.slice(0, Math.min(title.length, 24)));
+  });
+
+  if (desc.includes('merge') || desc.includes('duplicate') || desc.includes('dedupe') || desc.includes('delete')) {
+    if ((page === 'todos' || page === 'calendar') && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('todos').delete().eq('id', m.id);
+      }
+      return `Merged into “${matched[0].title}”; removed ${matched.length - 1} duplicate(s).`;
+    }
+    if (page === 'notes' && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('notes').delete().eq('id', m.id);
+      }
+      return `Kept “${matched[0].title}”; removed ${matched.length - 1} note(s).`;
+    }
+    if (page === 'kanban' && matched.length >= 2) {
+      for (const m of matched.slice(1)) {
+        if (m.id) await supabase.from('kanban_tasks').delete().eq('id', m.id);
+      }
+      return `Removed ${matched.length - 1} duplicate card(s).`;
+    }
+  }
+
+  if (page === 'todos' && matched[0]?.id && (desc.includes('priority') || desc.includes('urgent'))) {
+    let priority = 'not_urgent_important';
+    if (desc.includes('urgent') && desc.includes('not important')) priority = 'urgent_not_important';
+    else if (desc.includes('urgent')) priority = 'urgent_important';
+    await supabase.from('todos').update({ priority }).eq('id', matched[0].id);
+    return `Updated priority on “${matched[0].title}”.`;
+  }
+
+  return 'Noted. Could not map that ACTION to a concrete row — name the exact task title.';
+}
+
+export default function CodsworthPanel({
+  page,
+  onClose,
 }: {
-  icon: typeof Calculator;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  badge?: string;
+  page: PageId;
+  onClose: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-all ${
-        active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200/50'
-      }`}
-      title={label}
-    >
-      <Icon className="h-5 w-5" />
-      {badge ? (
-        <span className="text-[10px] font-bold tabular-nums">{badge}</span>
-      ) : (
-        <span className="text-[10px] font-medium">{label}</span>
-      )}
-    </button>
-  );
-}
+  const [messages, setMessages] = useState<CodsworthMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-function FloatingPomodoro() {
-  const pomodoro = usePomodoro();
-  const [pos, setPos] = useState({ x: window.innerWidth - 220, y: 80 });
+  // Draggable like DictionaryWidget
+  const [pos, setPos] = useState({ x: Math.max(24, window.innerWidth - 344), y: Math.max(80, window.innerHeight - 560) });
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 
-  const minutes = Math.floor(pomodoro.timeLeft / 60);
-  const seconds = pomodoro.timeLeft % 60;
-  const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const refreshItems = useCallback(async () => {
+    setItems(await loadPageItems(page));
+  }, [page]);
+
+  useEffect(() => {
+    refreshItems();
+  }, [refreshItems]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!draggingRef.current) return;
-      setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
+      setPos({
+        x: Math.min(window.innerWidth - 80, Math.max(0, e.clientX - offsetRef.current.x)),
+        y: Math.min(window.innerHeight - 80, Math.max(0, e.clientY - offsetRef.current.y)),
+      });
     };
     const onUp = () => {
       draggingRef.current = false;
@@ -404,56 +138,170 @@ function FloatingPomodoro() {
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
   };
 
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    const key = getOpenRouterKey();
+    setInput('');
+    const nextMessages: CodsworthMessage[] = [...messages, { role: 'user', content: text }];
+    setMessages(nextMessages);
+
+    if (!key) {
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', content: 'No OpenRouter API key found — add one in Settings.' },
+      ]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await refreshItems();
+      const snapshot = items.slice(0, 40).map((it) => ({
+        id: it.id,
+        title: it.title,
+        content: typeof it.content === 'string' ? it.content.slice(0, 120) : undefined,
+        priority: it.priority,
+        completed: it.completed,
+        column: it.column || it.status,
+      }));
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: getDefaultModel() || 'nvidia/nemotron-nano-9b-v2:free',
+          messages: [
+            {
+              role: 'system',
+              content:
+                (SCOPE_PROMPTS[page] || 'You are Codsworth.') +
+                '\n\nCurrent page data:\n' +
+                JSON.stringify(snapshot),
+            },
+            ...nextMessages.map((m) => ({ role: m.role, content: m.content })),
+          ],
+        }),
+      });
+      const data = await res.json();
+      const raw: string = data.choices?.[0]?.message?.content || 'Sorry, I had trouble with that.';
+      const actionMatch = raw.match(/ACTION:\s*(.+)$/m);
+      const content = actionMatch ? raw.slice(0, actionMatch.index).trim() : raw;
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'assistant',
+          content,
+          action: actionMatch ? { id: `${Date.now()}`, description: actionMatch[1].trim() } : undefined,
+        },
+      ]);
+    } catch {
+      setMessages((m) => [...m, { role: 'assistant', content: 'Something went wrong reaching Codsworth.' }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resolveAction(id: string, confirmed: boolean) {
+    const msg = messages.find((m) => m.action?.id === id);
+    if (!msg?.action) return;
+    let suffix = '\n\n✕ Cancelled.';
+    if (confirmed) {
+      try {
+        const result = await applyAction(page, msg.action.description, items);
+        suffix = `\n\n✓ Applied. ${result}`;
+        await refreshItems();
+      } catch (err) {
+        suffix = `\n\n✕ Failed: ${err instanceof Error ? err.message : 'error'}`;
+      }
+    }
+    setMessages((m) =>
+      m.map((row) =>
+        row.action?.id === id ? { ...row, content: row.content + suffix, action: undefined } : row
+      )
+    );
+  }
+
   return (
     <div
-      className="fixed z-[60] overflow-hidden rounded-2xl glass-dark glass-shadow-lg"
+      className="fixed z-[60] flex w-80 max-h-[28rem] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
       style={{ left: pos.x, top: pos.y }}
     >
+      {/* Drag handle — same idea as Dictionary */}
       <div
-        className="flex cursor-move items-center gap-2 px-3 py-2"
+        className="flex cursor-move items-center justify-between border-b border-zinc-100 bg-zinc-50 px-3 py-2.5"
         onMouseDown={onDragStart}
-        onClick={() => {
-          if (!draggingRef.current) pomodoro.snapBack();
-        }}
       >
-        <GripHorizontal className="h-4 w-4 text-zinc-500" />
-        <div className="flex items-center gap-2">
-          {pomodoro.isRunning ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                pomodoro.pause();
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
-            >
-              <Pause className="h-3.5 w-3.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                pomodoro.start();
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
-            >
-              <Play className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              pomodoro.reset();
-              pomodoro.snapBack();
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
-          >
-            <Square className="h-3 w-3" />
-          </button>
+        <div className="flex items-center gap-2 text-sm font-medium text-zinc-800">
+          <GripHorizontal className="h-4 w-4 text-zinc-400" />
+          <Bot className="h-4 w-4 text-zinc-700" />
+          Codsworth
         </div>
-        <span className="text-lg font-bold tabular-nums text-white">{timeStr}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="text-zinc-400 hover:text-zinc-700"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 space-y-2.5 overflow-y-auto px-3 py-3 text-sm">
+        {messages.length === 0 && (
+          <p className="text-xs text-zinc-400">
+            Organize this page — try &quot;find duplicates.&quot;
+            {items.length > 0 ? ` (${items.length} items loaded)` : ''}
+          </p>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[85%] whitespace-pre-wrap rounded-xl px-3 py-2 ${
+                m.role === 'user' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-800'
+              }`}
+            >
+              {m.content}
+              {m.action && (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => resolveAction(m.action!.id, true)}
+                    className="flex items-center gap-1 rounded-full bg-zinc-900 px-2 py-1 text-xs text-white"
+                  >
+                    <Check className="h-3 w-3" /> Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resolveAction(m.action!.id, false)}
+                    className="flex items-center gap-1 rounded-full border border-zinc-300 px-2 py-1 text-xs text-zinc-600"
+                  >
+                    <X className="h-3 w-3" /> Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />}
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2.5">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
+          placeholder="Ask Codsworth..."
+          className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={loading}
+          className="rounded-full bg-zinc-900 p-1.5 text-white disabled:opacity-50"
+        >
+          <Send className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );

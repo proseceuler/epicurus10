@@ -496,23 +496,24 @@
 
   /* Input bar — glass (matches epicure dock/cards) */
   .sa-input-bar {
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 1rem;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-    transition: border-color 160ms ease, background 160ms ease;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 1.5rem;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   }
   .sa-input-bar:focus-within {
-    border-color: rgba(161, 161, 170, 0.5);
-    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 
   .sa-send-btn {
     background: var(--sa-text);
-    color: var(--sa-bg);
-    border-radius: 0.625rem;
+    color: var(--sa-accent-text);
+    border-radius: 999px;
     transition: opacity 160ms ease, transform 160ms ease;
   }
   .sa-send-btn:hover:not(:disabled) { opacity: 0.88; }
@@ -543,10 +544,9 @@
     background: var(--sa-surface-hover);
   }
 
-  /* Chat messages */
+  /* Chat messages — Claude-style: user gets a soft bubble, assistant is plain flowing prose */
   .sa-chat-bubble-user {
     background: var(--sa-surface);
-    border: 1px solid var(--sa-border);
     color: var(--sa-text);
   }
   .sa-chat-bubble-assistant {

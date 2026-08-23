@@ -98,7 +98,7 @@ export default function CodsworthPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Draggable like DictionaryWidget
-  const [pos, setPos] = useState({ x: Math.max(24, window.innerWidth / 2 - 160), y: Math.max(80, window.innerHeight - 480) });
+  const [pos, setPos] = useState({ x: Math.max(24, window.innerWidth - 344), y: Math.max(80, window.innerHeight - 500) });
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 

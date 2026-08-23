@@ -127,7 +127,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
       )}
 
       <div className="fixed bottom-4 right-4 z-50">
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-row items-end gap-2">
           {open && (
             <div className="glass glass-shadow-lg flex items-center gap-1 rounded-2xl px-2 py-2">
               {activeTab === 'main' && (
@@ -288,7 +288,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col-reverse items-center gap-2">
             <button
               type="button"
               onClick={() => {

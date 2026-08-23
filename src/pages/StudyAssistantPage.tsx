@@ -5,7 +5,7 @@ import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Key, Globe, ExternalLink, Check, Wrench, Trash2, History, ChevronDown } from 'lucide-react';
+import { Bot, Key, Globe, ExternalLink, Check, Wrench, Trash2, History } from 'lucide-react';
 import {
   MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
   type ModeId, type SubModeId,
@@ -419,20 +419,18 @@ export default function StudyAssistantPage() {
       ) : (
         /* ===== Active conversation — Claude layout: top + input fixed, only messages scroll ===== */
         <div className="flex flex-1 flex-col min-h-0 max-w-3xl w-full mx-auto px-4">
-          {/* Header — title, chat history, clear chat */}
+          {/* Header — mode name as a plain breadcrumb, icon-only actions like Claude's chat header */}
           <div className="shrink-0 flex items-center justify-between pt-3">
-            <h1 className="text-sm font-semibold text-[var(--sa-text)]">{activeMode.label}</h1>
-            <div className="flex items-center gap-1.5">
+            <h1 className="text-sm font-medium text-[var(--sa-text-muted)]">{activeMode.label}</h1>
+            <div className="flex items-center gap-0.5">
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setHistoryOpen((v) => !v)}
-                  className="sa-pill"
+                  className="sa-icon-btn w-8 h-8 flex items-center justify-center"
                   title="Chat history"
                 >
-                  <History className="w-3.5 h-3.5" />
-                  History
-                  <ChevronDown className="w-3 h-3" />
+                  <History className="w-4 h-4" />
                 </button>
                 {historyOpen && (
                   <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-[var(--sa-border)] bg-[var(--sa-surface)] shadow-lg z-20 overflow-hidden">
@@ -464,11 +462,10 @@ export default function StudyAssistantPage() {
               <button
                 type="button"
                 onClick={clearChat}
-                className="sa-pill"
+                className="sa-icon-btn w-8 h-8 flex items-center justify-center"
                 title="Clear this chat"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Clear Chat
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -488,16 +485,16 @@ export default function StudyAssistantPage() {
             {mode === 'writing' && <QuintilianAiCheck text={input} />}
           </div>
 
-          {/* Scrollable conversation only */}
-          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-3 space-y-4 min-h-0">
+          {/* Scrollable conversation only — plain prose for assistant, soft bubble for user */}
+          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-4 space-y-6 min-h-0">
             {visibleMessages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={
                     m.role === 'user'
-                      ? 'sa-chat-bubble-user whitespace-pre-wrap'
-                      : 'sa-chat-bubble-assistant min-w-0'
-                  }`}
+                      ? 'sa-chat-bubble-user max-w-[75%] rounded-3xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap'
+                      : 'sa-chat-bubble-assistant w-full min-w-0 text-[15px] leading-[1.7]'
+                  }
                 >
                   {m.image && (
                     <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />

@@ -405,12 +405,12 @@
   }
   .sa-pill-active {
     background: var(--sa-text);
-    color: var(--sa-bg);
+    color: var(--sa-accent-text);
     border-color: var(--sa-text);
   }
   .sa-pill-active:hover {
     background: var(--sa-text);
-    color: var(--sa-bg);
+    color: var(--sa-accent-text);
     opacity: 0.92;
   }
 

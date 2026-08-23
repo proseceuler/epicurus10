@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MODEL_KEY, getDefaultModel, getOpenRouterKey, getTavilyKey, saveKey } from '@/lib/apiKeys';
 import Markdown from '@/components/Markdown';
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Key, Globe, ExternalLink, Check, Wrench, Trash2, History, ChevronDown } from 'lucide-react';
+import { Bot, Key, Globe, ExternalLink, Check, Wrench, Trash2, History, ChevronDown, Library } from 'lucide-react';
+import { getSources, buildSourcesPrompt, type Source } from '@/lib/sources';
+import SourcesPanel from '@/components/assistant/SourcesPanel';
 import {
   MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
   type ModeId, type SubModeId,
@@ -30,6 +32,7 @@ interface ChatMessage {
   name?: string;
   actions?: { name: string; ok: boolean }[];
   searches?: SearchResponse[];
+  usedSources?: { title: string }[];
 }
 
 const HISTORY_KEY = 'epicure-ai-history';
@@ -57,6 +60,8 @@ export default function StudyAssistantPage() {
   const [webSearchOn, setWebSearchOn] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [sourcesTick, setSourcesTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -133,6 +138,7 @@ export default function StudyAssistantPage() {
   const visionModel = FREE_MODELS.find((m) => m.value === model)?.vision ?? false;
   const searchAllowed = SEARCH_MODES.includes(mode);
   const searchActive = searchAllowed && webSearchOn && Boolean(tavilyKey);
+  const sources: Source[] = useMemo(() => getSources(mode), [mode, sourcesTick]);
 
   useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(histories));
@@ -223,7 +229,9 @@ export default function StudyAssistantPage() {
       (subModeSystem ? '\n\n' + subModeSystem : '') +
       TOOL_PROMPT +
       (searchActive ? SEARCH_PROMPT : '') +
+      buildSourcesPrompt(sources) +
       `\n\nToday's date is ${new Date().toLocaleDateString('en-CA')}.`;
+    const usedSources = sources.length ? sources.map((s) => ({ title: s.title })) : undefined;
 
     try {
       for (let round = 0; round < 5; round++) {
@@ -293,7 +301,7 @@ export default function StudyAssistantPage() {
 
         const pending = calls.filter(Boolean);
         if (!pending.length) {
-          history = [...history, { role: 'assistant', content }];
+          history = [...history, { role: 'assistant', content, ...(usedSources ? { usedSources } : {}) }];
           setMessages(() => history);
           break;
         }
@@ -369,7 +377,16 @@ export default function StudyAssistantPage() {
 
       {visibleMessages.length === 0 ? (
         /* ===== Idle / empty state ===== */
-        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6">
+        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6 relative">
+          <button
+            type="button"
+            onClick={() => setSourcesOpen(true)}
+            className={`absolute top-3 right-4 sa-pill ${sources.length ? 'sa-pill-active' : ''}`}
+            style={{ padding: '0.3125rem 0.625rem', fontSize: '0.6875rem' }}
+          >
+            <Library className="w-3 h-3" />
+            Sources{sources.length ? ` (${sources.length})` : ''}
+          </button>
           {/* Centered icon */}
           <div className="w-11 h-11 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-4">
             <Bot className="w-5 h-5 text-[var(--sa-text)]" />
@@ -463,6 +480,19 @@ export default function StudyAssistantPage() {
             </div>
 
             <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setSourcesOpen(true)}
+                className={`sa-icon-btn relative w-8 h-8 flex items-center justify-center ${sources.length ? 'text-[var(--sa-accent)]' : ''}`}
+                title="Sources"
+              >
+                <Library className="w-4 h-4" />
+                {sources.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--sa-text)] text-[9px] font-semibold leading-none text-[var(--sa-accent-text)]">
+                    {sources.length}
+                  </span>
+                )}
+              </button>
               {searchAllowed && (
                 <button
                   type="button"
@@ -570,6 +600,21 @@ export default function StudyAssistantPage() {
                     </div>
                   ) : null}
 
+                  {m.role === 'assistant' && m.usedSources?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {m.usedSources.map((s, si) => (
+                        <span
+                          key={si}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-[var(--sa-surface)] text-[var(--sa-text-muted)]"
+                          title={s.title}
+                        >
+                          <Library className="w-3 h-3" />
+                          {s.title}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {m.searches?.map((s, si) => (
                     <div key={si} className="rounded-xl p-3 mb-2 space-y-2 bg-[var(--sa-surface)] border border-[var(--sa-border)]">
                       <p className="text-[11px] font-semibold text-[var(--sa-text-muted)] flex items-center gap-1">
@@ -634,6 +679,15 @@ export default function StudyAssistantPage() {
             />
           </div>
         </div>
+      )}
+
+      {sourcesOpen && (
+        <SourcesPanel
+          mode={mode}
+          sources={sources}
+          onChange={() => setSourcesTick((t) => t + 1)}
+          onClose={() => setSourcesOpen(false)}
+        />
       )}
     </div>
   );

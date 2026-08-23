@@ -184,7 +184,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         <main
           className={
             isAssistant
-              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-28 pt-4 lg:px-6'
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-20 pt-4 lg:px-6'
               : 'min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-6'
           }
         >

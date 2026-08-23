@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import AppLayout, { usePageState } from '@/components/AppLayout';
 import DashboardPage from '@/pages/DashboardPage';
@@ -40,7 +41,17 @@ function App() {
   return (
     <PomodoroProvider>
       <AppLayout page={page} navigate={navigate}>
-        {pages[page] ?? pages.dashboard}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={page}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            {pages[page] ?? pages.dashboard}
+          </motion.div>
+        </AnimatePresence>
       </AppLayout>
     </PomodoroProvider>
   );

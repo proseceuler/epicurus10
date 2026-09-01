@@ -16,7 +16,7 @@ import { Check, Pen, Eraser, Type, Square, Circle, Triangle, ArrowLeft, Grid3x3,
 
 type BgMode = 'plain' | 'dotted' | 'grid';
 
-const BG_NONE = 10;
+const BG_NONE = null as unknown as undefined;
 const BG_DOTS = 16;
 const BG_GRID = 24;
 

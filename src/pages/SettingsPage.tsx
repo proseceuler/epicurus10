@@ -46,7 +46,7 @@ export default function SettingsPage() {
       'pomodoro_sessions', 'pomodoro_settings', 'habits', 'habit_completions',
       'finance_settings', 'finance_transactions', 'finance_goals', 'notes',
       'timetable_entries', 'class_attendance', 'flashcard_decks', 'flashcards',
-      'todo_subtasks', 'forecast_scenarios', 'scratchpad'];
+      'todo_subtasks', 'forecast_scenarios', 'scratchpad', 'whiteboard'];
     const dump: Record<string, unknown> = {};
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');

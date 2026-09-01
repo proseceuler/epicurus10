@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MODEL_KEY, getDefaultModel, getOpenRouterKey, getTavilyKey, saveKey } from '@/lib/apiKeys';
 import Markdown from '@/components/Markdown';
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolDef } from '@/lib/aiTools';
 import type { SearchResponse } from '@/lib/webSearch';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
-import { Bot, Key, Globe, ExternalLink, Check, Wrench, Sun, Moon } from 'lucide-react';
+import { Bot, Key, Globe, ExternalLink, Check, Wrench, Trash2, History, ChevronDown, Library } from 'lucide-react';
+import { getSources, buildSourcesPrompt, type Source } from '@/lib/sources';
+import SourcesPanel from '@/components/assistant/SourcesPanel';
 import {
   MODES, FREE_MODELS, TOOL_PROMPT, SEARCH_PROMPT, SEARCH_MODES,
   type ModeId, type SubModeId,
@@ -13,6 +15,7 @@ import {
 import DynamicHeadline from '@/components/assistant/DynamicHeadline';
 import ModeSelector from '@/components/assistant/ModeSelector';
 import ChatInputBar from '@/components/assistant/ChatInputBar';
+import QuintilianAiCheck from '@/components/assistant/QuintilianAiCheck';
 
 interface ToolCall {
   id: string;
@@ -29,6 +32,7 @@ interface ChatMessage {
   name?: string;
   actions?: { name: string; ok: boolean }[];
   searches?: SearchResponse[];
+  usedSources?: { title: string }[];
 }
 
 const HISTORY_KEY = 'epicure-ai-history';
@@ -54,7 +58,10 @@ export default function StudyAssistantPage() {
   const [toolStatus, setToolStatus] = useState('');
   const [error, setError] = useState('');
   const [webSearchOn, setWebSearchOn] = useState(true);
-  const [dark, setDark] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [sourcesTick, setSourcesTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -131,6 +138,7 @@ export default function StudyAssistantPage() {
   const visionModel = FREE_MODELS.find((m) => m.value === model)?.vision ?? false;
   const searchAllowed = SEARCH_MODES.includes(mode);
   const searchActive = searchAllowed && webSearchOn && Boolean(tavilyKey);
+  const sources: Source[] = useMemo(() => getSources(mode), [mode, sourcesTick]);
 
   useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(histories));
@@ -189,6 +197,12 @@ export default function StudyAssistantPage() {
     setInput(def.starter);
   };
 
+  const clearChat = () => {
+    setHistories((prev) => ({ ...prev, [mode]: [] }));
+  };
+
+  const modesWithHistory = MODES.filter((m) => (histories[m.id] ?? []).filter((msg) => msg.role !== 'tool').length > 0);
+
   const send = async () => {
     const text = input.trim();
     if ((!text && !image) || streaming) return;
@@ -215,7 +229,9 @@ export default function StudyAssistantPage() {
       (subModeSystem ? '\n\n' + subModeSystem : '') +
       TOOL_PROMPT +
       (searchActive ? SEARCH_PROMPT : '') +
+      buildSourcesPrompt(sources) +
       `\n\nToday's date is ${new Date().toLocaleDateString('en-CA')}.`;
+    const usedSources = sources.length ? sources.map((s) => ({ title: s.title })) : undefined;
 
     try {
       for (let round = 0; round < 5; round++) {
@@ -285,7 +301,7 @@ export default function StudyAssistantPage() {
 
         const pending = calls.filter(Boolean);
         if (!pending.length) {
-          history = [...history, { role: 'assistant', content }];
+          history = [...history, { role: 'assistant', content, ...(usedSources ? { usedSources } : {}) }];
           setMessages(() => history);
           break;
         }
@@ -345,21 +361,10 @@ export default function StudyAssistantPage() {
     }
   };
 
-  const themeClass = dark ? 'sa-dark' : 'sa-light';
   const searchLabel = searchActive ? 'Web search on' : tavilyKey ? 'Web search off' : 'Web search — no key';
 
   return (
-    <div className={`${themeClass} min-h-[calc(100vh-2rem)] rounded-2xl flex flex-col`}>
-      {/* Theme toggle */}
-      <div className="flex justify-end p-3">
-        <button
-          onClick={() => setDark((v) => !v)}
-          className="sa-icon-btn w-8 h-8 flex items-center justify-center"
-          title="Toggle theme"
-        >
-          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-      </div>
+    <div className="sa-glass flex h-full min-h-0 flex-col overflow-hidden">
 
       {!apiKey && (
         <div className="mx-4 mb-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--sa-surface)] border border-[var(--sa-border)]">
@@ -372,17 +377,26 @@ export default function StudyAssistantPage() {
 
       {visibleMessages.length === 0 ? (
         /* ===== Idle / empty state ===== */
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6 relative">
+          <button
+            type="button"
+            onClick={() => setSourcesOpen(true)}
+            className={`absolute top-3 right-4 sa-pill ${sources.length ? 'sa-pill-active' : ''}`}
+            style={{ padding: '0.3125rem 0.625rem', fontSize: '0.6875rem' }}
+          >
+            <Library className="w-3 h-3" />
+            Sources{sources.length ? ` (${sources.length})` : ''}
+          </button>
           {/* Centered icon */}
-          <div className="w-14 h-14 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-6">
-            <Bot className="w-7 h-7 text-[var(--sa-text)]" />
+          <div className="w-11 h-11 rounded-2xl bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center mb-4">
+            <Bot className="w-5 h-5 text-[var(--sa-text)]" />
           </div>
 
           {/* Dynamic headline */}
           <DynamicHeadline mode={mode} />
 
-          {/* Input bar */}
-          <div className="mt-8 w-full flex flex-col items-center gap-5">
+          {/* Input bar + modes — kept tight so no long scroll to reach the box */}
+          <div className="mt-5 w-full flex flex-col items-center gap-3">
             <ChatInputBar
               input={input}
               onInput={setInput}
@@ -400,6 +414,7 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder="How can I help you today?"
+              showWeissSources={mode === 'research'}
             />
 
             {/* Mode pills + web search */}
@@ -413,37 +428,159 @@ export default function StudyAssistantPage() {
               searchLabel={searchLabel}
               onToggleSearch={() => setWebSearchOn((v) => !v)}
             />
+
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
           </div>
 
           {error && <p className="mt-4 text-xs text-rose-500">{error}</p>}
         </div>
       ) : (
-        /* ===== Active conversation state ===== */
-        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0">
-          {/* Mode pills bar */}
-          <div className="py-3 border-b border-[var(--sa-border)]">
-            <ModeSelector
-              mode={mode}
-              subMode={subMode}
-              onMode={(m) => setMode(m)}
-              onSubMode={setSubMode}
-              searchActive={searchActive}
-              searchAllowed={searchAllowed}
-              searchLabel={searchLabel}
-              onToggleSearch={() => setWebSearchOn((v) => !v)}
-            />
+        /* ===== Active conversation — Claude layout: top + input fixed, only messages scroll ===== */
+        <div className="flex flex-1 flex-col min-h-0 max-w-3xl w-full mx-auto px-4">
+          {/* Header — Claude-style: agent identity + a compact mode switcher, minimal icon actions */}
+          <div className="shrink-0 flex items-center justify-between pt-3">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setModeMenuOpen((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-[var(--sa-surface-hover)] transition-colors"
+              >
+                <span className="w-5 h-5 rounded-full bg-[var(--sa-surface)] border border-[var(--sa-border)] flex items-center justify-center shrink-0">
+                  <Bot className="w-3 h-3 text-[var(--sa-text)]" />
+                </span>
+                <span className="text-sm font-medium text-[var(--sa-text)]">{activeMode.agentName}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-[var(--sa-text-dim)]" />
+              </button>
+              {modeMenuOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-[var(--sa-border)] bg-[var(--sa-surface)] shadow-lg z-20 overflow-hidden">
+                  {MODES.map((m) => {
+                    const Icon = m.icon;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setMode(m.id);
+                          setModeMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--sa-surface-hover)] ${
+                          m.id === mode ? 'text-[var(--sa-text)]' : 'text-[var(--sa-text-muted)]'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="flex flex-col leading-tight">
+                          <span className="text-xs font-medium">{m.agentName}</span>
+                          <span className="text-[10px] text-[var(--sa-text-dim)]">{m.label}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setSourcesOpen(true)}
+                className={`sa-icon-btn relative w-8 h-8 flex items-center justify-center ${sources.length ? 'text-[var(--sa-accent)]' : ''}`}
+                title="Sources"
+              >
+                <Library className="w-4 h-4" />
+                {sources.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--sa-text)] text-[9px] font-semibold leading-none text-[var(--sa-accent-text)]">
+                    {sources.length}
+                  </span>
+                )}
+              </button>
+              {searchAllowed && (
+                <button
+                  type="button"
+                  onClick={() => setWebSearchOn((v) => !v)}
+                  className={`sa-icon-btn w-8 h-8 flex items-center justify-center ${searchActive ? 'text-[var(--sa-accent)]' : ''}`}
+                  title={searchLabel}
+                >
+                  <Globe className="w-4 h-4" />
+                </button>
+              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen((v) => !v)}
+                  className="sa-icon-btn w-8 h-8 flex items-center justify-center"
+                  title="Chat history"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+                {historyOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-[var(--sa-border)] bg-[var(--sa-surface)] shadow-lg z-20 overflow-hidden">
+                    {modesWithHistory.length === 0 ? (
+                      <p className="px-3 py-2.5 text-xs text-[var(--sa-text-dim)]">No conversations yet.</p>
+                    ) : (
+                      modesWithHistory.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setMode(m.id);
+                            setHistoryOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-[var(--sa-surface-hover)] ${
+                            m.id === mode ? 'text-[var(--sa-text)] font-medium' : 'text-[var(--sa-text-muted)]'
+                          }`}
+                        >
+                          {m.agentName}
+                          <span className="text-[10px] text-[var(--sa-text-dim)]">
+                            {(histories[m.id] ?? []).filter((msg) => msg.role !== 'tool').length}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={clearChat}
+                className="sa-icon-btn w-8 h-8 flex items-center justify-center"
+                title="Clear this chat"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Chat messages */}
-          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto py-4 space-y-4">
+          {/* Sub-mode chips only — shown compact, inline, no full mode selector during chat */}
+          {activeMode.hasSubMode && activeMode.subModes && (
+            <div className="shrink-0 flex gap-1.5 pt-2">
+              {activeMode.subModes.map((s) => {
+                const Icon = s.icon;
+                const active = subMode === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSubMode(s.id)}
+                    className={`sa-pill ${active ? 'sa-pill-active' : ''}`}
+                    style={{ padding: '0.3125rem 0.625rem', fontSize: '0.6875rem' }}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Scrollable conversation only — plain prose for assistant, soft bubble for user */}
+          <div ref={scrollRef} className="sa-chat-scroll flex-1 overflow-y-auto pt-4 pb-2 space-y-6 min-h-0">
             {visibleMessages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={
                     m.role === 'user'
-                      ? 'sa-chat-bubble-user whitespace-pre-wrap'
-                      : 'sa-chat-bubble-assistant min-w-0'
-                  }`}
+                      ? 'sa-chat-bubble-user max-w-[75%] rounded-3xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap'
+                      : 'sa-chat-bubble-assistant w-full min-w-0 text-[15px] leading-[1.7]'
+                  }
                 >
                   {m.image && (
                     <img src={m.image} alt="Uploaded attachment" className="rounded-xl mb-2 max-h-56 object-contain" />
@@ -458,6 +595,21 @@ export default function StudyAssistantPage() {
                         >
                           {a.name === 'web_search' ? <Globe className="w-3 h-3" /> : a.ok ? <Check className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
                           {a.name.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {m.role === 'assistant' && m.usedSources?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {m.usedSources.map((s, si) => (
+                        <span
+                          key={si}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-[var(--sa-surface)] text-[var(--sa-text-muted)]"
+                          title={s.title}
+                        >
+                          <Library className="w-3 h-3" />
+                          {s.title}
                         </span>
                       ))}
                     </div>
@@ -503,8 +655,9 @@ export default function StudyAssistantPage() {
 
           {error && <p className="px-1 pb-2 text-xs text-rose-500">{error}</p>}
 
-          {/* Composer */}
-          <div className="pt-3 border-t border-[var(--sa-border)]">
+          {/* Composer — fixed at bottom, no divider line */}
+          <div className="shrink-0 pt-2 pb-3">
+            {mode === 'writing' && <QuintilianAiCheck text={input} />}
             <ChatInputBar
               input={input}
               onInput={setInput}
@@ -522,9 +675,19 @@ export default function StudyAssistantPage() {
               image={image}
               onClearImage={() => setImage(null)}
               placeholder={listening ? 'Listening… speak now' : `Ask ${activeMode.agentName}… (Enter to send, Shift+Enter for new line)`}
+              showWeissSources={mode === 'research'}
             />
           </div>
         </div>
+      )}
+
+      {sourcesOpen && (
+        <SourcesPanel
+          mode={mode}
+          sources={sources}
+          onChange={() => setSourcesTick((t) => t + 1)}
+          onClose={() => setSourcesOpen(false)}
+        />
       )}
     </div>
   );

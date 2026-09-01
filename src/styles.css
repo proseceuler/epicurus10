@@ -1,5 +1,4 @@
 @import "tailwindcss" source(none);
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap');
 @source "../src";
 @import "tw-animate-css";
 
@@ -574,4 +573,32 @@
   .sa-chat-scroll::-webkit-scrollbar-thumb {
     background: var(--sa-border);
     border-radius: 3px;
+  }
+
+  /* ===== Canvas (tldraw) — glass UI overrides ===== */
+
+  .canvas-wrapper .tl-container {
+    background: rgba(255, 255, 255, 0.4);
+  }
+
+  /* Hide tldraw's own UI since we provide a custom toolbar */
+  .canvas-wrapper .tlui-layout {
+    --tlui-foreground-color: oklch(0.22 0.02 264);
+    --tlui-background: rgba(255, 255, 255, 0.55);
+    --tlui-panel-background: rgba(255, 255, 255, 0.65);
+    --tlui-border: rgba(24, 24, 27, 0.08);
+  }
+
+  .canvas-wrapper .tlui-layout__top__left,
+  .canvas-wrapper .tlui-layout__top__right,
+  .canvas-wrapper .tlui-layout__bottom__left,
+  .canvas-wrapper .tlui-layout__bottom__right,
+  .canvas-wrapper .tlui-layout__top__center,
+  .canvas-wrapper .tlui-layout__bottom__center {
+    display: none !important;
+  }
+
+  /* Keep the canvas itself interactive */
+  .canvas-wrapper .tl-canvas {
+    background: transparent;
   }

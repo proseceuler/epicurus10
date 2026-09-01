@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Note } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
-import { Plus, Search, Pin, PinOff, Trash2, Folder, Tag, BookOpen, FileText, Check, StickyNote, Pen, Link2, ArrowUpRight } from 'lucide-react';
+import { Plus, Search, Pin, PinOff, Trash2, Folder, Tag, BookOpen, FileText, Check, StickyNote, Pen } from 'lucide-react';
 import Whiteboard from '@/components/Whiteboard';
 
 type Tab = 'notes' | 'scratchpad' | 'whiteboard';
@@ -15,23 +15,10 @@ function renderMarkdown(text: string): string {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code class="bg-zinc-100 px-1 rounded text-xs">$1</code>')
-    .replace(
-      /\[\[(.*?)\]\]/g,
-      '<a href="#" data-wikilink="$1" class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-zinc-900/[0.06] text-zinc-800 font-medium no-underline hover:bg-zinc-900/[0.12] transition-colors">$1</a>',
-    )
     .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline">$1</a>')
     .replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
     .replace(/^> (.*$)/gm, '<blockquote class="border-l-2 border-zinc-300 pl-3 italic text-zinc-600">$1</blockquote>')
     .replace(/\n/g, '<br />');
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function wikiLinkTitles(content: string): string[] {
-  const matches = [...(content || '').matchAll(/\[\[(.*?)\]\]/g)];
-  return [...new Set(matches.map((m) => m[1].trim()).filter(Boolean))];
 }
 
 export default function NotesPage() {
@@ -88,8 +75,6 @@ function NotesTab() {
   const [newTags, setNewTags] = useState('');
   const [newSubject, setNewSubject] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const loadNotes = useCallback(async () => {
     const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false });
@@ -150,65 +135,6 @@ function NotesTab() {
     setNotes(notes.filter((n) => n.id !== id));
     if (selectedNote?.id === id) setSelectedNote(null);
   };
-
-  const createLinkedNote = async (title: string) => {
-    const { data } = await supabase.from('notes').insert({
-      title,
-      content: '',
-      folder: 'General',
-      tags: [],
-      pinned: false,
-      linked_subject: null,
-    }).select().single();
-    if (data) {
-      setNotes((prev) => [data as Note, ...prev]);
-      setSelectedNote(data as Note);
-      setEditMode(true);
-    }
-  };
-
-  const insertWikiLink = (title: string) => {
-    const el = editTextareaRef.current;
-    if (!selectedNote) return;
-    const insertion = `[[${title}]]`;
-    if (!el) {
-      setSelectedNote({ ...selectedNote, content: (selectedNote.content || '') + insertion });
-      setLinkPickerOpen(false);
-      return;
-    }
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? el.value.length;
-    const next = el.value.slice(0, start) + insertion + el.value.slice(end);
-    setSelectedNote({ ...selectedNote, content: next });
-    setLinkPickerOpen(false);
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + insertion.length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
-
-  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = (e.target as HTMLElement).closest('[data-wikilink]');
-    const title = el?.getAttribute('data-wikilink');
-    if (!title) return;
-    e.preventDefault();
-    const existing = notes.find((n) => n.title.toLowerCase() === title.toLowerCase());
-    if (existing) {
-      setSelectedNote(existing);
-      setEditMode(false);
-    } else {
-      createLinkedNote(title);
-    }
-  };
-
-  const backlinks = selectedNote
-    ? notes.filter(
-        (n) =>
-          n.id !== selectedNote.id &&
-          new RegExp(`\\[\\[\\s*${escapeRegex(selectedNote.title)}\\s*\\]\\]`, 'i').test(n.content || ''),
-      )
-    : [];
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><FileText className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
@@ -310,41 +236,15 @@ function NotesTab() {
                   <div className="flex items-center justify-between">
                     <Input value={selectedNote.title} onChange={(v) => { const updated = { ...selectedNote, title: v }; setSelectedNote(updated); }} placeholder="Note title" />
                     <div className="flex gap-2 ml-2">
-                      <div className="relative">
-                        <Button size="sm" variant="secondary" onClick={() => setLinkPickerOpen((v) => !v)}>
-                          <Link2 className="w-3.5 h-3.5" /> Link note
-                        </Button>
-                        {linkPickerOpen && (
-                          <div className="absolute right-0 top-full mt-1.5 w-56 max-h-64 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg z-20">
-                            {notes.filter((n) => n.id !== selectedNote.id).length === 0 ? (
-                              <p className="px-3 py-2.5 text-xs text-zinc-400">No other notes yet.</p>
-                            ) : (
-                              notes
-                                .filter((n) => n.id !== selectedNote.id)
-                                .map((n) => (
-                                  <button
-                                    key={n.id}
-                                    onClick={() => insertWikiLink(n.title)}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 truncate"
-                                  >
-                                    <FileText className="w-3 h-3 shrink-0 text-zinc-400" />
-                                    <span className="truncate">{n.title}</span>
-                                  </button>
-                                ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => { setEditMode(false); setLinkPickerOpen(false); updateNote(selectedNote.id, selectedNote); }}>Save</Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setEditMode(false); setLinkPickerOpen(false); }}>Cancel</Button>
+                      <Button size="sm" variant="secondary" onClick={() => { setEditMode(false); updateNote(selectedNote.id, selectedNote); }}>Save</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>Cancel</Button>
                     </div>
                   </div>
                   <textarea
-                    ref={editTextareaRef}
                     value={selectedNote.content}
                     onChange={(e) => setSelectedNote({ ...selectedNote, content: e.target.value })}
                     className="w-full h-96 px-3 py-2 glass-input rounded-xl text-sm text-zinc-700 font-mono"
-                    placeholder="Write in markdown... use [[Note Title]] to link another note"
+                    placeholder="Write in markdown..."
                   />
                   <div className="flex gap-2">
                     <Input value={(selectedNote.tags || []).join(', ')} onChange={(v) => setSelectedNote({ ...selectedNote, tags: v.split(',').map((t) => t.trim()).filter(Boolean) })} placeholder="Tags (comma separated)" />
@@ -382,75 +282,11 @@ function NotesTab() {
                   </div>
                   <div
                     className="prose prose-sm max-w-none text-sm text-zinc-700"
-                    onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedNote.content || '') }}
                   />
                   <p className="text-xs text-zinc-400 mt-4">
                     Last updated {new Date(selectedNote.updated_at).toLocaleString()}
                   </p>
-
-                  {(() => {
-                    const outgoing = selectedNote ? wikiLinkTitles(selectedNote.content || '') : [];
-                    if (!outgoing.length) return null;
-                    return (
-                      <div className="mt-5 pt-4 border-t border-zinc-200/60">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-                          <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                            Links to ({outgoing.length})
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {outgoing.map((title) => {
-                            const exists = notes.some((n) => n.title.toLowerCase() === title.toLowerCase());
-                            return (
-                              <button
-                                key={title}
-                                onClick={() => {
-                                  const existing = notes.find((n) => n.title.toLowerCase() === title.toLowerCase());
-                                  if (existing) { setSelectedNote(existing); setEditMode(false); }
-                                  else createLinkedNote(title);
-                                }}
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                  exists ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                }`}
-                                title={exists ? undefined : 'Not created yet — click to create'}
-                              >
-                                <FileText className="w-3 h-3" />
-                                {title}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {backlinks.length > 0 && (
-                    <div className="mt-5 pt-4 border-t border-zinc-200/60">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-                        <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                          Linked mentions ({backlinks.length})
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        {backlinks.map((n) => (
-                          <button
-                            key={n.id}
-                            onClick={() => { setSelectedNote(n); setEditMode(false); }}
-                            className="flex w-full items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-sm text-zinc-600 hover:bg-zinc-100 transition-colors"
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0">
-                              <FileText className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-                              <span className="truncate">{n.title}</span>
-                            </span>
-                            <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-zinc-300" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </Card>

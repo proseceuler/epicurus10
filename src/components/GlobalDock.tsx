@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
 import ScientificCalculator from '@/components/ScientificCalculator';
 import DictionaryWidget from '@/components/DictionaryWidget';
 import QuickImportModal from '@/components/QuickImportModal';
-import CodsworthPanel from '@/components/CodsworthPanel';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
   GripHorizontal, X, StickyNote, Bot, Sparkles,
@@ -14,39 +12,20 @@ import {
 
 type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote';
 
-const TASKS_PAGES: PageId[] = ['todos', 'kanban', 'calendar', 'notes'];
-
-export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) => void; page: PageId }) {
+/**
+ * Global dock — same bar height/padding as the original epicure dock.
+ * Collapsed: FAB with +. Expanded: horizontal tool bar above the FAB.
+ * No portal, no full-screen overlay — plain fixed positioning like the old dock.
+ */
+export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void }) {
   const pomodoro = usePomodoro();
   const [open, setOpen] = useState(false);
-  const [codsworthOpen, setCodsworthOpen] = useState(false);
-  const onTasksPage = TASKS_PAGES.includes(page);
-  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
-  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
   const [activeTab, setActiveTab] = useState<DockTab>('main');
   const [calcDetached, setCalcDetached] = useState(false);
   const [dictDetached, setDictDetached] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (onTasksPage) {
-      setCodsworthLeaving(false);
-      setCodsworthVisible(true);
-    } else {
-      setCodsworthOpen(false);
-      setCodsworthLeaving(true);
-      timer = setTimeout(() => {
-        setCodsworthVisible(false);
-        setCodsworthLeaving(false);
-      }, 320);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [onTasksPage]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
@@ -123,22 +102,12 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
         />
       )}
 
-      {codsworthVisible && codsworthOpen && (
-        <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
-      )}
-
-      <div className="fixed bottom-4 right-4 z-50">
-        <div className="flex flex-row items-end gap-2">
-          <AnimatePresence>
+      {/* Same anchor as the old dock: fixed bottom-4 center */}
+      <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+        <div className="flex flex-col items-center gap-2">
+          {/* Expanded bar — identical chrome to old dock */}
           {open && (
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, scale: 0.9, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 8 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="glass glass-shadow-lg flex items-center gap-1 rounded-2xl px-2 py-2"
-            >
+            <div className="glass glass-shadow-lg flex items-center gap-1 rounded-2xl px-2 py-2">
               {activeTab === 'main' && (
                 <>
                   <DockButton icon={Calculator} label="Calculator" onClick={() => openTab('calculator')} />
@@ -294,62 +263,37 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                   </button>
                 </div>
               )}
-            </motion.div>
+            </div>
           )}
-          </AnimatePresence>
 
-          <div className="flex flex-col-reverse items-center gap-2">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              type="button"
-              onClick={() => {
-                if (open) {
-                  if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
-                  setActiveTab('main');
-                  pomodoro.setDockOpen(false);
-                  setOpen(false);
-                } else {
-                  setOpen(true);
-                  setActiveTab('main');
-                }
-              }}
-              aria-label={open ? 'Close tools' : 'Open tools'}
-              className={
-                open
-                  ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                  : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
+          {/* FAB — only control that toggles the dock */}
+          <button
+            type="button"
+            onClick={() => {
+              if (open) {
+                if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
+                setActiveTab('main');
+                pomodoro.setDockOpen(false);
+                setOpen(false);
+              } else {
+                setOpen(true);
+                setActiveTab('main');
               }
-            >
-              <Plus className={`h-6 w-6 transition-transform duration-200 ${open ? 'rotate-45' : ''}`} />
-              {pomodoro.isRunning && !open && (
-                <span className="absolute -right-1 -top-1 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
-                  {timeStr}
-                </span>
-              )}
-            </motion.button>
-
-            {codsworthVisible && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                key="codsworth-fab"
-                type="button"
-                onClick={() => setCodsworthOpen((v) => !v)}
-                aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
-                className={
-                  (codsworthOpen
-                    ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
-                  (codsworthLeaving ? ' codsworth-split-out' : ' codsworth-split-in')
-                }
-                title="Codsworth — drag the panel header to move it"
-              >
-                <Bot className="h-5 w-5" />
-              </motion.button>
+            }}
+            aria-label={open ? 'Close tools' : 'Open tools'}
+            className={
+              open
+                ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
+                : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95'
+            }
+          >
+            <Plus className={`h-6 w-6 transition-transform duration-200 ${open ? 'rotate-45' : ''}`} />
+            {pomodoro.isRunning && !open && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
+                {timeStr}
+              </span>
             )}
-          </div>
+          </button>
         </div>
       </div>
     </>
@@ -370,9 +314,7 @@ function DockButton({
   badge?: string;
 }) {
   return (
-    <motion.button
-      whileTap={{ scale: 0.92 }}
-      whileHover={{ y: -2 }}
+    <button
       type="button"
       onClick={onClick}
       className={`flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-all ${
@@ -386,7 +328,7 @@ function DockButton({
       ) : (
         <span className="text-[10px] font-medium">{label}</span>
       )}
-    </motion.button>
+    </button>
   );
 }
 

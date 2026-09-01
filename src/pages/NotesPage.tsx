@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Note } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
 import { Plus, Search, Pin, PinOff, Trash2, Folder, Tag, BookOpen, FileText, Check, StickyNote, Pen } from 'lucide-react';
-import Canvas from '@/components/Canvas';
+import Whiteboard from '@/components/Whiteboard';
 
-type Tab = 'notes' | 'scratchpad' | 'canvas';
+type Tab = 'notes' | 'scratchpad' | 'whiteboard';
 
 function renderMarkdown(text: string): string {
   return text
@@ -27,7 +27,7 @@ export default function NotesPage() {
   const tabs: { id: Tab; label: string; icon: typeof FileText }[] = [
     { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'scratchpad', label: 'Scratchpad', icon: StickyNote },
-    { id: 'canvas', label: 'Canvas', icon: Pen },
+    { id: 'whiteboard', label: 'Whiteboard', icon: Pen },
   ];
 
   return (
@@ -54,7 +54,7 @@ export default function NotesPage() {
 
       {tab === 'notes' && <NotesTab />}
       {tab === 'scratchpad' && <ScratchpadTab />}
-      {tab === 'canvas' && <Canvas />}
+      {tab === 'whiteboard' && <Whiteboard />}
     </div>
   );
 }

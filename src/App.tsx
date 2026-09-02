@@ -17,6 +17,7 @@ import NotesPage from '@/pages/NotesPage';
 import FlashcardsPage from '@/pages/FlashcardsPage';
 import StudyAssistantPage from '@/pages/StudyAssistantPage';
 import SettingsPage from '@/pages/SettingsPage';
+import './rice.css';
 
 function App() {
   const [page, navigate] = usePageState();

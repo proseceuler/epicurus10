@@ -1,19 +1,60 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, NUM_TERMS, type Assessment, type Todo, type PomodoroSession } from '@/lib/types';
 import { computeFinalGrade, computeGeneralAverage, computeTermGrade } from '@/lib/gradeUtils';
 import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
-import {
-  TrendingUp, CheckSquare, Timer, Calendar,
-  ArrowRight, BookOpen, Target
-} from 'lucide-react';
+import { usePomodoro } from '@/context/PomodoroContext';
+import { Calendar, BookOpen } from 'lucide-react';
+
+const SIGIL_KEY = 'epicure-ascii-sigil';
+
+const DEFAULT_SIGIL = `
+      .·:·.
+    ·´     \`·
+   /    ∧    \\
+  |   /   \\   |
+  |   \\   /   |
+   \\   \\_/   /
+    \`·.   .·´
+       \`·´
+`.trimEnd();
+
+function computeStreak(sessions: PomodoroSession[]): number {
+  const days = new Set(
+    sessions
+      .filter((s) => s.session_type === 'focus')
+      .map((s) => new Date(s.completed_at).toDateString()),
+  );
+  if (days.size === 0) return 0;
+  let streak = 0;
+  const cursor = new Date();
+  if (!days.has(cursor.toDateString())) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!days.has(cursor.toDateString())) return 0;
+  }
+  while (days.has(cursor.toDateString())) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
 
 export default function DashboardPage({ navigate }: { navigate: (p: PageId) => void }) {
+  const pomodoro = usePomodoro();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sigil, setSigil] = useState(() => {
+    try {
+      return localStorage.getItem(SIGIL_KEY) || DEFAULT_SIGIL;
+    } catch {
+      return DEFAULT_SIGIL;
+    }
+  });
+  const [editingSigil, setEditingSigil] = useState(false);
+  const [awake, setAwake] = useState(false);
 
   const loadData = useCallback(async () => {
     const [{ data: aData }, { data: tData }, { data: sData }] = await Promise.all([
@@ -35,6 +76,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const todayFocus = sessions
     .filter((s) => s.session_type === 'focus' && new Date(s.completed_at).toDateString() === todayStr)
     .reduce((sum, s) => sum + s.duration_minutes, 0);
+  const streak = useMemo(() => computeStreak(sessions), [sessions]);
 
   const upcomingTodos = activeTodos
     .filter((t) => t.due_date)
@@ -48,121 +90,118 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     return 3;
   })();
 
+  useEffect(() => {
+    if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
+      setAwake(true);
+      const t = window.setTimeout(() => setAwake(false), 2200);
+      return () => window.clearTimeout(t);
+    }
+  }, [pomodoro.isRunning, pomodoro.lastCompletedAt, streak]);
+
+  const saveSigil = (value: string) => {
+    const next = value.trim() || DEFAULT_SIGIL;
+    setSigil(next);
+    try {
+      localStorage.setItem(SIGIL_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    setEditingSigil(false);
+  };
+
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
+  const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
+
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><TrendingUp className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <span className="font-mono text-xs tracking-[0.3em] text-[#5c6168]">LOADING</span>
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="mb-6 glass-dark glass-shadow-lg rounded-3xl p-6 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20" />
-        <div className="relative">
-          <h2 className="text-xl font-bold mb-1">Welcome to your study hub</h2>
-          <p className="text-sm text-zinc-400">Grade 10 · Key Stage 3 · {NUM_TERMS} Terms · {SUBJECTS.length} Subjects</p>
-          <div className="flex flex-wrap gap-3 mt-4">
-            <button
-              onClick={() => navigate('grades')}
-              className="flex items-center gap-1.5 text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition-all"
-            >
-              <BookOpen className="w-4 h-4" /> Add Grades
-            </button>
-            <button
-              onClick={() => navigate('pomodoro')}
-              className="flex items-center gap-1.5 text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition-all"
-            >
-              <Timer className="w-4 h-4" /> Start Focus Session
-            </button>
+      <section className={`hud-hero mb-10 ${awake ? 'hud-awake' : ''}`}>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-14">
+          <div className="min-w-0 flex-1">
+            {editingSigil ? (
+              <div>
+                <textarea
+                  defaultValue={sigil}
+                  rows={10}
+                  className="w-full resize-y rounded-lg bg-transparent p-2 font-mono text-[11px] leading-[1.15] text-[#9aa8ab] outline-none"
+                  autoFocus
+                  onBlur={(e) => saveSigil(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setEditingSigil(false);
+                  }}
+                />
+                <p className="mt-1 font-mono text-[10px] text-[#5c6168]">click away to save · original glyph only</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingSigil(true)}
+                title="Customize sigil"
+                className="hud-sigil block text-left"
+              >
+                <pre className="select-none font-mono text-[11px] leading-[1.15] sm:text-[12px]">{sigil}</pre>
+              </button>
+            )}
+          </div>
+
+          <div className="font-mono text-[12px] leading-6 text-[#8b8f96] lg:min-w-[280px] lg:pt-2">
+            <p className="text-[#d7d8dc]">
+              user<span className="text-[#5c6168]">@</span>{host}
+            </p>
+            <p className="text-[#3f4349]">{'─'.repeat(22)}</p>
+            <StatRow label="OS" value="epicure 10.2" />
+            <StatRow label="STREAK" value={`${streak}d`} />
+            <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
+            <StatRow label="FOCUS" value={focusLabel} />
+            <StatRow label="GPA" value={gpa} />
+            <StatRow label="TASKS" value={`${activeTodos.length} open`} />
+            <StatRow label="KERNEL" value={`${SUBJECTS.length} subjects`} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate('grades')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
+                → grades
+              </button>
+              <button type="button" onClick={() => navigate('pomodoro')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
+                → focus
+              </button>
+            </div>
           </div>
         </div>
+      </section>
+
+      <div className="mb-10 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
+        <QuietStat label="GPA" value={gpa} onOpen={() => navigate('grades')} />
+        <QuietStat label="PENDING" value={String(activeTodos.length)} onOpen={() => navigate('todos')} />
+        <QuietStat label="FOCUS" value={focusLabel} onOpen={() => navigate('pomodoro')} />
+        <QuietStat label="TERM" value={`T${currentTerm}`} onOpen={() => navigate('grades')} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-zinc-700" />
-            </div>
-            <button onClick={() => navigate('grades')} className="text-zinc-300 hover:text-zinc-600">
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-zinc-500 mb-1">General Average</p>
-          <div className="text-2xl font-bold text-zinc-800">
-            {generalAverage !== null ? generalAverage.toFixed(2) : '—'}
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center">
-              <CheckSquare className="w-5 h-5 text-zinc-700" />
-            </div>
-            <button onClick={() => navigate('todos')} className="text-zinc-300 hover:text-zinc-600">
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-zinc-500 mb-1">Pending Tasks</p>
-          <div className="text-2xl font-bold text-zinc-800">{activeTodos.length}</div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center">
-              <Timer className="w-5 h-5 text-zinc-700" />
-            </div>
-            <button onClick={() => navigate('pomodoro')} className="text-zinc-300 hover:text-zinc-600">
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-zinc-500 mb-1">Today's Focus</p>
-          <div className="text-2xl font-bold text-zinc-800">
-            {Math.floor(todayFocus / 60)}h {todayFocus % 60}m
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center">
-              <Target className="w-5 h-5 text-zinc-700" />
-            </div>
-            <button onClick={() => navigate('grades')} className="text-zinc-300 hover:text-zinc-600">
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-zinc-500 mb-1">Current Term</p>
-          <div className="text-2xl font-bold text-zinc-800">T{currentTerm}</div>
-        </Card>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-zinc-800">Subject Grades</h3>
-            <button onClick={() => navigate('grades')} className="text-xs text-zinc-600 hover:text-zinc-900 font-medium">
-              View all →
-            </button>
+      <div className="grid gap-10 lg:grid-cols-2">
+        <Card className="p-0">
+          <div className="mb-5 flex items-baseline justify-between">
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">SUBJECT GRADES</h3>
+            <button onClick={() => navigate('grades')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">all →</button>
           </div>
           {assessments.length === 0 ? (
             <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add your assessment scores to see your grades here." />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {SUBJECTS.map((s) => {
                 const fg = computeFinalGrade(s.key, assessments);
                 const tg = computeTermGrade(s.key, currentTerm, assessments);
                 return (
-                  <button
-                    key={s.key}
-                    onClick={() => navigate('grades')}
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-white/40 transition-colors group"
-                  >
-                    <div className="flex items-center gap-2">
-                      <SubjectBadge shortName={s.shortName} />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-zinc-400">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
-                      <span className={`text-sm font-bold ${gradeColor(fg)}`}>
-                        {fg !== null ? fg.toFixed(2) : '—'}
-                      </span>
+                  <button key={s.key} onClick={() => navigate('grades')} className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/3">
+                    <SubjectBadge shortName={s.shortName} />
+                    <div className="flex items-center gap-4 font-mono">
+                      <span className="text-[11px] text-[#5c6168]">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
+                      <span className={`text-sm ${gradeColor(fg)}`}>{fg !== null ? fg.toFixed(2) : '—'}</span>
                     </div>
                   </button>
                 );
@@ -171,33 +210,27 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
           )}
         </Card>
 
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-zinc-800">Upcoming Deadlines</h3>
-            <button onClick={() => navigate('calendar')} className="text-xs text-zinc-600 hover:text-zinc-900 font-medium">
-              View calendar →
-            </button>
+        <Card className="p-0">
+          <div className="mb-5 flex items-baseline justify-between">
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">UPCOMING</h3>
+            <button onClick={() => navigate('calendar')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">calendar →</button>
           </div>
           {upcomingTodos.length === 0 ? (
             <EmptyState icon={Calendar} title="No upcoming deadlines" subtitle="Add due dates to your tasks to see them here." />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {upcomingTodos.map((todo) => {
                 const dDate = new Date(todo.due_date! + 'T00:00:00');
                 const daysAway = Math.ceil((dDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 return (
-                  <div key={todo.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/40 transition-colors">
-                    <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center shrink-0 ${
-                      daysAway <= 1 ? 'bg-zinc-900 text-white' : daysAway <= 3 ? 'bg-zinc-400 text-zinc-900' : 'bg-zinc-100 text-zinc-600'
-                    }`}>
-                      <span className="text-[10px] font-medium leading-none">{dDate.toLocaleDateString('en-US', { month: 'short' })}</span>
-                      <span className="text-sm font-bold leading-none">{dDate.getDate()}</span>
+                  <div key={todo.id} className="flex items-center gap-3 rounded-md px-1 py-2">
+                    <div className="w-10 shrink-0 font-mono">
+                      <div className="text-[9px] uppercase tracking-wider text-[#5c6168]">{dDate.toLocaleDateString('en-US', { month: 'short' })}</div>
+                      <div className="text-sm text-[#d7d8dc]">{dDate.getDate()}</div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-700 truncate">{todo.title}</p>
-                      <span className="text-xs text-zinc-400">
-                        {daysAway <= 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `In ${daysAway} days`}
-                      </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-[#c9cbd0]">{todo.title}</p>
+                      <span className="font-mono text-[10px] text-[#5c6168]">{daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}</span>
                     </div>
                   </div>
                 );
@@ -207,5 +240,23 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
         </Card>
       </div>
     </div>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p>
+      <span className="inline-block w-[7.5rem] text-[#5c6168]">{label}:</span>
+      <span className="text-[#c9cbd0]">{value}</span>
+    </p>
+  );
+}
+
+function QuietStat({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="group text-left">
+      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-[#5c6168]">{label}</div>
+      <div className="font-mono text-2xl text-[#e4e5e8]">{value}</div>
+    </button>
   );
 }

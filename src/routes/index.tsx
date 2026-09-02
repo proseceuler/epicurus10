@@ -10,7 +10,7 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) {
-    return <div className="min-h-screen bg-zinc-100" />;
+    return <div className="min-h-screen bg-[#0b0c0e]" />;
   }
   return <App />;
 }

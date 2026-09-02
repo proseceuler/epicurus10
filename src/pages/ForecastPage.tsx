@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type SubjectKey, type ComponentType, type ExType } from '@/lib/types';
 import { computeTermGrade, gradeDescriptor } from '@/lib/gradeUtils';
-import { Card, PageHeader, Button, Input, Badge, SubjectBadge, gradeColor } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Badge, SubjectBadge, gradeColor } from '@/components/kit';
 import { TrendingUp, Plus, Trash2, Lightbulb } from 'lucide-react';
 
 interface ForecastItem {

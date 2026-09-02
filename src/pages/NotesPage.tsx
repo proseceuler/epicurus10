@@ -1,95 +1,50 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase, DB_CHANGED } from '@/lib/supabase';
 import { SUBJECTS, type Note } from '@/lib/types';
-import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
-import { Plus, Search, Pin, PinOff, Trash2, Folder, Tag, BookOpen, FileText, Check, StickyNote, Pen, Link2, ArrowUpRight } from 'lucide-react';
-import Whiteboard from '@/components/Whiteboard';
+import { Button, EmptyState, Input, Select } from '@/components/kit';
+import Whiteboard from '@/components/board/Whiteboard';
+import NoteMarkdown from '@/components/notes/NoteMarkdown';
+import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle, escapeRegex } from '@/lib/wiki';
+import { loadBoards, BOARDS_CHANGED, findBoardByName } from '@/lib/board-store';
+import {
+  FileText,
+  Folder,
+  GitBranch,
+  LayoutGrid,
+  Link2,
+  Plus,
+  Search,
+  Tag,
+  Pin,
+  PinOff,
+  Trash2,
+  BookOpen,
+  CalendarDays,
+  Network,
+} from 'lucide-react';
 
-type Tab = 'notes' | 'scratchpad' | 'whiteboard';
+type Tab = 'notes' | 'board' | 'graph';
 
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/^### (.*$)/gm, '<h3 class="font-semibold text-zinc-800 mt-3 mb-1">$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2 class="font-bold text-zinc-800 mt-3 mb-1">$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1 class="font-bold text-lg text-zinc-900 mt-3 mb-1">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code class="bg-zinc-100 px-1 rounded text-xs">$1</code>')
-    .replace(
-      /\[\[(.*?)\]\]/g,
-      '<a href="#" data-wikilink="$1" class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-zinc-900/[0.06] text-zinc-800 font-medium no-underline hover:bg-zinc-900/[0.12] transition-colors">$1</a>',
-    )
-    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline">$1</a>')
-    .replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
-    .replace(/^> (.*$)/gm, '<blockquote class="border-l-2 border-zinc-300 pl-3 italic text-zinc-600">$1</blockquote>')
-    .replace(/\n/g, '<br />');
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function wikiLinkTitles(content: string): string[] {
-  const matches = [...(content || '').matchAll(/\[\[(.*?)\]\]/g)];
-  return [...new Set(matches.map((m) => m[1].trim()).filter(Boolean))];
+function outline(content: string) {
+  return (content || '')
+    .split('\n')
+    .map((line) => {
+      const m = /^(#{1,3})\s+(.+)/.exec(line);
+      return m ? { level: m[1].length, text: m[2] } : null;
+    })
+    .filter((x): x is { level: number; text: string } => Boolean(x));
 }
 
 export default function NotesPage() {
   const [tab, setTab] = useState<Tab>('notes');
-
-  const tabs: { id: Tab; label: string; icon: typeof FileText }[] = [
-    { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'scratchpad', label: 'Scratchpad', icon: StickyNote },
-    { id: 'whiteboard', label: 'Whiteboard', icon: Pen },
-  ];
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-        <div className="flex gap-1 p-1 glass rounded-xl">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab === t.id ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-700'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {tab === 'notes' && <NotesTab />}
-      {tab === 'scratchpad' && <ScratchpadTab />}
-      {tab === 'whiteboard' && <Whiteboard />}
-    </div>
-  );
-}
-
-// ─── Notes Tab ───
-
-function NotesTab() {
+  const [openBoardName, setOpenBoardName] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>('note-home');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [activeFolder, setActiveFolder] = useState('All');
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [showNewNote, setShowNewNote] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
-  const [newFolder, setNewFolder] = useState('General');
-  const [newTags, setNewTags] = useState('');
-  const [newSubject, setNewSubject] = useState('');
-  const [editMode, setEditMode] = useState(false);
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const loadNotes = useCallback(async () => {
     const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false });
@@ -97,10 +52,178 @@ function NotesTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadNotes(); }, [loadNotes]);
+  useEffect(() => {
+    loadNotes();
+    const on = () => loadNotes();
+    window.addEventListener(DB_CHANGED, on);
+    return () => window.removeEventListener(DB_CHANGED, on);
+  }, [loadNotes]);
 
-  const folders = ['All', ...new Set(notes.map((n) => n.folder).filter(Boolean))];
-  const allTags = [...new Set(notes.flatMap((n) => n.tags || []))];
+  useEffect(() => {
+    try {
+      const folder = sessionStorage.getItem('epicure-open-folder');
+      if (folder) sessionStorage.removeItem('epicure-open-folder');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const selected = notes.find((n) => n.id === selectedId) ?? null;
+
+  const createNote = async (partial: Partial<Note> & { title: string }) => {
+    const { data } = await supabase
+      .from('notes')
+      .insert({
+        title: partial.title,
+        content: partial.content ?? '',
+        folder: partial.folder ?? 'Vault',
+        tags: partial.tags ?? [],
+        pinned: partial.pinned ?? false,
+        linked_subject: partial.linked_subject ?? null,
+        linked_board_ids: partial.linked_board_ids ?? [],
+      })
+      .select()
+      .single();
+    if (data) {
+      setNotes((prev) => [data as Note, ...prev]);
+      setSelectedId((data as Note).id);
+      setTab('notes');
+      return data as Note;
+    }
+    return null;
+  };
+
+  const openOrCreate = async (title: string) => {
+    const existing = findNoteByTitle(notes, title);
+    if (existing) {
+      setSelectedId(existing.id);
+      setTab('notes');
+      return existing;
+    }
+    return createNote({ title, folder: 'Vault' });
+  };
+
+  const openBoard = (name: string) => {
+    setOpenBoardName(name);
+    setTab('board');
+  };
+
+  const tabs: { id: Tab; label: string; icon: typeof FileText }[] = [
+    { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'board', label: 'Board', icon: LayoutGrid },
+    { id: 'graph', label: 'Graph', icon: Network },
+  ];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-xl p-1 glass">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  tab === t.id ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-sm text-zinc-500">
+          {tab === 'notes' && 'Obsidian-style vault — wiki-links, backlinks, folders'}
+          {tab === 'board' && 'Scratchpad + whiteboard in one canvas'}
+          {tab === 'graph' && 'How notes and boards connect'}
+        </p>
+      </div>
+
+      {tab === 'notes' && (
+        <NotesVault
+          notes={notes}
+          selected={selected}
+          loading={loading}
+          onSelect={(n) => setSelectedId(n.id)}
+          onCreate={createNote}
+          onOpenOrCreate={openOrCreate}
+          onOpenBoard={openBoard}
+          onReload={loadNotes}
+        />
+      )}
+      {tab === 'board' && (
+        <div className="min-h-0 flex-1" style={{ minHeight: '70vh' }}>
+          <Whiteboard
+            notes={notes}
+            openBoardName={openBoardName}
+            onOpenNote={(n) => {
+              setSelectedId(n.id);
+              setTab('notes');
+            }}
+            onCreateNote={(title) => openOrCreate(title)}
+          />
+        </div>
+      )}
+      {tab === 'graph' && (
+        <GraphView
+          notes={notes}
+          onOpenNote={(n) => {
+            setSelectedId(n.id);
+            setTab('notes');
+          }}
+          onOpenBoard={openBoard}
+        />
+      )}
+    </div>
+  );
+}
+
+function NotesVault({
+  notes,
+  selected,
+  loading,
+  onSelect,
+  onCreate,
+  onOpenOrCreate,
+  onOpenBoard,
+  onReload,
+}: {
+  notes: Note[];
+  selected: Note | null;
+  loading: boolean;
+  onSelect: (n: Note) => void;
+  onCreate: (p: Partial<Note> & { title: string }) => Promise<Note | null>;
+  onOpenOrCreate: (title: string) => Promise<Note | null>;
+  onOpenBoard: (name: string) => void;
+  onReload: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [activeFolder, setActiveFolder] = useState('All');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(true);
+  const [draft, setDraft] = useState<Note | null>(null);
+  const [linkPicker, setLinkPicker] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newFolder, setNewFolder] = useState('Vault');
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setDraft(selected);
+    setEditMode(true);
+  }, [selected?.id]);
+
+  const folders = useMemo(() => {
+    const set = new Set<string>();
+    notes.forEach((n) => set.add(n.folder || 'Vault'));
+    return ['All', ...[...set].sort()];
+  }, [notes]);
+
+  const allTags = useMemo(() => [...new Set(notes.flatMap((n) => n.tags || []))], [notes]);
 
   const filtered = notes.filter((n) => {
     if (activeFolder !== 'All' && n.folder !== activeFolder) return false;
@@ -112,75 +235,35 @@ function NotesTab() {
     return true;
   });
 
-  const pinnedNotes = filtered.filter((n) => n.pinned);
-  const regularNotes = filtered.filter((n) => !n.pinned);
-
-  const createNote = async () => {
-    if (!newTitle.trim()) return;
-    const tags = newTags.split(',').map((t) => t.trim()).filter(Boolean);
-    const { data } = await supabase.from('notes').insert({
-      title: newTitle.trim(),
-      content: newContent,
-      folder: newFolder || 'General',
-      tags,
-      pinned: false,
-      linked_subject: newSubject || null,
-    }).select().single();
-    if (data) {
-      setNotes([data as Note, ...notes]);
-      setSelectedNote(data as Note);
-    }
-    setNewTitle(''); setNewContent(''); setNewTags(''); setNewSubject(''); setNewFolder('General');
-    setShowNewNote(false);
+  const persistDraft = (next: Note) => {
+    setDraft(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      await supabase.from('notes').update({
+        title: next.title,
+        content: next.content,
+        tags: next.tags,
+        folder: next.folder,
+        linked_subject: next.linked_subject,
+      }).eq('id', next.id);
+      onReload();
+    }, 600);
   };
 
-  const updateNote = async (id: string, updates: Partial<Note>) => {
-    await supabase.from('notes').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
-    setNotes(notes.map((n) => n.id === id ? { ...n, ...updates } : n));
-    if (selectedNote?.id === id) setSelectedNote({ ...selectedNote, ...updates });
-  };
-
-  const togglePin = async (note: Note) => {
-    await supabase.from('notes').update({ pinned: !note.pinned }).eq('id', note.id);
-    setNotes(notes.map((n) => n.id === note.id ? { ...n, pinned: !n.pinned } : n));
-  };
-
-  const deleteNote = async (id: string) => {
-    await supabase.from('notes').delete().eq('id', id);
-    setNotes(notes.filter((n) => n.id !== id));
-    if (selectedNote?.id === id) setSelectedNote(null);
-  };
-
-  const createLinkedNote = async (title: string) => {
-    const { data } = await supabase.from('notes').insert({
-      title,
-      content: '',
-      folder: 'General',
-      tags: [],
-      pinned: false,
-      linked_subject: null,
-    }).select().single();
-    if (data) {
-      setNotes((prev) => [data as Note, ...prev]);
-      setSelectedNote(data as Note);
-      setEditMode(true);
-    }
-  };
-
-  const insertWikiLink = (title: string) => {
-    const el = editTextareaRef.current;
-    if (!selectedNote) return;
+  const insertWiki = (title: string) => {
+    const el = taRef.current;
+    if (!draft) return;
     const insertion = `[[${title}]]`;
     if (!el) {
-      setSelectedNote({ ...selectedNote, content: (selectedNote.content || '') + insertion });
-      setLinkPickerOpen(false);
+      persistDraft({ ...draft, content: (draft.content || '') + insertion });
+      setLinkPicker(false);
       return;
     }
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? el.value.length;
     const next = el.value.slice(0, start) + insertion + el.value.slice(end);
-    setSelectedNote({ ...selectedNote, content: next });
-    setLinkPickerOpen(false);
+    persistDraft({ ...draft, content: next });
+    setLinkPicker(false);
     requestAnimationFrame(() => {
       el.focus();
       const pos = start + insertion.length;
@@ -188,415 +271,411 @@ function NotesTab() {
     });
   };
 
-  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = (e.target as HTMLElement).closest('[data-wikilink]');
-    const title = el?.getAttribute('data-wikilink');
-    if (!title) return;
-    e.preventDefault();
-    const existing = notes.find((n) => n.title.toLowerCase() === title.toLowerCase());
-    if (existing) {
-      setSelectedNote(existing);
-      setEditMode(false);
-    } else {
-      createLinkedNote(title);
-    }
+  const daily = async () => {
+    const t = todayStamp();
+    const existing = notes.find((n) => n.title === t && n.folder === 'Daily');
+    if (existing) onSelect(existing);
+    else await onCreate({ title: t, folder: 'Daily', tags: ['daily'], content: `# ${t}\n\n## Focus\n- \n` });
   };
 
-  const backlinks = selectedNote
+  const backlinks = draft
     ? notes.filter(
         (n) =>
-          n.id !== selectedNote.id &&
-          new RegExp(`\\[\\[\\s*${escapeRegex(selectedNote.title)}\\s*\\]\\]`, 'i').test(n.content || ''),
+          n.id !== draft.id &&
+          new RegExp(`\\[\\[\\s*${escapeRegex(draft.title)}\\s*(\\|[^\\]]+)?\\]\\]`, 'i').test(n.content || ''),
       )
     : [];
+  const outgoing = draft ? wikiLinkTitles(draft.content || '') : [];
+  const boardLinks = draft ? wikiBoardTitles(draft.content || '') : [];
+  const heads = draft ? outline(draft.content || '') : [];
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><FileText className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <FileText className="h-8 w-8 animate-pulse text-zinc-300" />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-zinc-500">Full markdown notes with folders, tags, and subject linking</p>
-        <Button onClick={() => setShowNewNote(true)}><Plus className="w-4 h-4" /> New Note</Button>
-      </div>
-
-      <div className="grid lg:grid-cols-4 gap-4">
-        {/* Sidebar: folders + tags */}
-        <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Folder className="w-4 h-4 text-zinc-400" />
-              <span className="text-sm font-semibold text-zinc-700">Folders</span>
+    <div className="grid min-h-0 gap-4 lg:grid-cols-[16rem_18rem_minmax(0,1fr)_14rem]">
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={daily}
+          className="glass glass-hover flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-zinc-700"
+        >
+          <CalendarDays className="h-4 w-4" /> Today
+        </button>
+        <div className="glass rounded-2xl p-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700">
+            <Folder className="h-4 w-4 text-zinc-400" /> Folders
+          </div>
+          <div className="space-y-0.5">
+            {folders.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setActiveFolder(f)}
+                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm ${
+                  activeFolder === f ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                <span className="truncate">{f}</span>
+                <span className="text-[10px] opacity-60">
+                  {f === 'All' ? notes.length : notes.filter((n) => n.folder === f).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {allTags.length > 0 && (
+          <div className="glass rounded-2xl p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700">
+              <Tag className="h-4 w-4 text-zinc-400" /> Tags
             </div>
-            <div className="space-y-1">
-              {folders.map((folder) => (
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map((tag) => (
                 <button
-                  key={folder}
-                  onClick={() => setActiveFolder(folder)}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                    activeFolder === folder ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                  key={tag}
+                  type="button"
+                  onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                  className={`rounded-md px-2 py-0.5 text-xs ${
+                    activeTag === tag ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'
                   }`}
                 >
-                  {folder}
-                  <span className="text-xs ml-1 opacity-50">
-                    ({folder === 'All' ? notes.length : notes.filter((n) => n.folder === folder).length})
-                  </span>
+                  #{tag}
                 </button>
               ))}
             </div>
-          </Card>
-
-          {allTags.length > 0 && (
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Tag className="w-4 h-4 text-zinc-400" />
-                <span className="text-sm font-semibold text-zinc-700">Tags</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                    className={`px-2 py-0.5 rounded-md text-xs transition-all ${
-                      activeTag === tag ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-
-        {/* Note list */}
-        <div className="lg:col-span-1 space-y-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search notes..."
-              className="w-full pl-9 pr-3 py-2 glass-input rounded-xl text-sm text-zinc-700"
-            />
           </div>
+        )}
+      </div>
 
-          {pinnedNotes.length > 0 && (
-            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mt-3">Pinned</p>
-          )}
-          {pinnedNotes.map((note) => (
-            <NoteCard key={note.id} note={note} onClick={() => { setSelectedNote(note); setEditMode(false); }} onPin={togglePin} isSelected={selectedNote?.id === note.id} />
-          ))}
-
-          {regularNotes.length > 0 && pinnedNotes.length > 0 && (
-            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mt-3">All Notes</p>
-          )}
-          {regularNotes.map((note) => (
-            <NoteCard key={note.id} note={note} onClick={() => { setSelectedNote(note); setEditMode(false); }} onPin={togglePin} isSelected={selectedNote?.id === note.id} />
-          ))}
-
-          {filtered.length === 0 && (
-            <EmptyState icon={FileText} title="No notes found" subtitle="Create your first note to get started." />
-          )}
+      <div className="min-h-0 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vault…"
+            className="glass-input w-full rounded-xl py-2 pl-9 pr-3 text-sm"
+          />
         </div>
+        <Button
+          onClick={() => {
+            setShowNew(true);
+            setNewTitle('');
+          }}
+        >
+          <Plus className="h-4 w-4" /> New note
+        </Button>
+        <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1">
+          {filtered.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              onClick={() => onSelect(note)}
+              className={`w-full rounded-xl border p-3 text-left transition-all ${
+                selected?.id === note.id ? 'border-zinc-800 bg-zinc-100/70' : 'glass border-zinc-200/40 glass-hover'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                {note.pinned && <Pin className="h-3 w-3 text-zinc-600" />}
+                <span className="truncate text-sm font-medium text-zinc-800">{note.title}</span>
+              </div>
+              <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">
+                {(note.content || '').replace(/[#*`>[\]]/g, '').slice(0, 90)}
+              </p>
+              <p className="mt-1 text-[10px] text-zinc-400">{note.folder}</p>
+            </button>
+          ))}
+          {filtered.length === 0 && <EmptyState icon={FileText} title="No notes" subtitle="Create one to start the vault." />}
+        </div>
+      </div>
 
-        {/* Note editor/viewer */}
-        <div className="lg:col-span-2">
-          {selectedNote ? (
-            <Card className="p-6 h-full">
+      <div className="min-h-0">
+        {showNew ? (
+          <div className="glass rounded-2xl p-5">
+            <h3 className="mb-3 font-semibold">New note</h3>
+            <div className="space-y-2">
+              <Input value={newTitle} onChange={setNewTitle} placeholder="Title" />
+              <Input value={newFolder} onChange={setNewFolder} placeholder="Folder (e.g. Science/Biology)" />
+              <div className="flex gap-2">
+                <Button
+                  onClick={async () => {
+                    if (!newTitle.trim()) return;
+                    await onCreate({ title: newTitle.trim(), folder: newFolder || 'Vault' });
+                    setShowNew(false);
+                  }}
+                >
+                  Create
+                </Button>
+                <Button variant="ghost" onClick={() => setShowNew(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : draft ? (
+          <div className="glass flex h-full min-h-[70vh] flex-col rounded-2xl">
+            <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/60 px-4 py-3">
+              <input
+                value={draft.title}
+                onChange={(e) => persistDraft({ ...draft, title: e.target.value })}
+                className="min-w-0 flex-1 bg-transparent text-lg font-semibold outline-none"
+              />
+              <div className="flex gap-1 rounded-lg bg-zinc-100 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setEditMode(true)}
+                  className={`rounded-md px-2 py-1 ${editMode ? 'bg-white shadow-sm' : 'text-zinc-500'}`}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode(false)}
+                  className={`rounded-md px-2 py-1 ${!editMode ? 'bg-white shadow-sm' : 'text-zinc-500'}`}
+                >
+                  Preview
+                </button>
+              </div>
+              <div className="relative">
+                <Button size="sm" variant="secondary" onClick={() => setLinkPicker((v) => !v)}>
+                  <Link2 className="h-3.5 w-3.5" /> Link
+                </Button>
+                {linkPicker && (
+                  <div className="absolute right-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg">
+                    {notes
+                      .filter((n) => n.id !== draft.id)
+                      .map((n) => (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={() => insertWiki(n.title)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-zinc-100"
+                        >
+                          <FileText className="h-3 w-3 text-zinc-400" />
+                          {n.title}
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() => insertWiki('Board: Study sketch')}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-zinc-100"
+                    >
+                      <LayoutGrid className="h-3 w-3 text-zinc-400" /> Board: Study sketch
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.from('notes').update({ pinned: !draft.pinned }).eq('id', draft.id);
+                  persistDraft({ ...draft, pinned: !draft.pinned });
+                }}
+                className="rounded-lg p-2 hover:bg-zinc-100"
+              >
+                {draft.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4 text-zinc-400" />}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.from('notes').delete().eq('id', draft.id);
+                  onReload();
+                }}
+                className="rounded-lg p-2 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
               {editMode ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Input value={selectedNote.title} onChange={(v) => { const updated = { ...selectedNote, title: v }; setSelectedNote(updated); }} placeholder="Note title" />
-                    <div className="flex gap-2 ml-2">
-                      <div className="relative">
-                        <Button size="sm" variant="secondary" onClick={() => setLinkPickerOpen((v) => !v)}>
-                          <Link2 className="w-3.5 h-3.5" /> Link note
-                        </Button>
-                        {linkPickerOpen && (
-                          <div className="absolute right-0 top-full mt-1.5 w-56 max-h-64 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg z-20">
-                            {notes.filter((n) => n.id !== selectedNote.id).length === 0 ? (
-                              <p className="px-3 py-2.5 text-xs text-zinc-400">No other notes yet.</p>
-                            ) : (
-                              notes
-                                .filter((n) => n.id !== selectedNote.id)
-                                .map((n) => (
-                                  <button
-                                    key={n.id}
-                                    onClick={() => insertWikiLink(n.title)}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 truncate"
-                                  >
-                                    <FileText className="w-3 h-3 shrink-0 text-zinc-400" />
-                                    <span className="truncate">{n.title}</span>
-                                  </button>
-                                ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => { setEditMode(false); setLinkPickerOpen(false); updateNote(selectedNote.id, selectedNote); }}>Save</Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setEditMode(false); setLinkPickerOpen(false); }}>Cancel</Button>
-                    </div>
-                  </div>
-                  <textarea
-                    ref={editTextareaRef}
-                    value={selectedNote.content}
-                    onChange={(e) => setSelectedNote({ ...selectedNote, content: e.target.value })}
-                    className="w-full h-96 px-3 py-2 glass-input rounded-xl text-sm text-zinc-700 font-mono"
-                    placeholder="Write in markdown... use [[Note Title]] to link another note"
-                  />
-                  <div className="flex gap-2">
-                    <Input value={(selectedNote.tags || []).join(', ')} onChange={(v) => setSelectedNote({ ...selectedNote, tags: v.split(',').map((t) => t.trim()).filter(Boolean) })} placeholder="Tags (comma separated)" />
-                    <Select
-                      value={selectedNote.linked_subject || ''}
-                      onChange={(v) => setSelectedNote({ ...selectedNote, linked_subject: v || null })}
-                      options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]}
-                    />
-                  </div>
-                </div>
+                <textarea
+                  ref={taRef}
+                  value={draft.content}
+                  onChange={(e) => persistDraft({ ...draft, content: e.target.value })}
+                  placeholder="Write in markdown. Use [[Note title]] or [[Board: Name]] to link."
+                  className="h-full min-h-[28rem] w-full resize-none bg-transparent px-5 py-4 font-mono text-sm leading-relaxed outline-none"
+                />
               ) : (
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-zinc-800">{selectedNote.title}</h3>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <Badge>{selectedNote.folder}</Badge>
-                        {selectedNote.linked_subject && (
-                          <Badge>{SUBJECTS.find((s) => s.key === selectedNote.linked_subject)?.shortName}</Badge>
-                        )}
-                        {(selectedNote.tags || []).map((tag) => (
-                          <span key={tag} className="text-xs text-zinc-400">#{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => togglePin(selectedNote)} className="p-2 rounded-lg hover:bg-zinc-100" title={selectedNote.pinned ? 'Unpin' : 'Pin'}>
-                        {selectedNote.pinned ? <PinOff className="w-4 h-4 text-zinc-600" /> : <Pin className="w-4 h-4 text-zinc-400" />}
-                      </button>
-                      <Button size="sm" variant="secondary" onClick={() => setEditMode(true)}>Edit</Button>
-                      <button onClick={() => deleteNote(selectedNote.id)} className="p-2 rounded-lg hover:bg-red-50">
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    className="prose prose-sm max-w-none text-sm text-zinc-700"
-                    onClick={handleContentClick}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedNote.content || '') }}
+                <div className="h-full overflow-y-auto px-6 py-5">
+                  <NoteMarkdown
+                    content={draft.content}
+                    notes={notes}
+                    onOpenNote={(t) => onOpenOrCreate(t)}
+                    onOpenBoard={onOpenBoard}
+                    onCreateNote={(t) => onOpenOrCreate(t)}
                   />
-                  <p className="text-xs text-zinc-400 mt-4">
-                    Last updated {new Date(selectedNote.updated_at).toLocaleString()}
-                  </p>
-
-                  {(() => {
-                    const outgoing = selectedNote ? wikiLinkTitles(selectedNote.content || '') : [];
-                    if (!outgoing.length) return null;
-                    return (
-                      <div className="mt-5 pt-4 border-t border-zinc-200/60">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-                          <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                            Links to ({outgoing.length})
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {outgoing.map((title) => {
-                            const exists = notes.some((n) => n.title.toLowerCase() === title.toLowerCase());
-                            return (
-                              <button
-                                key={title}
-                                onClick={() => {
-                                  const existing = notes.find((n) => n.title.toLowerCase() === title.toLowerCase());
-                                  if (existing) { setSelectedNote(existing); setEditMode(false); }
-                                  else createLinkedNote(title);
-                                }}
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                  exists ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                }`}
-                                title={exists ? undefined : 'Not created yet — click to create'}
-                              >
-                                <FileText className="w-3 h-3" />
-                                {title}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {backlinks.length > 0 && (
-                    <div className="mt-5 pt-4 border-t border-zinc-200/60">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-                        <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                          Linked mentions ({backlinks.length})
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        {backlinks.map((n) => (
-                          <button
-                            key={n.id}
-                            onClick={() => { setSelectedNote(n); setEditMode(false); }}
-                            className="flex w-full items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-sm text-zinc-600 hover:bg-zinc-100 transition-colors"
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0">
-                              <FileText className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-                              <span className="truncate">{n.title}</span>
-                            </span>
-                            <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-zinc-300" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
-            </Card>
-          ) : showNewNote ? (
-            <Card className="p-6">
-              <h3 className="font-semibold text-zinc-800 mb-4">New Note</h3>
-              <div className="space-y-3">
-                <Input value={newTitle} onChange={setNewTitle} placeholder="Note title" />
-                <textarea
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  className="w-full h-64 px-3 py-2 glass-input rounded-xl text-sm text-zinc-700 font-mono"
-                  placeholder="Write in markdown..."
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input value={newFolder} onChange={setNewFolder} placeholder="Folder name" />
-                  <Input value={newTags} onChange={setNewTags} placeholder="Tags (comma separated)" />
-                </div>
-                <Select
-                  value={newSubject}
-                  onChange={setNewSubject}
-                  options={[{ value: '', label: 'No linked subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]}
-                />
-                <div className="flex gap-2">
-                  <Button onClick={createNote}><Plus className="w-4 h-4" /> Create Note</Button>
-                  <Button variant="ghost" onClick={() => setShowNewNote(false)}>Cancel</Button>
-                </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-zinc-200/60 px-4 py-2">
+              <Input
+                value={(draft.tags || []).join(', ')}
+                onChange={(v) => persistDraft({ ...draft, tags: v.split(',').map((t) => t.trim()).filter(Boolean) })}
+                placeholder="tags"
+                className="max-w-xs"
+              />
+              <Select
+                value={draft.linked_subject || ''}
+                onChange={(v) => persistDraft({ ...draft, linked_subject: v || null })}
+                options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="glass rounded-2xl p-6">
+            <EmptyState icon={BookOpen} title="Select a note" subtitle="Or create one from the list." />
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {draft && (
+          <>
+            <div className="glass rounded-2xl p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Outline</p>
+              {heads.length === 0 && <p className="text-xs text-zinc-400">Headings appear here.</p>}
+              <div className="space-y-1">
+                {heads.map((h, i) => (
+                  <p key={i} className="truncate text-xs text-zinc-600" style={{ paddingLeft: (h.level - 1) * 8 }}>
+                    {h.text}
+                  </p>
+                ))}
               </div>
-            </Card>
-          ) : (
-            <Card className="p-6">
-              <EmptyState icon={BookOpen} title="Select a note to read" subtitle="Or create a new one to start writing." />
-            </Card>
-          )}
-        </div>
+            </div>
+            <div className="glass rounded-2xl p-3">
+              <p className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                <Link2 className="h-3 w-3" /> Links
+              </p>
+              {outgoing.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onOpenOrCreate(t)}
+                  className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                >
+                  <FileText className="h-3 w-3 text-zinc-400" /> {t}
+                </button>
+              ))}
+              {boardLinks.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onOpenBoard(t)}
+                  className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                >
+                  <LayoutGrid className="h-3 w-3 text-zinc-400" /> {t}
+                </button>
+              ))}
+              {outgoing.length === 0 && boardLinks.length === 0 && <p className="text-xs text-zinc-400">No outgoing links.</p>}
+            </div>
+            <div className="glass rounded-2xl p-3">
+              <p className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                <GitBranch className="h-3 w-3" /> Backlinks
+              </p>
+              {backlinks.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => onSelect(n)}
+                  className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                >
+                  <FileText className="h-3 w-3 text-zinc-400" /> {n.title}
+                </button>
+              ))}
+              {backlinks.length === 0 && <p className="text-xs text-zinc-400">Nothing links here yet.</p>}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function NoteCard({ note, onClick, onPin, isSelected }: { note: Note; onClick: () => void; onPin: (n: Note) => void; isSelected: boolean }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`p-3 rounded-xl cursor-pointer transition-all border ${
-        isSelected ? 'border-zinc-800 bg-zinc-100/60' : 'border-zinc-200/30 glass glass-hover'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            {note.pinned && <Pin className="w-3 h-3 text-zinc-600 shrink-0" />}
-            <p className="text-sm font-medium text-zinc-700 truncate">{note.title}</p>
-          </div>
-          <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{(note.content || '').replace(/[#*`>]/g, '').slice(0, 80)}</p>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] text-zinc-400">{note.folder}</span>
-            {note.linked_subject && (
-              <span className="text-[10px] text-zinc-400">· {SUBJECTS.find((s) => s.key === note.linked_subject)?.shortName}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+function GraphView({
+  notes,
+  onOpenNote,
+  onOpenBoard,
+}: {
+  notes: Note[];
+  onOpenNote: (n: Note) => void;
+  onOpenBoard: (name: string) => void;
+}) {
+  const [boards, setBoards] = useState(() => (typeof window === 'undefined' ? [] : loadBoards()));
+  useEffect(() => {
+    const on = () => setBoards(loadBoards());
+    window.addEventListener(BOARDS_CHANGED, on);
+    return () => window.removeEventListener(BOARDS_CHANGED, on);
+  }, []);
 
-// ─── Scratchpad Tab ───
-
-function ScratchpadTab() {
-  const [content, setContent] = useState('');
-  const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recordId = useRef<string | null>(null);
-
-  const loadScratchpad = useCallback(async () => {
-    const { data } = await supabase.from('scratchpad').select('*').maybeSingle();
-    if (data) {
-      setContent(data.content);
-      recordId.current = data.id;
+  const nodes = [
+    ...notes.map((n) => ({ id: n.id, label: n.title, kind: 'note' as const })),
+    ...boards.map((b) => ({ id: `board:${b.id}`, label: b.name, kind: 'board' as const })),
+  ];
+  const edges: { from: string; to: string }[] = [];
+  for (const n of notes) {
+    for (const t of wikiLinkTitles(n.content || '')) {
+      const dest = findNoteByTitle(notes, t);
+      if (dest) edges.push({ from: n.id, to: dest.id });
     }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadScratchpad(); }, [loadScratchpad]);
-
-  const save = useCallback(async (text: string) => {
-    setSaved(false);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      if (recordId.current) {
-        await supabase.from('scratchpad').update({ content: text, updated_at: new Date().toISOString() }).eq('id', recordId.current);
-      } else {
-        const { data } = await supabase.from('scratchpad').insert({ content: text }).select().single();
-        if (data) recordId.current = data.id;
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }, 800);
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setContent(text);
-    save(text);
-  };
-
-  if (loading) {
-    return <div className="flex items-center justify-center py-20"><StickyNote className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
+    for (const t of wikiBoardTitles(n.content || '')) {
+      const b = findBoardByName(boards, t);
+      if (b) edges.push({ from: n.id, to: `board:${b.id}` });
+    }
   }
 
-  const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
-  const charCount = content.length;
+  const w = 900;
+  const h = 520;
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = Math.min(w, h) * 0.36;
+  const pos = new Map<string, { x: number; y: number }>();
+  nodes.forEach((n, i) => {
+    const a = (i / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    pos.set(n.id, { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  });
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-zinc-500">Quick capture — auto-saves as you type</p>
-        <div className="flex items-center gap-1.5 text-sm">
-          {saved ? (
-            <span className="flex items-center gap-1 text-zinc-700 font-medium">
-              <Check className="w-4 h-4" /> Saved
-            </span>
-          ) : (
-            <span className="text-zinc-400">Auto-saving...</span>
-          )}
-        </div>
-      </div>
-
-      <Card className="p-0 overflow-hidden">
-        <textarea
-          value={content}
-          onChange={handleChange}
-          autoFocus
-          placeholder="Start typing anything — ideas, reminders, formulas, quick notes..."
-          className="w-full min-h-[60vh] p-6 text-sm text-zinc-800 placeholder-zinc-400 resize-none focus:outline-none leading-relaxed bg-transparent"
-          style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
-        />
-        <div className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-200/40 text-xs text-zinc-400">
-          <span>{wordCount} words · {charCount} characters</span>
-          <span className="flex items-center gap-1">
-            <StickyNote className="w-3 h-3" /> Auto-saved
-          </span>
-        </div>
-      </Card>
+    <div className="glass overflow-hidden rounded-2xl">
+      <svg viewBox={`0 0 ${w} ${h}`} className="h-[70vh] w-full">
+        {edges.map((e, i) => {
+          const a = pos.get(e.from);
+          const b = pos.get(e.to);
+          if (!a || !b) return null;
+          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(24,24,27,0.18)" strokeWidth="1.2" />;
+        })}
+        {nodes.map((n) => {
+          const p = pos.get(n.id)!;
+          const isBoard = n.kind === 'board';
+          return (
+            <g
+              key={n.id}
+              transform={`translate(${p.x},${p.y})`}
+              className="cursor-pointer"
+              onClick={() => {
+                if (isBoard) onOpenBoard(n.label);
+                else {
+                  const note = notes.find((x) => x.id === n.id);
+                  if (note) onOpenNote(note);
+                }
+              }}
+            >
+              {isBoard ? (
+                <rect x={-9} y={-9} width={18} height={18} rx={3} transform="rotate(45)" fill="#18181b" />
+              ) : (
+                <circle r={10} fill="#18181b" />
+              )}
+              <text y={26} textAnchor="middle" fontSize="11" fill="#3f3f46">
+                {n.label.slice(0, 22)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }

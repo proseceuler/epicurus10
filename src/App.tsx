@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
+import type { ReactNode } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import AppLayout, { usePageState } from '@/components/AppLayout';
 import DashboardPage from '@/pages/DashboardPage';
@@ -20,7 +21,7 @@ import SettingsPage from '@/pages/SettingsPage';
 function App() {
   const [page, navigate] = usePageState();
 
-  const pages: Record<string, React.ReactNode> = {
+  const pages: Record<string, ReactNode> = {
     dashboard: <DashboardPage navigate={navigate} />,
     grades: <GradesPage />,
     forecast: <ForecastPage />,

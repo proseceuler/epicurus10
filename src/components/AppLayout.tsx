@@ -3,7 +3,7 @@ import { SUBJECTS, NUM_TERMS } from '@/lib/types';
 import GlobalDock from '@/components/GlobalDock';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
-  Timer, ChartBar as BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X,
+  Timer, BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X,
   Layers, Bot, Settings as SettingsIcon,
 } from 'lucide-react';
 
@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'todos', label: 'To-Do List', icon: CheckSquare, group: 'Tasks' },
   { id: 'kanban', label: 'Kanban Board', icon: LayoutDashboard, group: 'Tasks' },
   { id: 'calendar', label: 'Calendar', icon: Calendar, group: 'Tasks' },
-  { id: 'notes', label: 'Notes & Ideas', icon: StickyNote, group: 'Tasks' },
+  { id: 'notes', label: 'Notes & Board', icon: StickyNote, group: 'Tasks' },
   { id: 'pomodoro', label: 'Focus Timer', icon: Timer, group: 'Focus' },
   { id: 'analytics', label: 'Focus Analytics', icon: BarChart3, group: 'Focus' },
   { id: 'habits', label: 'Habit Tracker', icon: CalendarHeart, group: 'Personal' },

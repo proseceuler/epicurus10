@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type ClassHub, type ClassHubLink, type TimetableEntry, type ClassAttendance, type SubjectKey } from '@/lib/types';
-import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
+import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
 import { FolderTree, Plus, Trash2, Link2, Clock, MapPin, User, Save, ExternalLink, Calendar, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 
 type Tab = 'info' | 'timetable';

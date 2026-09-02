@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSession } from '@/lib/types';
-import { Card, PageHeader, EmptyState } from '@/components/ui';
+import { Card, PageHeader, EmptyState } from '@/components/kit';
 import { BarChart3, Clock, Flame, Target } from 'lucide-react';
 
 export default function AnalyticsPage() {

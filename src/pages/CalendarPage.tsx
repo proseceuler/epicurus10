@@ -8,7 +8,7 @@ import {
   CALENDAR_EVENTS_UPDATED,
   type CalendarEvent,
 } from '@/lib/calendarStore';
-import { Card, PageHeader, EmptyState, SubjectBadge, Button, Input, Select } from '@/components/ui';
+import { Card, PageHeader, EmptyState, SubjectBadge, Button, Input, Select } from '@/components/kit';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertCircle, Plus, X, Trash2, Link2 } from 'lucide-react';
 
 export type { CalendarEvent };

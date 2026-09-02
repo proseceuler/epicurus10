@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type FlashcardDeck, type Flashcard, type SubjectKey } from '@/lib/types';
-import { Card, PageHeader, Button, Input, Select, EmptyState, Badge } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
 import { Plus, Trash2, Layers, ChevronLeft, ChevronRight, RotateCcw, Check, X, BookOpen } from 'lucide-react';
 
 type ReviewRating = 'again' | 'hard' | 'good' | 'easy';

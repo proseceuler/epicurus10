@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, NUM_TERMS, type Assessment, type Todo, type PomodoroSession } from '@/lib/types';
 import { computeFinalGrade, computeGeneralAverage, computeTermGrade } from '@/lib/gradeUtils';
-import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/ui';
+import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import {
   TrendingUp, CheckSquare, Timer, Calendar,

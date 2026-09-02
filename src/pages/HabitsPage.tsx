@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type Habit, type HabitCompletion, type WellnessLog } from '@/lib/types';
-import { Card, PageHeader, Button } from '@/components/ui';
+import { Card, PageHeader, Button } from '@/components/kit';
 import {
   Plus, Trash2, Check, Flame, Trophy, Smile,
 } from 'lucide-react';

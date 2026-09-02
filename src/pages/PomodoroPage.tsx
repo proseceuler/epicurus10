@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
-import { Card, PageHeader, Button, Select } from '@/components/ui';
+import { Card, PageHeader, Button, Select } from '@/components/kit';
 import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain } from 'lucide-react';
 
 type SessionType = 'focus' | 'short_break' | 'long_break';

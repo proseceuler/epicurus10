@@ -4,7 +4,7 @@ import {
   type FinanceSettings, type FinanceTransaction, type FinanceGoal,
   type ExpenseCategory, EXPENSE_CATEGORIES,
 } from '@/lib/types';
-import { Card, PageHeader, Button, Input, Select, EmptyState } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Select, EmptyState } from '@/components/kit';
 import { Wallet, Plus, Trash2, Target, TrendingDown, PiggyBank, ArrowRight, TrendingUp } from 'lucide-react';
 
 export default function FinancePage() {

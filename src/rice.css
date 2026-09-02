@@ -1,0 +1,166 @@
+/* ===== Rice / neofetch HUD skin ===== */
+
+.rice-shell {
+  --rice-bg: #0b0c0e;
+  --rice-accent: #6d8b8e;
+  --rice-accent-dim: #4e6668;
+  color: #c9cbd0;
+  font-family: Outfit, "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.rice-shell .font-mono,
+.rice-shell .hud-sigil,
+.rice-shell kbd {
+  font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.film-grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.hud-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.hud-sigil {
+  color: #6a7076;
+  text-shadow: 0 0 18px rgba(109, 139, 142, 0.05);
+  transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease;
+}
+
+.hud-awake .hud-sigil {
+  color: #8eadaf;
+  text-shadow: 0 0 28px rgba(109, 139, 142, 0.35);
+  filter: saturate(1.15);
+}
+
+.rice-sidebar .rice-nav-label {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 160ms ease;
+}
+
+.rice-sidebar:hover .rice-nav-label,
+.rice-sidebar.w-56 .rice-nav-label {
+  opacity: 1;
+  width: auto;
+}
+
+@media (max-width: 1023px) {
+  .rice-sidebar .rice-nav-label {
+    opacity: 1;
+    width: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rice-main {
+    padding-left: 4.75rem;
+    transition: padding-left 300ms ease;
+  }
+  .rice-sidebar:hover ~ .rice-main {
+    padding-left: 15.5rem;
+  }
+}
+
+.rice-shell .text-zinc-800,
+.rice-shell .text-zinc-900,
+.rice-shell .text-zinc-700 {
+  color: #d4d5d9;
+}
+.rice-shell .text-zinc-600 {
+  color: #9aa0a6;
+}
+.rice-shell .text-zinc-500 {
+  color: #6f747c;
+}
+.rice-shell .text-zinc-400,
+.rice-shell .text-zinc-300 {
+  color: #5c6168;
+}
+.rice-shell .bg-zinc-100,
+.rice-shell .bg-zinc-200,
+.rice-shell .bg-zinc-200\/60 {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+.rice-shell .placeholder-zinc-400::placeholder {
+  color: #5c6168;
+}
+
+.rice-shell .glass {
+  background: rgba(16, 17, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+}
+
+.rice-shell .glass-dark {
+  background: rgba(12, 13, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rice-shell .glass-shadow,
+.rice-shell .glass-shadow-lg {
+  box-shadow: none;
+}
+
+.rice-shell .glass-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #e4e5e8;
+}
+
+.rice-shell .glass-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(109, 139, 142, 0.35);
+  box-shadow: none;
+}
+
+.rice-shell .glass-hover:hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  transform: none;
+}
+
+.rice-shell .glass-sticky {
+  background: #121317;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.rice-shell * {
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.rice-shell ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.rice-palette {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.rice-shell .sa-glass {
+  --sa-bg: transparent;
+  --sa-surface: rgba(255, 255, 255, 0.04);
+  --sa-surface-hover: rgba(255, 255, 255, 0.07);
+  --sa-text: #d7d8dc;
+  --sa-text-muted: #8b8f96;
+  --sa-text-dim: #6f747c;
+  --sa-border: rgba(255, 255, 255, 0.06);
+  --sa-border-hover: rgba(255, 255, 255, 0.12);
+  --sa-accent: #c9cbd0;
+  --sa-accent-text: #0b0c0e;
+  color: var(--sa-text);
+}

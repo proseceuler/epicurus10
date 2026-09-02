@@ -4,7 +4,7 @@ import GlobalDock from '@/components/GlobalDock';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X,
-  Layers, Bot, Settings as SettingsIcon,
+  Layers, Bot, Settings as SettingsIcon, Columns3,
 } from 'lucide-react';
 
 export type PageId =
@@ -22,23 +22,23 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Overview' },
-  { id: 'grades', label: 'Grade Calculator', icon: Calculator, group: 'Academic' },
-  { id: 'forecast', label: 'Grade Forecaster', icon: BarChart3, group: 'Academic' },
-  { id: 'classhub', label: 'Class Hub', icon: FolderTree, group: 'Academic' },
-  { id: 'assistant', label: 'Study Assistant', icon: Bot, group: 'Academic' },
-  { id: 'todos', label: 'To-Do List', icon: CheckSquare, group: 'Tasks' },
-  { id: 'kanban', label: 'Kanban Board', icon: LayoutDashboard, group: 'Tasks' },
-  { id: 'calendar', label: 'Calendar', icon: Calendar, group: 'Tasks' },
-  { id: 'notes', label: 'Notes & Board', icon: StickyNote, group: 'Tasks' },
-  { id: 'pomodoro', label: 'Focus Timer', icon: Timer, group: 'Focus' },
-  { id: 'analytics', label: 'Focus Analytics', icon: BarChart3, group: 'Focus' },
-  { id: 'habits', label: 'Habit Tracker', icon: CalendarHeart, group: 'Personal' },
-  { id: 'finance', label: 'Baon Tracker', icon: Wallet, group: 'Personal' },
-  { id: 'flashcards', label: 'Flashcards', icon: Layers, group: 'Personal' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
+  { id: 'grades', label: 'Grade Calculator', icon: Calculator, group: 'Core' },
+  { id: 'forecast', label: 'Grade Forecaster', icon: BarChart3, group: 'Core' },
+  { id: 'classhub', label: 'Class Hub', icon: FolderTree, group: 'Core' },
+  { id: 'assistant', label: 'Study Assistant', icon: Bot, group: 'Core' },
+  { id: 'todos', label: 'To-Do List', icon: CheckSquare, group: 'Work' },
+  { id: 'kanban', label: 'Kanban Board', icon: Columns3, group: 'Work' },
+  { id: 'calendar', label: 'Calendar', icon: Calendar, group: 'Work' },
+  { id: 'notes', label: 'Notes & Board', icon: StickyNote, group: 'Work' },
+  { id: 'pomodoro', label: 'Focus Timer', icon: Timer, group: 'Pulse' },
+  { id: 'analytics', label: 'Focus Analytics', icon: BarChart3, group: 'Pulse' },
+  { id: 'habits', label: 'Habit Tracker', icon: CalendarHeart, group: 'Pulse' },
+  { id: 'finance', label: 'Baon Tracker', icon: Wallet, group: 'Pulse' },
+  { id: 'flashcards', label: 'Flashcards', icon: Layers, group: 'Pulse' },
 ];
 
-const GROUPS = ['Overview', 'Academic', 'Tasks', 'Focus', 'Personal'];
+const GROUPS = ['Core', 'Work', 'Pulse'];
 
 export function usePageState(): [PageId, (p: PageId) => void] {
   const [page, setPage] = useState<PageId>(() => {
@@ -73,44 +73,42 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [currentLabel]);
 
   return (
-    /* Fixed full-viewport shell — no document scrollbar */
-    <div className="relative flex h-screen overflow-hidden bg-zinc-100">
-      {/* Ambient liquid-glass blobs */}
+    <div className="rice-shell relative flex h-screen overflow-hidden bg-[#0b0c0e]">
+      <div className="film-grain" aria-hidden />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-zinc-300/25 blur-3xl" />
-        <div className="absolute -right-40 top-1/3 h-96 w-96 rounded-full bg-zinc-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-white/40 blur-3xl" />
+        <div className="absolute -left-32 top-[-8rem] h-[28rem] w-[28rem] rounded-full bg-[#6d8b8e]/8 blur-[90px]" />
+        <div className="absolute -right-24 top-1/3 h-[26rem] w-[26rem] rounded-full bg-[#7a8fa3]/6 blur-[100px]" />
+        <div className="absolute bottom-[-6rem] left-1/4 h-[22rem] w-[22rem] rounded-full bg-white/3 blur-[80px]" />
       </div>
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
       <aside
-        className={`fixed bottom-4 left-4 top-4 z-40 w-60 transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-[280px] lg:translate-x-0'
+        className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${
+          sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'
         }`}
       >
-        <div className="glass-dark glass-shadow-lg flex h-full flex-col overflow-hidden rounded-3xl">
-          <div className="flex h-16 shrink-0 items-center gap-3 px-5">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-              <img
-                src="https://cdn-icons-png.flaticon.com/512/3582/3582676.png"
-                alt="epicure"
-                className="h-5 w-5 invert"
-              />
+        <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#101114]/80 backdrop-blur-xl">
+          <div className="flex h-14 shrink-0 items-center gap-3 px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 font-mono text-[11px] font-semibold tracking-widest text-[#9aa8ab]">
+              E
             </div>
-            <span className="text-lg font-bold text-white">epicure</span>
+            <span className="rice-nav-label truncate font-mono text-[13px] font-medium tracking-[0.18em] text-[#d7d8dc] uppercase">
+              epicure
+            </span>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-3">
+          <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
             {GROUPS.map((group) => (
               <div key={group} className="mb-3">
-                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{group}</p>
+                <p className="rice-nav-label mb-1 px-2 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-[#5c6168]">
+                  {group}
+                </p>
                 {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const active = page === item.id;
@@ -118,16 +116,19 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                     <button
                       key={item.id}
                       type="button"
+                      title={item.label}
                       onClick={() => {
                         navigate(item.id);
                         setSidebarOpen(false);
                       }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
-                        active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                      className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
+                        active
+                          ? 'bg-white/8 text-[#e4e5e8]'
+                          : 'text-[#6f747c] hover:bg-white/4 hover:text-[#c9cbd0]'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      {item.label}
+                      <span className="rice-nav-label truncate">{item.label}</span>
                     </button>
                   );
                 })}
@@ -135,22 +136,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             ))}
           </nav>
 
-          <div className="shrink-0 border-t border-white/5 p-3">
-            <div className="flex items-center gap-2 px-3 py-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+          <div className="shrink-0 p-2">
+            <div className="flex items-center gap-2 px-1 py-1">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/6 font-mono text-[11px] text-[#c9cbd0]">
                 G
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-zinc-200">Grade 10</p>
-                <p className="text-xs text-zinc-500">
-                  {SUBJECTS.length} subjects · {NUM_TERMS} terms
+              <div className="rice-nav-label min-w-0 flex-1">
+                <p className="truncate text-[12px] text-[#c9cbd0]">Grade 10</p>
+                <p className="truncate font-mono text-[10px] text-[#5c6168]">
+                  {SUBJECTS.length} subj · {NUM_TERMS} terms
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('settings')}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
-                  page === 'settings' ? 'bg-white/15 text-white' : 'text-zinc-500 hover:bg-white/10 hover:text-white'
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  page === 'settings' ? 'bg-white/10 text-[#e4e5e8]' : 'text-[#5c6168] hover:bg-white/6 hover:text-[#c9cbd0]'
                 }`}
                 title="Settings"
               >
@@ -161,31 +162,28 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         </div>
       </aside>
 
-      {/* Main workspace column */}
-      <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden lg:pl-[17rem]">
-        {/* Mobile header */}
-        <header className="z-20 shrink-0 px-3 pt-4 lg:hidden">
-          <div className="glass glass-shadow flex h-10 items-center justify-between rounded-xl px-2">
+      <div className="rice-main relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-20 shrink-0 px-3 pt-3 lg:hidden">
+          <div className="flex h-10 items-center justify-between rounded-xl bg-[#121317]/80 px-2 backdrop-blur-xl">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="rounded-lg p-1.5 hover:bg-zinc-200/50"
+                className="rounded-lg p-1.5 text-[#c9cbd0] hover:bg-white/6"
                 title="Toggle sidebar"
               >
-                {sidebarOpen ? <X className="h-4 w-4 text-zinc-700" /> : <Menu className="h-4 w-4 text-zinc-700" />}
+                {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               </button>
-              <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
+              <h1 className="truncate font-mono text-xs tracking-wide text-[#d7d8dc]">{currentLabel}</h1>
             </div>
           </div>
         </header>
 
-        {/* Page content — scrolls unless assistant (assistant manages its own panes) */}
         <main
           className={
             isAssistant
-              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-20 pt-4 lg:px-6'
-              : 'min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-6'
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-20 pt-4 lg:px-8'
+              : 'min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-8'
           }
         >
           {children}

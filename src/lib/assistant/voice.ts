@@ -53,16 +53,31 @@ export function createRecognizer(opts: {
   return rec;
 }
 
+function pickVoice(preferred = ['Google UK English Male']) {
+  const voices = window.speechSynthesis.getVoices();
+  for (const name of preferred) {
+    const match = voices.find((v) => v.name.includes(name));
+    if (match) return match;
+  }
+  return (
+    voices.find((v) => v.lang.startsWith('en') && /male/i.test(v.name)) ||
+    voices.find((v) => v.lang.startsWith('en')) ||
+    voices[0] ||
+    null
+  );
+}
+
 export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim().slice(0, 800);
+  const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, ' ').trim().slice(0, 800);
   if (!clean) { hooks?.onEnd?.(); return; }
   const u = new SpeechSynthesisUtterance(clean);
-  u.rate = 1.02;
+  u.rate = 0.92;           // slowed down, calmer pacing
+  u.pitch = 0.9;           // slightly lower, more reserved tone
+  u.voice = pickVoice();   // calm/reserved male voice, falls back gracefully
   u.onstart = () => hooks?.onStart?.();
   u.onend = () => hooks?.onEnd?.();
-  u.onerror = () => hooks?.onEnd?.();
   window.speechSynthesis.speak(u);
 }
 

@@ -3,13 +3,15 @@ import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
-import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain } from 'lucide-react';
+import AnalyticsPage from '@/pages/AnalyticsPage';
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3 } from 'lucide-react';
 
 type SessionType = 'focus' | 'short_break' | 'long_break';
 
 export default function PomodoroPage() {
   const pomo = usePomodoro();
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey | ''>('math');
+  const [section, setSection] = useState<'timer' | 'analytics'>('timer');
   const [showSettings, setShowSettings] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
   const [soundType, setSoundType] = useState<'rain' | 'white' | 'lofi'>('rain');
@@ -112,20 +114,33 @@ export default function PomodoroPage() {
   return (
     <div>
       <PageHeader
-        title="Focus Timer"
-        subtitle="Structure your study sessions with the Pomodoro Technique"
+        title="Focus"
         action={
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setSoundOn(!soundOn)}>
-              {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              {soundOn ? 'Sound On' : 'Sound Off'}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowSettings(!showSettings)}>
-              <Settings className="w-4 h-4" /> Settings
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 rounded-xl p-1 glass">
+              <button type="button" onClick={() => setSection('timer')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'timer' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <Brain className="h-3.5 w-3.5" /> Timer
+              </button>
+              <button type="button" onClick={() => setSection('analytics')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <BarChart3 className="h-3.5 w-3.5" /> Analytics
+              </button>
+            </div>
+            {section === 'timer' && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => setSoundOn(!soundOn)}>
+                  {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  {soundOn ? 'Sound On' : 'Sound Off'}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowSettings(!showSettings)}>
+                  <Settings className="w-4 h-4" /> Settings
+                </Button>
+              </>
+            )}
           </div>
         }
       />
+      {section === 'analytics' ? <AnalyticsPage embedded /> : null}
+      {section === 'timer' && (
 
       <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
         <div className="lg:col-span-2">
@@ -258,6 +273,7 @@ export default function PomodoroPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

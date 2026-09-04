@@ -4,18 +4,15 @@ import { PomodoroProvider } from '@/context/PomodoroContext';
 import AppLayout, { usePageState } from '@/components/AppLayout';
 import DashboardPage from '@/pages/DashboardPage';
 import GradesPage from '@/pages/GradesPage';
-import ForecastPage from '@/pages/ForecastPage';
 import ClassHubPage from '@/pages/ClassHubPage';
 import TodosPage from '@/pages/TodosPage';
 import KanbanPage from '@/pages/KanbanPage';
 import CalendarPage from '@/pages/CalendarPage';
 import PomodoroPage from '@/pages/PomodoroPage';
-import AnalyticsPage from '@/pages/AnalyticsPage';
 import HabitsPage from '@/pages/HabitsPage';
 import FinancePage from '@/pages/FinancePage';
 import NotesPage from '@/pages/NotesPage';
 import FlashcardsPage from '@/pages/FlashcardsPage';
-import StudyAssistantPage from '@/pages/StudyAssistantPage';
 import SettingsPage from '@/pages/SettingsPage';
 import './rice.css';
 
@@ -25,15 +22,15 @@ function App() {
   const pages: Record<string, ReactNode> = {
     dashboard: <DashboardPage navigate={navigate} />,
     grades: <GradesPage />,
-    forecast: <ForecastPage />,
+    forecast: <GradesPage />,
     classhub: <ClassHubPage />,
-    assistant: <StudyAssistantPage />,
+    assistant: <DashboardPage navigate={navigate} />,
     todos: <TodosPage />,
     kanban: <KanbanPage />,
     calendar: <CalendarPage />,
     notes: <NotesPage />,
     pomodoro: <PomodoroPage />,
-    analytics: <AnalyticsPage />,
+    analytics: <PomodoroPage />,
     habits: <HabitsPage />,
     finance: <FinancePage />,
     flashcards: <FlashcardsPage />,

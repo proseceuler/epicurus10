@@ -50,7 +50,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader title="Settings" subtitle="API keys, AI model and your data" action={
+      <PageHeader title="Settings" action={
         <Button variant="secondary" onClick={flash}>{saved ? <><Check className="w-4 h-4" /> Saved</> : 'Saved automatically'}</Button>
       } />
       <div className="space-y-4">

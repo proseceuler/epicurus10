@@ -1,4 +1,5 @@
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolContext, type ToolDef } from '@/lib/aiTools';
+import { EXTRA_TOOLS, runExtraTool } from '@/lib/assistant/extraTools';
 
 /**
  * MCP-style connector registry.
@@ -43,7 +44,7 @@ export function listConnectors(opts: { webSearch: boolean }): Connector[] {
     id: 'site',
     label: 'epicure',
     enabled: true,
-    tools: DATA_TOOLS.map((d) => wrap(d, 'site')),
+    tools: [...EXTRA_TOOLS, ...DATA_TOOLS].map((d) => wrap(d, 'site')),
   };
   const web: Connector = {
     id: 'web',
@@ -76,6 +77,8 @@ export async function dispatchTool(name: string, args: Record<string, unknown>, 
       return (c as Connector & { run: typeof runTool }).run(name, args, ctx);
     }
   }
+  const extra = await runExtraTool(name, args);
+  if (extra !== undefined) return extra;
   return runTool(name, args, ctx);
 }
 

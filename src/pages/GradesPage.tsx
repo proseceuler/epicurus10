@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type SubjectKey, type ComponentType, type ExType } from '@/lib/types';
 import { computeTermGrade, computeFinalGrade, gradeDescriptor, gradeTone, componentPercentage, exComponentPercentage } from '@/lib/gradeUtils';
 import { Card, PageHeader, Button, Input, Select, Badge, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
-import { Calculator, Plus, Trash2, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import ForecastPage from '@/pages/ForecastPage';
+import { Calculator, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, TrendingUp } from 'lucide-react';
 
 const COMPONENT_LABELS: Record<ComponentType, string> = { ww: 'Written Works', pt: 'Performance Tasks', ex: 'Examinations' };
 const COMPONENT_SHORT: Record<ComponentType, string> = { ww: 'WW', pt: 'PT', ex: 'EX' };
@@ -15,6 +16,7 @@ export default function GradesPage() {
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey>('math');
   const [selectedTerm, setSelectedTerm] = useState(1);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [mode, setMode] = useState<'calculator' | 'forecast'>('calculator');
   const [adding, setAdding] = useState<{ component: ComponentType; exType?: ExType } | null>(null);
   const [newName, setNewName] = useState('');
   const [newScore, setNewScore] = useState('');
@@ -202,9 +204,20 @@ export default function GradesPage() {
   return (
     <div>
       <PageHeader
-        title="Grade Calculator"
-        subtitle={`DepEd KS3 · WW ${subject.weights.ww}% · PT ${subject.weights.pt}% · EX ${subject.weights.ex}% (ST1 30% / ST2 30% / TE 40% of EX)`}
+        title="Grades"
+        action={
+          <div className="flex gap-1 rounded-xl p-1 glass">
+            <button type="button" onClick={() => setMode('calculator')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${mode === 'calculator' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+              <Calculator className="h-3.5 w-3.5" /> Calculator
+            </button>
+            <button type="button" onClick={() => setMode('forecast')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${mode === 'forecast' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+              <TrendingUp className="h-3.5 w-3.5" /> Forecaster
+            </button>
+          </div>
+        }
       />
+      {mode === 'forecast' ? <ForecastPage embedded /> : (
+      <>
 
       <div className="flex flex-wrap gap-2 mb-6">
         {SUBJECTS.map((s) => {
@@ -311,6 +324,8 @@ export default function GradesPage() {
           {(['ww', 'pt', 'ex'] as ComponentType[]).map(renderComponentSection)}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

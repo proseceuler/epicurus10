@@ -13,10 +13,12 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'insights', label: 'Insights' },
 ];
 const DEFAULT_HABITS = [
-  { name: 'Woke up at 05:00', emoji: '⏰', goal_target: 30 },
-  { name: 'Gym', emoji: '💪', goal_target: 25 },
-  { name: 'Reading / Learning', emoji: '📚', goal_target: 30 },
-  { name: 'Project Work', emoji: '🧬', goal_target: 20 },
+  { name: 'Journal', emoji: '📔', goal_target: 30 },
+  { name: 'Push Up', emoji: '💪', goal_target: 25 },
+  { name: 'Healthy Diet', emoji: '🥗', goal_target: 30 },
+  { name: 'Read 3 pages', emoji: '📚', goal_target: 30 },
+  { name: 'Active Learning', emoji: '🧠', goal_target: 25 },
+  { name: 'Run', emoji: '🏃', goal_target: 20 },
 ];
 
 function dedupeHabits(list: Habit[]) {
@@ -103,31 +105,34 @@ export default function HabitsPage() {
 
   const life = lifetimePct(habits, completions);
   const todayLeft = habits.filter((h) => !isDone(done, h.id, today));
-  const last14 = lastNDays(14);
-  const dailyScores = last14.map((d) => ({ date: d, score: habits.length ? habits.filter((h) => isDone(done, h.id, d)).length / habits.length : 0 }));
+  const last42 = lastNDays(42);
+  const dailyScores = last42.map((d) => ({
+    date: d,
+    score: habits.length ? habits.filter((h) => isDone(done, h.id, d)).length / habits.length : 0,
+  }));
 
   if (loading) {
     return <div className="flex items-center justify-center py-20 text-xs text-zinc-500">Loading tracker…</div>;
   }
 
   return (
-    <div className="ht-shell -mx-1 rounded-2xl bg-zinc-950 px-2.5 py-2.5 text-zinc-100 pb-16">
+    <div className="ht-shell pb-16">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
-        <h2 className="text-[15px] font-semibold tracking-tight">Habit Tracker</h2>
+        <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
           {VIEWS.map((v) => (
-            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>{v.label}</button>
+            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
           ))}
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-200">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
             {MONTHS.map((m, i) => <option key={m} value={i}>{m.slice(0, 3)}</option>)}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-200">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
       </div>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
-      {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
+      {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
       {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} />}
       {view === 'insights' && <InsightsView habits={habits} days={days} weeks={weeks} done={done} />}
     </div>

@@ -28,6 +28,25 @@
   background-size: 180px 180px, 90px 90px, 70px 70px;
 }
 
+.ht-shell {
+  color: #e4e4e7;
+}
+
+.ht-card {
+  background: rgba(24, 24, 27, 0.78);
+  border: 1px solid rgba(228, 228, 231, 0.1);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.ht-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+}
+
 .hud-panel {
   background: transparent;
   border: 0;

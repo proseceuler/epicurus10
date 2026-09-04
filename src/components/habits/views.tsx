@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { Fragment, type Dispatch, SetStateAction } from 'react';
 import type { Habit, HabitCompletion } from '@/lib/types';
 import BlackHole from '@/components/habits/BlackHole';
 import {
@@ -18,8 +18,8 @@ function weekPct(habits: Habit[], week: DayCell[], done: Set<string>) {
   return slots ? got / slots : 0;
 }
 
-function habitPct(h: Habit, days: { dateStr: string }[], done: Set<string>) {
-  if (!days.length) return 0;
+function habitPct(h: Habit | undefined, days: { dateStr: string }[], done: Set<string>) {
+  if (!h || !days.length) return 0;
   return days.filter((d) => isDone(done, h.id, d.dateStr)).length / days.length;
 }
 
@@ -29,9 +29,7 @@ function momDelta(h: Habit, done: Set<string>) {
   const lmMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
   const lmYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
   const lm = monthDays(lmYear, lmMonth);
-  const a = habitPct(h, tm, done);
-  const b = habitPct(h, lm, done);
-  return { mtd: a, mom: a - b };
+  return { mtd: habitPct(h, tm, done), mom: habitPct(h, tm, done) - habitPct(h, lm, done) };
 }
 
 export function HomeView({
@@ -62,7 +60,7 @@ export function HomeView({
 
   return (
     <div className="flex flex-col gap-2 lg:flex-row">
-      <Card className="flex shrink-0 items-center justify-center lg:w-[240px]" pad>
+      <Card className="flex shrink-0 flex-col items-center justify-center lg:w-[240px]">
         <BlackHole className="h-[220px] w-[220px]" percent={life} />
         <p className="mt-1 text-center text-[10px] text-zinc-500">{completions.length} lifetime logs</p>
       </Card>
@@ -100,12 +98,12 @@ export function HomeView({
                 const { mtd, mom } = momDelta(h, done);
                 const up = mom >= 0;
                 return (
-                  <>
-                    <span key={`${h.id}-n`} className="truncate text-zinc-300">{h.emoji} {h.name}</span>
-                    <span key={`${h.id}-m`} className="tabular-nums text-zinc-400">{Math.round(mtd * 100)}%</span>
-                    <span key={`${h.id}-d`} className={`tabular-nums ${up ? 'text-emerald-400' : 'text-orange-400'}`}>{up ? '▲' : '▼'}{Math.abs(Math.round(mom * 100))}</span>
-                    <span key={`${h.id}-s`}><Spark values={habitWeekSeries(h.id, done)} /></span>
-                  </>
+                  <Fragment key={h.id}>
+                    <span className="truncate text-zinc-300">{h.emoji} {h.name}</span>
+                    <span className="tabular-nums text-zinc-400">{Math.round(mtd * 100)}%</span>
+                    <span className={`tabular-nums ${up ? 'text-emerald-400' : 'text-orange-400'}`}>{up ? '▲' : '▼'}{Math.abs(Math.round(mom * 100))}</span>
+                    <span><Spark values={habitWeekSeries(h.id, done)} /></span>
+                  </Fragment>
                 );
               })}
             </div>
@@ -234,7 +232,7 @@ export function TrackView({
               const pct = weekPct(habits, week, done);
               const spark = week.map((d) => rateOn(habits, d.dateStr, done));
               return (
-                <Card key={wi} title={`Weekly Completion %`}>
+                <Card key={wi} title="Weekly Completion %">
                   <p className="text-xl font-semibold tabular-nums text-zinc-50">{Math.round(pct * 100)}%</p>
                   <Spark values={spark} width={90} />
                   <p className="text-[10px] text-zinc-500">Week {wi + 1} · {week.length} days</p>
@@ -281,7 +279,7 @@ export function DashView({
     if (!subset.length) return 0;
     return subset.reduce((s, d) => s + rateOn(habits, d.dateStr, done), 0) / subset.length;
   });
-  const weekCols = weeks.map((w, i) => ({ key: String(i), label: `W${i + 1}` }));
+  const weekCols = weeks.map((_, i) => ({ key: String(i), label: `W${i + 1}` }));
   const last7 = days.slice(-7);
 
   return (
@@ -296,9 +294,9 @@ export function DashView({
             rows={habits.map((h) => ({ key: h.id, label: `${h.emoji} ${h.name}` }))}
             cols={[...weekCols, { key: 'all', label: 'All' }]}
             value={(hid, col) => {
-              if (col === 'all') return habitPct(habits.find((h) => h.id === hid)!, days, done);
-              const w = weeks[Number(col)] ?? [];
-              return habitPct(habits.find((h) => h.id === hid)!, w, done);
+              const habit = habits.find((h) => h.id === hid);
+              if (col === 'all') return habitPct(habit, days, done);
+              return habitPct(habit, weeks[Number(col)] ?? [], done);
             }}
           />
         </Card>
@@ -349,19 +347,16 @@ export function InsightsView({
   const dayRates = days.map((d, i) => ({ d, pct: scores[i] ?? 0 }));
   const bestD = dayRates.reduce((a, b) => (b.pct > a.pct ? b : a), dayRates[0]);
   const worstD = dayRates.reduce((a, b) => (b.pct < a.pct ? b : a), dayRates[0]);
-  const weekRates = weeks.map((w, i) => ({ i, pct: weekPct(habits, w, done), w }));
+  const weekRates = weeks.map((w, i) => ({ i, pct: weekPct(habits, w, done) }));
   const bestW = weekRates.reduce((a, b) => (b.pct > a.pct ? b : a), weekRates[0]);
   const worstW = weekRates.reduce((a, b) => (b.pct < a.pct ? b : a), weekRates[0]);
   const series = habits.map((h) => days.map((d) => (isDone(done, h.id, d.dateStr) ? 1 : 0)));
   const corr: number[][] = habits.map((_, i) => habits.map((__, j) => (i === j ? 1 : pearson(series[i] ?? [], series[j] ?? []))));
-  const bestIdx = bestH ? habits.findIndex((h) => h.id === bestH.h.id) : 0;
-  const worstIdx = worstH ? habits.findIndex((h) => h.id === worstH.h.id) : 0;
+  const bestIdx = Math.max(0, bestH ? habits.findIndex((h) => h.id === bestH.h.id) : 0);
+  const worstIdx = Math.max(0, worstH ? habits.findIndex((h) => h.id === worstH.h.id) : 0);
 
   const byWeekday = WEEKDAYS.map((_, wd) => days.filter((d) => d.weekdayIdx === wd).map((d) => rateOn(habits, d.dateStr, done)));
-  const dayCorr = WEEKDAYS.map((_, i) => WEEKDAYS.map((__, j) => {
-    if (i === j) return 1;
-    return pearson(byWeekday[i] ?? [], byWeekday[j] ?? []);
-  }));
+  const dayCorr = WEEKDAYS.map((_, i) => WEEKDAYS.map((__, j) => (i === j ? 1 : pearson(byWeekday[i] ?? [], byWeekday[j] ?? []))));
 
   const Call = ({ title, name, pct, cap }: { title: string; name: string; pct: number; cap: string }) => (
     <Card title={title} className="mb-2">

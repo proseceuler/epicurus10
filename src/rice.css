@@ -18,7 +18,7 @@
   position: fixed;
   inset: 0;
   z-index: 70;
-  opacity: 0.04;
+  opacity: 0.06;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
   background-size: 180px 180px;
@@ -81,4 +81,22 @@
 .assistant-panel {
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+
+.rice-shell.assistant-open [data-global-dock] {
+  right: auto;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  max-width: min(28rem, calc(100vw - 2rem));
+}
+
+.rice-main {
+  color: #27272a;
+}
+
+@media (min-width: 1024px) {
+  .rice-shell.assistant-open [data-global-dock] {
+    left: calc(50% - 8rem);
+  }
 }

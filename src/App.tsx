@@ -43,10 +43,10 @@ function App() {
         <AnimatePresence mode="wait">
           <motion.div
             key={page}
-            initial={{ opacity: 0, filter: 'blur(8px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, filter: 'blur(6px)' }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            initial={{ opacity: 0.92 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 1 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
           >
             {pages[page] ?? pages.dashboard}
           </motion.div>

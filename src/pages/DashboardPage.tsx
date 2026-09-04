@@ -13,9 +13,9 @@ const DEFAULT_SIGIL = `
       .·:·.
     ·´     \`·
    /    ∧    \\
-  |   /   \\   |
-  |   \\   /   |
-   \\   \\_/   /
+  |   /   \   |
+  |   \   /   |
+   \   \_/   /
     \`·.   .·´
        \`·´
 `.trimEnd();
@@ -131,7 +131,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
                 <textarea
                   defaultValue={sigil}
                   rows={10}
-                  className="w-full resize-y rounded-lg bg-transparent p-2 font-mono text-[11px] leading-[1.15] text-[#9aa8ab] outline-none"
+                  className="hud-sigil-frame w-full resize-y rounded-lg bg-transparent p-2 font-mono text-[11px] leading-[1.15] text-zinc-700 outline-none"
                   autoFocus
                   onBlur={(e) => saveSigil(e.target.value)}
                   onKeyDown={(e) => {
@@ -145,18 +145,18 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
                 type="button"
                 onClick={() => setEditingSigil(true)}
                 title="Customize sigil"
-                className="hud-sigil block text-left"
+                className="hud-sigil hud-sigil-frame block w-full text-left"
               >
-                <pre className="select-none font-mono text-[11px] leading-[1.15] sm:text-[12px]">{sigil}</pre>
+                <pre className="select-none font-mono leading-[1.12] text-[clamp(10px,1.6vw,16px)]">{sigil}</pre>
               </button>
             )}
           </div>
 
-          <div className="font-mono text-[12px] leading-6 text-[#8b8f96] lg:min-w-[280px] lg:pt-2">
-            <p className="text-[#d7d8dc]">
-              user<span className="text-[#5c6168]">@</span>{host}
+          <div className="font-mono text-[12px] leading-6 text-zinc-600 lg:min-w-[280px] lg:pt-2">
+            <p className="text-zinc-800">
+              user<span className="text-zinc-500">@</span>{host}
             </p>
-            <p className="text-[#3f4349]">{'─'.repeat(22)}</p>
+            <p className="text-zinc-400">{'─'.repeat(22)}</p>
             <StatRow label="OS" value="epicure 10.2" />
             <StatRow label="STREAK" value={`${streak}d`} />
             <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
@@ -165,10 +165,10 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             <StatRow label="TASKS" value={`${activeTodos.length} open`} />
             <StatRow label="KERNEL" value={`${SUBJECTS.length} subjects`} />
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => navigate('grades')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
+              <button type="button" onClick={() => navigate('grades')} className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900">
                 → grades
               </button>
-              <button type="button" onClick={() => navigate('pomodoro')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
+              <button type="button" onClick={() => navigate('pomodoro')} className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900">
                 → focus
               </button>
             </div>
@@ -186,8 +186,8 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
       <div className="grid gap-10 lg:grid-cols-2">
         <Card className="p-0">
           <div className="mb-5 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">SUBJECT GRADES</h3>
-            <button onClick={() => navigate('grades')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">all →</button>
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">SUBJECT GRADES</h3>
+            <button onClick={() => navigate('grades')} className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800">all →</button>
           </div>
           {assessments.length === 0 ? (
             <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add your assessment scores to see your grades here." />
@@ -200,7 +200,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
                   <button key={s.key} onClick={() => navigate('grades')} className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/3">
                     <SubjectBadge shortName={s.shortName} />
                     <div className="flex items-center gap-4 font-mono">
-                      <span className="text-[11px] text-[#5c6168]">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
+                      <span className="text-[11px] text-zinc-500">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
                       <span className={`text-sm ${gradeColor(fg)}`}>{fg !== null ? fg.toFixed(2) : '—'}</span>
                     </div>
                   </button>
@@ -212,8 +212,8 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
 
         <Card className="p-0">
           <div className="mb-5 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">UPCOMING</h3>
-            <button onClick={() => navigate('calendar')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">calendar →</button>
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">UPCOMING</h3>
+            <button onClick={() => navigate('calendar')} className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800">calendar →</button>
           </div>
           {upcomingTodos.length === 0 ? (
             <EmptyState icon={Calendar} title="No upcoming deadlines" subtitle="Add due dates to your tasks to see them here." />
@@ -225,12 +225,12 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
                 return (
                   <div key={todo.id} className="flex items-center gap-3 rounded-md px-1 py-2">
                     <div className="w-10 shrink-0 font-mono">
-                      <div className="text-[9px] uppercase tracking-wider text-[#5c6168]">{dDate.toLocaleDateString('en-US', { month: 'short' })}</div>
-                      <div className="text-sm text-[#d7d8dc]">{dDate.getDate()}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-zinc-500">{dDate.toLocaleDateString('en-US', { month: 'short' })}</div>
+                      <div className="text-sm text-zinc-800">{dDate.getDate()}</div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-[#c9cbd0]">{todo.title}</p>
-                      <span className="font-mono text-[10px] text-[#5c6168]">{daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}</span>
+                      <p className="truncate text-sm text-zinc-800">{todo.title}</p>
+                      <span className="font-mono text-[10px] text-zinc-500">{daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}</span>
                     </div>
                   </div>
                 );
@@ -246,8 +246,8 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <p>
-      <span className="inline-block w-[7.5rem] text-[#5c6168]">{label}:</span>
-      <span className="text-[#c9cbd0]">{value}</span>
+      <span className="inline-block w-[7.5rem] text-zinc-500">{label}:</span>
+      <span className="text-zinc-800">{value}</span>
     </p>
   );
 }
@@ -255,8 +255,8 @@ function StatRow({ label, value }: { label: string; value: string }) {
 function QuietStat({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="group text-left">
-      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-[#5c6168]">{label}</div>
-      <div className="font-mono text-2xl text-[#e4e5e8]">{value}</div>
+      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-zinc-500">{label}</div>
+      <div className="font-mono text-2xl text-zinc-800">{value}</div>
     </button>
   );
 }

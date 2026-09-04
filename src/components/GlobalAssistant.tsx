@@ -127,18 +127,16 @@ export default function GlobalAssistant({
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
 
-  if (rail && !open) {
-    return (
-      <div className="fixed right-3 top-3 z-50 hidden lg:flex">
-        <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-sm" title="Open assistant"><Bot className="h-4 w-4" /></button>
-      </div>
-    );
-  }
+  if (rail && !open) return null;
 
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-transparent lg:hidden" onClick={onClose} />}
-      <aside className={`assistant-panel fixed z-50 flex flex-col bg-white/92 shadow-[-12px_0_40px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'} inset-y-0 right-0 w-full lg:top-3 lg:bottom-3 lg:right-3 lg:rounded-[22px] lg:border lg:border-white/70`} style={typeof window !== 'undefined' && window.innerWidth >= 1024 && open ? { width } : undefined}>
+      <aside
+        aria-hidden={!open}
+        className={`assistant-panel fixed z-50 flex flex-col bg-white/92 shadow-[-12px_0_40px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'} inset-y-0 right-0 lg:top-3 lg:bottom-3 lg:right-3 lg:rounded-[22px] lg:border lg:border-white/70`}
+        style={{ width }}
+      >
         <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize lg:block" onPointerDown={startDrag} />
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">

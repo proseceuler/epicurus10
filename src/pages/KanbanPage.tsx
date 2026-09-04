@@ -1,23 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { SUBJECTS, type KanbanTask, type SubjectKey } from '@/lib/types';
+import { SUBJECTS, type KanbanTask } from '@/lib/types';
 import {
   COLUMNS,
   type KanbanStatus as Status,
-  kanbanUid as uid,
-  dueTone,
-  formatDue,
-  isImageUrl,
-  uniqueById,
-  uniqueAttachments,
-  resolveCover,
   normalizeTask,
 } from '@/lib/kanban';
 import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
-import {
-  FolderTree, Plus, Trash2, GripVertical, X, Calendar as CalIcon,
-  CheckSquare, Paperclip, MessageSquare, Activity, Tag, AlignLeft, Image as ImageIcon,
-} from 'lucide-react';
+import { KanbanCardPreview, CardDetailModal } from '@/components/KanbanCards';
+import { FolderTree, Plus, X } from 'lucide-react';
 
 export default function KanbanPage() {
   const [tasks, setTasks] = useState<KanbanTask[]>([]);

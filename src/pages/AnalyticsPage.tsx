@@ -4,7 +4,7 @@ import { SUBJECTS, type PomodoroSession } from '@/lib/types';
 import { Card, PageHeader, EmptyState } from '@/components/kit';
 import { BarChart3, Clock, Flame, Target } from 'lucide-react';
 
-export default function AnalyticsPage() {
+export default function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'week' | 'month'>('week');
@@ -76,26 +76,23 @@ export default function AnalyticsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Focus Analytics"
-        subtitle="Track your study time and build productive habits"
-        action={
-          <div className="flex gap-2 p-1 glass rounded-xl">
-            <button
-              onClick={() => setRange('week')}
-              className={`px-3 py-1 rounded-lg text-sm font-medium ${range === 'week' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
-            >
-              Week
-            </button>
-            <button
-              onClick={() => setRange('month')}
-              className={`px-3 py-1 rounded-lg text-sm font-medium ${range === 'month' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
-            >
-              Month
-            </button>
-          </div>
-        }
-      />
+      {!embedded && <PageHeader title="Focus Analytics" />}
+      <div className="mb-6 flex justify-end">
+        <div className="flex gap-2 p-1 glass rounded-xl">
+          <button
+            onClick={() => setRange('week')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium ${range === 'week' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => setRange('month')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium ${range === 'month' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
+          >
+            Month
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">

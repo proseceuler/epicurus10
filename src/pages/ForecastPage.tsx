@@ -14,7 +14,7 @@ interface ForecastItem {
   maxScore: number;
 }
 
-export default function ForecastPage() {
+export default function ForecastPage({ embedded = false }: { embedded?: boolean }) {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey>('math');
   const [selectedTerm, setSelectedTerm] = useState(1);
@@ -68,10 +68,7 @@ export default function ForecastPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Term Grade Forecaster"
-        subtitle="Add hypothetical scores to see how they would affect your term grade"
-      />
+      {!embedded && <PageHeader title="Term Grade Forecaster" />}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {SUBJECTS.map((s) => (

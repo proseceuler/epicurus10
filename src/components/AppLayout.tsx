@@ -1,9 +1,10 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { SUBJECTS, NUM_TERMS } from '@/lib/types';
 import GlobalDock from '@/components/GlobalDock';
+import GlobalAssistant from '@/components/GlobalAssistant';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
-  Timer, BarChart3, CalendarHeart, StickyNote, Wallet, Menu, X,
+  Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
   Layers, Bot, Settings as SettingsIcon, Columns3,
 } from 'lucide-react';
 
@@ -23,41 +24,45 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
-  { id: 'grades', label: 'Grade Calculator', icon: Calculator, group: 'Core' },
-  { id: 'forecast', label: 'Grade Forecaster', icon: BarChart3, group: 'Core' },
+  { id: 'grades', label: 'Grades', icon: Calculator, group: 'Core' },
   { id: 'classhub', label: 'Class Hub', icon: FolderTree, group: 'Core' },
-  { id: 'assistant', label: 'Study Assistant', icon: Bot, group: 'Core' },
   { id: 'todos', label: 'To-Do List', icon: CheckSquare, group: 'Work' },
   { id: 'kanban', label: 'Kanban Board', icon: Columns3, group: 'Work' },
   { id: 'calendar', label: 'Calendar', icon: Calendar, group: 'Work' },
   { id: 'notes', label: 'Notes & Board', icon: StickyNote, group: 'Work' },
-  { id: 'pomodoro', label: 'Focus Timer', icon: Timer, group: 'Pulse' },
-  { id: 'analytics', label: 'Focus Analytics', icon: BarChart3, group: 'Pulse' },
+  { id: 'pomodoro', label: 'Focus', icon: Timer, group: 'Pulse' },
   { id: 'habits', label: 'Habit Tracker', icon: CalendarHeart, group: 'Pulse' },
   { id: 'finance', label: 'Baon Tracker', icon: Wallet, group: 'Pulse' },
   { id: 'flashcards', label: 'Flashcards', icon: Layers, group: 'Pulse' },
 ];
 
+const ALIASES: Partial<Record<PageId, PageId>> = {
+  forecast: 'grades',
+  analytics: 'pomodoro',
+  assistant: 'dashboard',
+};
+
 const GROUPS = ['Core', 'Work', 'Pulse'];
 
+function resolvePage(hash: string): PageId {
+  const raw = hash as PageId;
+  if (ALIASES[raw]) return ALIASES[raw] as PageId;
+  return NAV_ITEMS.some((n) => n.id === raw) || raw === 'settings' ? raw : 'dashboard';
+}
+
 export function usePageState(): [PageId, (p: PageId) => void] {
-  const [page, setPage] = useState<PageId>(() => {
-    const hash = window.location.hash.slice(1) as PageId;
-    return NAV_ITEMS.some((n) => n.id === hash) ? hash : 'dashboard';
-  });
+  const [page, setPage] = useState<PageId>(() => resolvePage(window.location.hash.slice(1)));
 
   useEffect(() => {
-    const onHash = () => {
-      const hash = window.location.hash.slice(1) as PageId;
-      if (NAV_ITEMS.some((n) => n.id === hash)) setPage(hash);
-    };
+    const onHash = () => setPage(resolvePage(window.location.hash.slice(1)));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const navigate = (p: PageId) => {
-    window.location.hash = p;
-    setPage(p);
+    const next = ALIASES[p] ?? p;
+    window.location.hash = next;
+    setPage(next);
   };
 
   return [page, navigate];
@@ -65,68 +70,51 @@ export function usePageState(): [PageId, (p: PageId) => void] {
 
 export default function AppLayout({ page, navigate, children }: { page: PageId; navigate: (p: PageId) => void; children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard';
-  const isAssistant = page === 'assistant';
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
 
   useEffect(() => {
     document.title = `${currentLabel} — epicure`;
   }, [currentLabel]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setAssistantOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
-    <div className="rice-shell relative flex h-screen overflow-hidden bg-[#0b0c0e]">
+    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] ${assistantOpen ? 'assistant-open' : ''}`}>
       <div className="film-grain" aria-hidden />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-32 top-[-8rem] h-[28rem] w-[28rem] rounded-full bg-[#6d8b8e]/8 blur-[90px]" />
-        <div className="absolute -right-24 top-1/3 h-[26rem] w-[26rem] rounded-full bg-[#7a8fa3]/6 blur-[100px]" />
-        <div className="absolute bottom-[-6rem] left-1/4 h-[22rem] w-[22rem] rounded-full bg-white/3 blur-[80px]" />
+        <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />
+        <div className="absolute -right-24 top-1/3 h-[20rem] w-[20rem] rounded-full bg-white/70 blur-[100px]" />
       </div>
 
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside
-        className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${
-          sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'
-        }`}
-      >
-        <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#101114]/80 backdrop-blur-xl">
+      <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
+        <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 font-mono text-[11px] font-semibold tracking-widest text-[#9aa8ab]">
-              E
-            </div>
-            <span className="rice-nav-label truncate font-mono text-[13px] font-medium tracking-[0.18em] text-[#d7d8dc] uppercase">
-              epicure
-            </span>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 font-mono text-[11px] font-semibold text-white">E</div>
+            <span className="rice-nav-label truncate text-[15px] font-semibold text-white">epicure</span>
           </div>
-
           <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
             {GROUPS.map((group) => (
               <div key={group} className="mb-3">
-                <p className="rice-nav-label mb-1 px-2 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-[#5c6168]">
-                  {group}
-                </p>
+                <p className="rice-nav-label mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{group}</p>
                 {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const active = page === item.id;
                   return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      title={item.label}
-                      onClick={() => {
-                        navigate(item.id);
-                        setSidebarOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
-                        active
-                          ? 'bg-white/8 text-[#e4e5e8]'
-                          : 'text-[#6f747c] hover:bg-white/4 hover:text-[#c9cbd0]'
-                      }`}
-                    >
+                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="rice-nav-label truncate">{item.label}</span>
                     </button>
@@ -135,26 +123,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
               </div>
             ))}
           </nav>
-
           <div className="shrink-0 p-2">
             <div className="flex items-center gap-2 px-1 py-1">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/6 font-mono text-[11px] text-[#c9cbd0]">
-                G
-              </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] text-white">G</div>
               <div className="rice-nav-label min-w-0 flex-1">
-                <p className="truncate text-[12px] text-[#c9cbd0]">Grade 10</p>
-                <p className="truncate font-mono text-[10px] text-[#5c6168]">
-                  {SUBJECTS.length} subj · {NUM_TERMS} terms
-                </p>
+                <p className="truncate text-[12px] text-zinc-200">Grade 10</p>
+                <p className="truncate text-[10px] text-zinc-500">{SUBJECTS.length} subjects · {NUM_TERMS} terms</p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('settings')}
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  page === 'settings' ? 'bg-white/10 text-[#e4e5e8]' : 'text-[#5c6168] hover:bg-white/6 hover:text-[#c9cbd0]'
-                }`}
-                title="Settings"
-              >
+              <button type="button" onClick={() => navigate('settings')} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${page === 'settings' ? 'bg-white/15 text-white' : 'text-zinc-500 hover:bg-white/10 hover:text-white'}`} title="Settings">
                 <SettingsIcon className="h-4 w-4" />
               </button>
             </div>
@@ -163,33 +139,23 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </aside>
 
       <div className="rice-main relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="z-20 shrink-0 px-3 pt-3 lg:hidden">
-          <div className="flex h-10 items-center justify-between rounded-xl bg-[#121317]/80 px-2 backdrop-blur-xl">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="rounded-lg p-1.5 text-[#c9cbd0] hover:bg-white/6"
-                title="Toggle sidebar"
-              >
-                {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-              </button>
-              <h1 className="truncate font-mono text-xs tracking-wide text-[#d7d8dc]">{currentLabel}</h1>
-            </div>
+        <header className="z-20 flex shrink-0 items-center justify-between px-3 pt-3">
+          <div className="flex h-10 items-center gap-2 rounded-2xl glass px-2 lg:hidden">
+            <button type="button" onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-lg p-1.5 hover:bg-zinc-200/50" title="Toggle sidebar">
+              {sidebarOpen ? <X className="h-4 w-4 text-zinc-700" /> : <Menu className="h-4 w-4 text-zinc-700" />}
+            </button>
+            <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
+          </div>
+          <div className="ml-auto">
+            <button type="button" onClick={() => setAssistantOpen((v) => !v)} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘K)" aria-label="Toggle assistant">
+              <Bot className="h-4 w-4" />
+            </button>
           </div>
         </header>
-
-        <main
-          className={
-            isAssistant
-              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-20 pt-4 lg:px-8'
-              : 'min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-8'
-          }
-        >
-          {children}
-        </main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
       </div>
 
+      <GlobalAssistant open={assistantOpen} page={page} onClose={() => setAssistantOpen(false)} />
       <GlobalDock navigate={navigate} page={page} />
     </div>
   );

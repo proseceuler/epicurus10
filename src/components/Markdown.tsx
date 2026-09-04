@@ -4,7 +4,39 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
-export default function Markdown({ content, inverted = false }: { content: string; inverted?: boolean }) {
+function looksLikeJson(text: string) {
+  const t = text.trim();
+  return (t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'));
+}
+
+function JsonCard({ raw }: { raw: string }) {
+  try {
+    const value = JSON.parse(raw);
+    return (
+      <pre className="my-2 max-h-56 overflow-auto rounded-xl bg-zinc-900 p-3 text-[11px] leading-relaxed text-zinc-100">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  } catch {
+    return (
+      <pre className="my-2 overflow-auto rounded-xl bg-zinc-100 p-3 text-[11px] text-zinc-700">{raw}</pre>
+    );
+  }
+}
+
+export default function Markdown({
+  content,
+  children,
+  inverted = false,
+}: {
+  content?: string;
+  children?: string;
+  inverted?: boolean;
+}) {
+  const source = content ?? (typeof children === 'string' ? children : '');
+  if (looksLikeJson(source) && !source.includes('\n#')) {
+    return <JsonCard raw={source.trim()} />;
+  }
   return (
     <div className={`md-body text-sm leading-relaxed ${inverted ? 'md-inverted' : ''}`}>
       <ReactMarkdown
@@ -54,7 +86,7 @@ export default function Markdown({ content, inverted = false }: { content: strin
           ),
         }}
       >
-        {content}
+        {source}
       </ReactMarkdown>
     </div>
   );

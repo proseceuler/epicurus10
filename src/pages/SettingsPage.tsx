@@ -57,10 +57,10 @@ export default function SettingsPage() {
         <InstallTip />
         <Card className="p-6">
           <div className="mb-3">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">DASHBOARD SIGIL</h3>
-            <p className="mt-1 text-xs text-[#6f747c]">Original ASCII glyph only. Shown next to the neofetch readout.</p>
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">DASHBOARD SIGIL</h3>
+            <p className="mt-1 text-xs text-zinc-500">Original ASCII glyph only. Shown next to the neofetch readout.</p>
           </div>
-          <textarea value={sigil} onChange={(e) => { setSigil(e.target.value); try { localStorage.setItem('epicure-ascii-sigil', e.target.value); } catch { /* ignore */ } flash(); }} rows={8} placeholder="paste or draw an original glyph…" className="w-full rounded-lg bg-white/4 p-3 font-mono text-[11px] leading-[1.2] text-[#9aa8ab] outline-none" />
+          <textarea value={sigil} onChange={(e) => { setSigil(e.target.value); try { localStorage.setItem('epicure-ascii-sigil', e.target.value); } catch { /* ignore */ } flash(); }} rows={8} placeholder="paste or draw an original glyph…" className="w-full rounded-lg bg-white p-3 font-mono text-[11px] leading-[1.2] text-zinc-800 outline-none ring-1 ring-zinc-200" />
         </Card>
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Key className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">API Keys</h3></div>

@@ -73,7 +73,7 @@ export function Input({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-full min-h-11 rounded-xl px-3 py-2.5 text-base text-zinc-800 placeholder-zinc-400 glass-input ${className}`}
+      className={`w-full min-h-12 rounded-xl px-3 py-3 text-base leading-normal text-zinc-800 placeholder-zinc-400 glass-input ${className}`}
     />
   );
 }

@@ -40,13 +40,14 @@ function App() {
   return (
     <PomodoroProvider>
       <AppLayout page={page} navigate={navigate}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={page}
-            initial={{ opacity: 0.92 }}
+            className="min-h-full"
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 1 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
+            transition={{ duration: 0 }}
           >
             {pages[page] ?? pages.dashboard}
           </motion.div>

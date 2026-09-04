@@ -119,7 +119,6 @@ export interface HabitCompletion {
   completion_date: string;
 }
 
-// ─── Finance ───
 export type ExpenseCategory = 'transportation' | 'food' | 'academics' | 'leisure';
 
 export interface FinanceSettings {
@@ -144,6 +143,7 @@ export interface FinanceGoal {
   name: string;
   target_amount: number;
   saved_amount: number;
+  url?: string | null;
 }
 
 export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; emoji: string }[] = [
@@ -153,7 +153,6 @@ export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; emoji: s
   { key: 'leisure', label: 'Wants / Leisure', emoji: '🎮' },
 ];
 
-// ─── Wellness ───
 export interface WellnessLog {
   id: string;
   log_date: string;
@@ -161,7 +160,6 @@ export interface WellnessLog {
   sleep_hours: number | null;
 }
 
-// ─── Notes ───
 export interface Note {
   id: string;
   title: string;
@@ -175,7 +173,6 @@ export interface Note {
   updated_at: string;
 }
 
-// ─── Timetable ───
 export interface TimetableEntry {
   id: string;
   subject_key: string;
@@ -192,7 +189,6 @@ export interface ClassAttendance {
   status: 'pending' | 'attended' | 'skipped';
 }
 
-// ─── Flashcards ───
 export interface FlashcardDeck {
   id: string;
   subject_key: string | null;
@@ -210,7 +206,6 @@ export interface Flashcard {
   review_count: number;
 }
 
-// ─── Forecast Scenarios ───
 export interface ForecastScenario {
   id: string;
   name: string;
@@ -221,7 +216,6 @@ export interface ForecastScenario {
   created_at: string;
 }
 
-// ─── Subtasks ───
 export interface TodoSubtask {
   id: string;
   todo_id: string;

@@ -3,6 +3,7 @@
 .rice-shell {
   --rice-bg: #f5f5f7;
   --rice-accent: #18181b;
+  --assistant-w: 340px;
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
@@ -79,13 +80,13 @@
 @media (min-width: 1024px) {
   .rice-main {
     padding-left: 4.75rem;
-    transition: padding-left 280ms ease;
+    transition: padding-left 280ms ease, padding-right 280ms ease;
   }
   .rice-sidebar:hover ~ .rice-main {
     padding-left: 15.5rem;
   }
   .rice-shell.assistant-open .rice-main {
-    padding-right: 22.5rem;
+    padding-right: calc(var(--assistant-w, 340px) + 1.25rem);
   }
 }
 
@@ -98,12 +99,15 @@
   -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
 
+.rice-shell [data-global-dock] {
+  transition: right 280ms ease, left 280ms ease, bottom 280ms ease;
+}
+
 .rice-shell.assistant-open [data-global-dock] {
-  right: auto;
-  left: 1.25rem;
+  right: calc(var(--assistant-w, 340px) + 1.5rem);
+  left: auto;
   bottom: 1rem;
   transform: none;
-  max-width: min(28rem, calc(100vw - 2rem));
 }
 
 .rice-main {
@@ -112,7 +116,8 @@
 
 @media (min-width: 1024px) {
   .rice-shell.assistant-open [data-global-dock] {
-    left: 5.5rem;
+    right: calc(var(--assistant-w, 340px) + 1.75rem);
+    left: auto;
     bottom: 1.25rem;
   }
 }

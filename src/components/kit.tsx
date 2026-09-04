@@ -11,7 +11,7 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
 
 export function PageHeader({ title, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
       {title ? <h2 className="text-xl font-semibold tracking-tight text-zinc-800">{title}</h2> : <div />}
       {action}
     </div>
@@ -73,7 +73,7 @@ export function Input({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-full min-h-12 rounded-xl px-3 py-3 text-base leading-normal text-zinc-800 placeholder-zinc-400 glass-input ${className}`}
+      className={`w-full min-h-14 h-14 rounded-xl px-3.5 py-3 text-lg font-semibold leading-normal text-zinc-900 placeholder-zinc-400 glass-input ${className}`}
     />
   );
 }

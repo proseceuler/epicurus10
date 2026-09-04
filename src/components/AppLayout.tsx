@@ -92,7 +92,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, []);
 
   return (
-    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''}`}>
+    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
       <div className="film-grain" aria-hidden />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />
@@ -150,8 +150,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
           </div>
           <div className="ml-auto">
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘K)" aria-label="Toggle assistant">
-              <Bot className="h-4 w-4" />
+            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘K)" aria-label="Toggle assistant">
+              <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>
         </header>

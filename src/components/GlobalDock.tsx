@@ -127,7 +127,7 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
         <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
       )}
 
-      <div className="fixed bottom-4 right-4 z-50">
+      <div data-global-dock className="fixed bottom-4 right-4 z-40">
         <div className="flex flex-row items-end gap-2">
           <AnimatePresence>
           {open && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
-import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
 import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag } from 'lucide-react';
 
 const PRIORITY_CONFIG = {

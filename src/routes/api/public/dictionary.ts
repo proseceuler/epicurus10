@@ -1,21 +1,21 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from "@tanstack/react-router";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 
-export const Route = createFileRoute('/api/public/dictionary')({
+export const Route = createFileRoute("/api/public/dictionary")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: async ({ request }: { request: Request }) => {
         const url = new URL(request.url);
-        const word = (url.searchParams.get('word') || '').trim().toLowerCase();
-        const key = request.headers.get('x-mw-key') || '';
+        const word = (url.searchParams.get("word") || "").trim().toLowerCase();
+        const key = request.headers.get("x-mw-key") || "";
 
-        if (!word) return json({ error: 'Missing word.' }, 400);
-        if (!key) return json({ error: 'No Merriam-Webster API key set. Add one in Settings.' }, 400);
+        if (!word) return json({ error: "Missing word." }, 400);
+        if (!key) return json({ error: "No Merriam-Webster API key set. Add one in Settings." }, 400);
 
         try {
           const res = await fetch(
@@ -33,13 +33,13 @@ export const Route = createFileRoute('/api/public/dictionary')({
               {
                 error: detail
                   ? `Dictionary service: ${detail}. Check your API key in Settings.`
-                  : 'Dictionary service returned an invalid response.',
+                  : "Dictionary service returned an invalid response.",
               },
               200,
             );
           }
         } catch {
-          return json({ error: 'Could not reach the dictionary service.' }, 200);
+          return json({ error: "Could not reach the dictionary service." }, 200);
         }
       },
     },

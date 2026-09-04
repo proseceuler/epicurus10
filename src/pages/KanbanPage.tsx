@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type KanbanTask, type SubjectKey } from '@/lib/types';
-import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
 import {
   FolderTree, Plus, Trash2, GripVertical, X, Calendar as CalIcon,
   CheckSquare, Paperclip, MessageSquare, Activity, Tag, UserPlus, AlignLeft,

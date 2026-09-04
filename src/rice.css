@@ -1,0 +1,84 @@
+/* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
+
+.rice-shell {
+  --rice-bg: #f5f5f7;
+  --rice-accent: #18181b;
+  color: #3f3f46;
+  font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+.rice-shell .font-mono,
+.rice-shell .hud-sigil,
+.rice-shell kbd {
+  font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.film-grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.hud-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.hud-sigil {
+  color: #3f3f46;
+  transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease;
+}
+
+.hud-awake .hud-sigil {
+  color: #18181b;
+  text-shadow: 0 0 24px rgba(24, 24, 27, 0.18);
+}
+
+.rice-sidebar .rice-nav-label {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 160ms ease;
+}
+
+.rice-sidebar:hover .rice-nav-label,
+.rice-sidebar.w-56 .rice-nav-label {
+  opacity: 1;
+  width: auto;
+}
+
+@media (max-width: 1023px) {
+  .rice-sidebar .rice-nav-label {
+    opacity: 1;
+    width: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rice-main {
+    padding-left: 4.75rem;
+    transition: padding-left 280ms ease;
+  }
+  .rice-sidebar:hover ~ .rice-main {
+    padding-left: 15.5rem;
+  }
+  .rice-shell.assistant-open .rice-main {
+    padding-right: 22.5rem;
+  }
+}
+
+.rice-palette {
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
+}
+
+.assistant-panel {
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}

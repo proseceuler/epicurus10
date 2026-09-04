@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type SubjectKey, type ComponentType, type ExType } from '@/lib/types';
 import { computeTermGrade, computeFinalGrade, gradeDescriptor, gradeTone, componentPercentage, exComponentPercentage } from '@/lib/gradeUtils';
-import { Card, PageHeader, Button, Input, Select, Badge, EmptyState, SubjectBadge, gradeColor } from '@/components/ui';
+import { Card, PageHeader, Button, Input, Select, Badge, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import { Calculator, Plus, Trash2, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 
 const COMPONENT_LABELS: Record<ComponentType, string> = { ww: 'Written Works', pt: 'Performance Tasks', ex: 'Examinations' };

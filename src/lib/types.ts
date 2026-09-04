@@ -74,6 +74,24 @@ export interface Todo {
   completed: boolean;
 }
 
+export interface KanbanCheckItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface KanbanAttachment {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface KanbanComment {
+  id: string;
+  text: string;
+  created_at: string;
+}
+
 export interface KanbanTask {
   id: string;
   title: string;
@@ -82,6 +100,10 @@ export interface KanbanTask {
   status: 'todo' | 'in_progress' | 'review' | 'done';
   due_date: string | null;
   sort_order: number;
+  cover_url?: string | null;
+  checklist?: KanbanCheckItem[];
+  attachments?: KanbanAttachment[];
+  comments?: KanbanComment[];
 }
 
 export interface PomodoroSession {

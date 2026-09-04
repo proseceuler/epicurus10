@@ -9,20 +9,19 @@ import {
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DEFAULT_HABITS = [
-  { name: 'Woke up at 05:00', emoji: '⏰', goal_target: 30 },
-  { name: 'Gym', emoji: '💪', goal_target: 25 },
-  { name: 'Reading / Learning', emoji: '📚', goal_target: 30 },
-  { name: 'Project Work', emoji: '🧬', goal_target: 20 },
+  { name: 'Woke up at 05:00', emoji: '\u23f0', goal_target: 30 },
+  { name: 'Gym', emoji: '\ud83d\udcaa', goal_target: 25 },
+  { name: 'Reading / Learning', emoji: '\ud83d\udcda', goal_target: 30 },
+  { name: 'Project Work', emoji: '\ud83e\uddec', goal_target: 20 },
 ];
 
 interface DayInfo {
   day: number;
   dateStr: string;
-  weekdayIdx: number; // 0=Mon
+  weekdayIdx: number;
   weekNum: number;
 }
 
-/** Guard against duplicated rows (double seeding / repeat fetches). */
 function dedupeHabits(list: Habit[]): Habit[] {
   const seenId = new Set<string>();
   const seenName = new Set<string>();
@@ -45,7 +44,7 @@ export default function HabitsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newHabit, setNewHabit] = useState({ name: '', emoji: '✅', goal: '30' });
+  const [newHabit, setNewHabit] = useState({ name: '', emoji: '\u2705', goal: '30' });
   const seededRef = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -83,7 +82,6 @@ export default function HabitsPage() {
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
     const firstDow = new Date(selectedYear, selectedMonth, 1).getDay();
     const firstWeekdayIdx = firstDow === 0 ? 6 : firstDow - 1;
-
     const md: DayInfo[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(selectedYear, selectedMonth, d);
@@ -171,13 +169,13 @@ export default function HabitsPage() {
     if (!newHabit.name.trim()) return;
     const { data } = await supabase.from('habits').insert({
       name: newHabit.name.trim(),
-      emoji: newHabit.emoji || '✅',
+      emoji: newHabit.emoji || '\u2705',
       goal_target: parseInt(newHabit.goal) || 30,
       color: 'zinc',
     }).select().single();
     if (data) {
       setHabits(dedupeHabits([...habits, data as Habit]));
-      setNewHabit({ name: '', emoji: '✅', goal: '30' });
+      setNewHabit({ name: '', emoji: '\u2705', goal: '30' });
       setShowAddForm(false);
     }
   };
@@ -198,10 +196,10 @@ export default function HabitsPage() {
   const donutOffset = donutCircumference * (1 - overallPct / 100);
 
   return (
-    <div className="pb-28">
+    <div className="pb-16">
       <PageHeader
         title="Habit Tracker"
-        subtitle={`${habits.length} habits · ${MONTHS[selectedMonth]} ${selectedYear}`}
+        subtitle={`${habits.length} habits \u00b7 ${MONTHS[selectedMonth]} ${selectedYear}`}
         action={
           <div className="flex items-center gap-2">
             <select
@@ -224,11 +222,10 @@ export default function HabitsPage() {
         }
       />
 
-      {/* Top stats — stack on mobile */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-        <Card className="p-4 min-w-0">
-          <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Daily Progress ({monthDays.length} days)</p>
-          <div className="flex items-end gap-[2px] h-14">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-3">
+        <Card className="p-3 min-w-0">
+          <p className="text-[10px] text-zinc-400 mb-1.5 uppercase tracking-wider">Daily Progress ({monthDays.length} days)</p>
+          <div className="flex items-end gap-[2px] h-12">
             {dailyProgress.map((d) => {
               const h = d.max > 0 ? (d.count / d.max) * 100 : 0;
               return (
@@ -242,9 +239,9 @@ export default function HabitsPage() {
           </div>
         </Card>
 
-        <Card className="p-4 min-w-0">
-          <p className="text-[10px] text-zinc-400 mb-2 uppercase tracking-wider">Weekly Trend</p>
-          <div className="flex items-end gap-1.5 h-14">
+        <Card className="p-3 min-w-0">
+          <p className="text-[10px] text-zinc-400 mb-1.5 uppercase tracking-wider">Weekly Trend</p>
+          <div className="flex items-end gap-1.5 h-12">
             {weeklyProgress.map((w) => {
               const h = w.max > 0 ? (w.count / w.max) * 100 : 0;
               return (
@@ -258,7 +255,7 @@ export default function HabitsPage() {
           </div>
         </Card>
 
-        <Card className="p-4 flex items-center justify-between gap-4 min-w-0 sm:col-span-2 lg:col-span-1">
+        <Card className="p-3 flex items-center justify-between gap-4 min-w-0 sm:col-span-2 lg:col-span-1">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center justify-between gap-6 text-xs">
               <span className="text-zinc-500">Goal</span>
@@ -288,11 +285,9 @@ export default function HabitsPage() {
         </Card>
       </div>
 
-      {/* Habit grid */}
       <Card className="overflow-hidden mb-4">
         <div className="overflow-x-auto">
           <div className="min-w-max">
-            {/* Header row */}
             <div className="flex items-end border-b border-zinc-200/50">
               <div className="sticky left-0 z-20 glass-sticky w-32 sm:w-44 shrink-0 px-3 py-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 Habit
@@ -307,7 +302,6 @@ export default function HabitsPage() {
               </div>
             </div>
 
-            {/* Habit rows */}
             {habitStats.map(({ habit, completed, goal, left, pct, streak, bestStreak }) => (
               <div key={habit.id} className="flex items-center border-b border-zinc-200/40 group">
                 <div className="sticky left-0 z-20 glass-sticky w-32 sm:w-44 shrink-0 px-3 py-2 min-w-0">
@@ -353,6 +347,28 @@ export default function HabitsPage() {
                 </div>
               </div>
             ))}
+
+            <WellnessRow
+              label="Mood"
+              emoji="\ud83d\ude42"
+              monthDays={monthDays}
+              todayStr={todayStr}
+              getValue={(dateStr) => getWellnessForDay(dateStr)?.mood}
+              onChange={(dateStr, value) => updateWellness(dateStr, 'mood', value)}
+              options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+            />
+            <WellnessRow
+              label="Sleep"
+              emoji="\ud83d\ude34"
+              monthDays={monthDays}
+              todayStr={todayStr}
+              getValue={(dateStr) => getWellnessForDay(dateStr)?.sleep_hours}
+              onChange={(dateStr, value) => updateWellness(dateStr, 'sleep_hours', value)}
+              options={[3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((n) => ({
+                value: String(n),
+                label: String(n),
+              }))}
+            />
           </div>
         </div>
 
@@ -362,7 +378,7 @@ export default function HabitsPage() {
               value={newHabit.emoji}
               onChange={(e) => setNewHabit({ ...newHabit, emoji: e.target.value })}
               className="w-12 px-1 py-2 glass-input rounded-xl text-sm text-center text-zinc-800"
-              placeholder="✅"
+              placeholder="\u2705"
             />
             <input
               value={newHabit.name}
@@ -393,44 +409,12 @@ export default function HabitsPage() {
         )}
       </Card>
 
-      {/* Wellness + Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-4 min-w-0">
-          <div className="flex items-center gap-2 mb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <Card className="lg:col-span-2 p-3 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
             <Smile className="w-4 h-4 text-zinc-500" />
-            <h3 className="text-sm font-semibold text-zinc-800">Daily Wellness — {MONTHS[selectedMonth]}</h3>
+            <h3 className="text-sm font-semibold text-zinc-800">Wellness trend \u2014 {MONTHS[selectedMonth]}</h3>
           </div>
-
-          <div className="overflow-x-auto mb-4">
-            <div className="flex gap-1 min-w-max pb-2">
-              {monthDays.map((d) => {
-                const w = getWellnessForDay(d.dateStr);
-                const isToday = d.dateStr === todayStr;
-                return (
-                  <div key={d.dateStr} className={`flex flex-col items-center gap-1 p-1.5 rounded-lg ${isToday ? 'bg-white/60 ring-1 ring-zinc-400' : ''}`}>
-                    <span className="text-[9px] text-zinc-400">{d.day}</span>
-                    <select
-                      value={w?.mood ?? ''}
-                      onChange={(e) => updateWellness(d.dateStr, 'mood', parseInt(e.target.value) || 0)}
-                      className="w-11 px-0.5 py-1 glass-input rounded-lg text-[10px] text-zinc-800 cursor-pointer"
-                    >
-                      <option value="">—</option>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                    <select
-                      value={w?.sleep_hours ?? ''}
-                      onChange={(e) => updateWellness(d.dateStr, 'sleep_hours', parseFloat(e.target.value) || 0)}
-                      className="w-11 px-0.5 py-1 glass-input rounded-lg text-[10px] text-zinc-800 cursor-pointer"
-                    >
-                      <option value="">—</option>
-                      {[3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((n) => <option key={n} value={n}>{n}h</option>)}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="glass rounded-xl p-3">
             <div className="flex items-center gap-4 mb-2">
               <span className="flex items-center gap-1 text-[10px] text-zinc-500">
@@ -444,7 +428,7 @@ export default function HabitsPage() {
           </div>
         </Card>
 
-        <Card className="p-4 min-w-0">
+        <Card className="p-3 min-w-0">
           <div className="flex items-center gap-2 mb-3">
             <Trophy className="w-4 h-4 text-zinc-500" />
             <h3 className="text-sm font-semibold text-zinc-800">Top 10 Habits</h3>
@@ -481,11 +465,62 @@ export default function HabitsPage() {
   );
 }
 
+function WellnessRow({
+  label,
+  emoji,
+  monthDays,
+  todayStr,
+  getValue,
+  onChange,
+  options,
+}: {
+  label: string;
+  emoji: string;
+  monthDays: DayInfo[];
+  todayStr: string;
+  getValue: (dateStr: string) => number | null | undefined;
+  onChange: (dateStr: string, value: number) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex items-center border-b border-zinc-200/40">
+      <div className="sticky left-0 z-20 glass-sticky w-32 sm:w-44 shrink-0 px-3 py-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-sm shrink-0">{emoji}</span>
+          <span className="text-xs text-zinc-800 truncate">{label}</span>
+        </div>
+        <p className="text-[10px] text-zinc-400 mt-0.5">Wellness</p>
+      </div>
+      <div className="flex gap-[3px] px-2 py-1.5">
+        {monthDays.map((d) => {
+          const val = getValue(d.dateStr);
+          const isToday = d.dateStr === todayStr;
+          return (
+            <select
+              key={d.dateStr}
+              value={val ?? ''}
+              onChange={(e) => onChange(d.dateStr, parseFloat(e.target.value) || 0)}
+              aria-label={`${label} on ${d.dateStr}`}
+              className={`w-7 h-7 rounded-md text-[9px] text-center text-zinc-800 glass-input shrink-0 px-0 cursor-pointer ${
+                isToday ? 'ring-1 ring-zinc-500' : ''
+              }`}
+            >
+              <option value="">\u2014</option>
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function getStreak(habitId: string, completions: HabitCompletion[]): number {
   const dates = completions
     .filter((c) => c.habit_id === habitId)
     .map((c) => c.completion_date);
-
   let streak = 0;
   const today = new Date();
   for (let i = 0; i < 365; i++) {
@@ -503,7 +538,6 @@ function getBestStreak(habitId: string, completions: HabitCompletion[]): number 
     .filter((c) => c.habit_id === habitId)
     .map((c) => c.completion_date)
     .sort((a, b) => a.localeCompare(b));
-
   if (dates.length === 0) return 0;
   let best = 1;
   let current = 1;
@@ -523,19 +557,16 @@ function DualAxisChart({ moodData, sleepData, days }: { moodData: number[]; slee
   const padding = 20;
   const chartW = width - padding * 2;
   const chartH = height - padding * 2;
-
   const moodPoints = moodData.map((val, i) => {
     const x = padding + (i / Math.max(days - 1, 1)) * chartW;
     const y = padding + chartH - (val / 10) * chartH;
     return `${x},${y}`;
   });
-
   const sleepPoints = sleepData.map((val, i) => {
     const x = padding + (i / Math.max(days - 1, 1)) * chartW;
     const y = padding + chartH - (val / 12) * chartH;
     return `${x},${y}`;
   });
-
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-24">
       {[0, 0.5, 1].map((t) => (

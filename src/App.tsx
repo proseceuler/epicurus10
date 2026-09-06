@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
+import { ConfirmProvider } from '@/components/ConfirmProvider';
 import AppLayout, { usePageState } from '@/components/AppLayout';
 import DashboardPage from '@/pages/DashboardPage';
 import GradesPage from '@/pages/GradesPage';
@@ -39,6 +40,7 @@ function App() {
 
   return (
     <PomodoroProvider>
+      <ConfirmProvider>
       <AppLayout page={page} navigate={navigate}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -53,6 +55,7 @@ function App() {
           </motion.div>
         </AnimatePresence>
       </AppLayout>
+      </ConfirmProvider>
     </PomodoroProvider>
   );
 }

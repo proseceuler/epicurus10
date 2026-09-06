@@ -11,6 +11,7 @@ import {
 } from '@/lib/habit-stats';
 
 export type View = 'home' | 'track' | 'dash' | 'insights';
+export { TrackView, DashView, InsightsView } from '@/components/habits/panel-views';
 
 function weekPct(habits: Habit[], week: DayCell[], done: Set<string>) {
   if (!habits.length || !week.length) return 0;

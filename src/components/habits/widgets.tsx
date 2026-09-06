@@ -228,21 +228,27 @@ export function Ring({ value, caption }: { value: number; caption?: string }) {
   const off = c * (1 - Math.max(0, Math.min(100, value)) / 100);
   return (
     <div className="flex flex-col items-center">
-      <svg className="h-[120px] w-[120px] -rotate-90" viewBox="0 0 100 100">
+      <svg className="h-[88px] w-[88px] -rotate-90" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r={r} fill="none" stroke="#d4d4d8" strokeWidth="9" />
         <circle cx="50" cy="50" r={r} fill="none" stroke="#18181b" strokeWidth="9" strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" />
       </svg>
-      <p className="-mt-[78px] mb-[52px] text-[22px] font-semibold tabular-nums text-zinc-800">{Math.round(value)}%</p>
+      <p className="-mt-[58px] mb-[38px] text-[18px] font-semibold tabular-nums text-zinc-800">{Math.round(value)}%</p>
       {caption ? <p className="text-[10px] text-zinc-500">{caption}</p> : null}
     </div>
   );
 }
 
-export function AlertRow({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'pending' }) {
+export function AlertRow({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'pending' | 'na' }) {
+  const chip =
+    tone === 'ok'
+      ? 'bg-emerald-500 text-white'
+      : tone === 'na'
+        ? 'bg-red-500 text-white'
+        : 'bg-amber-400 text-zinc-900';
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 text-[12px]">
-      <span className="text-zinc-500">{label}</span>
-      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone === 'ok' ? 'bg-zinc-800 text-zinc-50' : 'bg-zinc-200 text-zinc-800'}`}>{value}</span>
+    <div className="flex items-center justify-between gap-2 py-1 text-[11px] lg:text-[12px]">
+      <span className="min-w-0 truncate text-zinc-500">{label}</span>
+      <span className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold ${chip}`}>{value}</span>
     </div>
   );
 }

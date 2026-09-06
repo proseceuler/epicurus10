@@ -116,8 +116,8 @@ export default function HabitsPage() {
   }
 
   return (
-    <div className="ht-shell pb-16">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+    <div className="ht-shell min-h-[calc(100vh-5.5rem)] pb-16">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
           {VIEWS.map((v) => (

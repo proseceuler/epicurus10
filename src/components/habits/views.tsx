@@ -93,17 +93,17 @@ export function HomeView({
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-8.5rem)] w-full items-center justify-center">
-      <div className="mx-auto flex w-full max-w-[1280px] items-center justify-center gap-8 px-4 lg:gap-14">
-        <div className="w-[300px] shrink-0 sm:w-[380px] lg:w-[460px]">
+    <div className="flex min-h-[calc(100vh-7rem)] w-full items-start justify-center pt-3 lg:pt-5">
+      <div className="mx-auto flex w-full max-w-[1440px] items-center justify-center gap-6 px-3 lg:gap-10">
+        <div className="w-[340px] shrink-0 sm:w-[430px] lg:w-[540px] xl:w-[580px]">
           <BlackHole className="aspect-square w-full bg-transparent" />
         </div>
 
-        <div className="min-w-0 max-w-[720px] flex-1">
-          <div className="grid grid-cols-3 items-center gap-x-5 gap-y-3 lg:gap-x-7">
+        <div className="min-w-0 max-w-[860px] flex-1">
+          <div className="grid grid-cols-3 items-start gap-x-6 gap-y-5 lg:gap-x-8 lg:gap-y-6">
             <div className="min-w-0">
-              <p className="ht-label mb-1.5">Quick Actions</p>
-              <ul className="space-y-1 text-[12px] leading-snug text-zinc-700">
+              <p className="ht-label mb-2">Quick Actions</p>
+              <ul className="space-y-1.5 text-[13px] leading-snug text-zinc-700">
                 {links.map((l) => (
                   <li key={l.view}>
                     <button type="button" onClick={() => onGo(l.view)} className="text-left underline decoration-zinc-400 underline-offset-4 hover:text-zinc-950">{l.label}</button>
@@ -113,8 +113,8 @@ export function HomeView({
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Completion %</p>
-              <p className="mb-0.5 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
-              <AreaChart values={wave.slice(-12)} labels={waveLabels} height={58} />
+              <p className="mb-1 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
+              <AreaChart values={wave.slice(-12)} labels={waveLabels} height={78} />
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Alerts</p>
@@ -126,12 +126,12 @@ export function HomeView({
               <AlertRow label="Done Top 3 Tasks?" value={!top3.length ? 'N/A' : top3Done ? 'Done' : 'Pending'} tone={alertTone(!top3.length, top3Done)} />
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-0.5">Daily Score Distribution</p>
-              <BarRow items={dist} height={64} showValue />
+              <p className="ht-label mb-1">Daily Score Distribution</p>
+              <BarRow items={dist} height={84} showValue />
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-0.5">Trend</p>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-[10px]">
+              <p className="ht-label mb-1">Trend</p>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 gap-y-1 text-[11px]">
                 <span className="text-[8px] uppercase tracking-wider text-zinc-500">Habit</span>
                 <span className="text-[8px] uppercase tracking-wider text-zinc-500">MTD %</span>
                 <span className="text-[8px] uppercase tracking-wider text-zinc-500">MoM %</span>
@@ -144,17 +144,17 @@ export function HomeView({
                       <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
                       <span className="tabular-nums text-zinc-600">{Math.round(mtd * 100)}%</span>
                       <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(mom * 100))}%</span>
-                      <span><Spark values={habitWeekSeries(h.id, done)} width={42} /></span>
+                      <span><Spark values={habitWeekSeries(h.id, done)} width={48} /></span>
                     </Fragment>
                   );
                 })}
               </div>
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-0.5">Progress ({monthName.slice(0, 3)})</p>
+              <p className="ht-label mb-1">Progress ({monthName.slice(0, 3)})</p>
               <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
-              <p className="ht-label mt-1 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
-              <BarRow items={monthBars} height={36} labelEvery={5} />
+              <p className="ht-label mt-1.5 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
+              <BarRow items={monthBars} height={44} labelEvery={5} />
             </div>
           </div>
         </div>

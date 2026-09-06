@@ -1,12 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-/**
- * Accretion disk with a dark inner shadow.
- * Camera is fixed. The hole spins. Pointer warps nearby dots.
- */
 export default function BlackHole({
   className = '',
-  percent,
 }: {
   className?: string;
   percent?: number;
@@ -23,12 +18,12 @@ export default function BlackHole({
       try {
         const THREE = await import('three');
         if (stop || !hostRef.current) return;
-        const w = Math.max(host.clientWidth, 160);
-        const h = Math.max(host.clientHeight, 160);
+        const w = Math.max(host.clientWidth, 200);
+        const h = Math.max(host.clientHeight, 200);
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(34, w / h, 0.05, 40);
-        camera.position.set(0, 0, 3.05);
+        const camera = new THREE.PerspectiveCamera(28, w / h, 0.05, 40);
+        camera.position.set(0, 0, 4.35);
         camera.lookAt(0, 0, 0);
 
         const renderer = new THREE.WebGLRenderer({
@@ -46,63 +41,47 @@ export default function BlackHole({
         host.appendChild(renderer.domElement);
 
         const tilt = new THREE.Group();
-        tilt.rotation.x = 1.08;
+        tilt.rotation.x = 1.05;
         scene.add(tilt);
         const hole = new THREE.Group();
         tilt.add(hole);
 
-        const shadowMap = document.createElement('canvas');
-        shadowMap.width = 256;
-        shadowMap.height = 256;
-        const sctx = shadowMap.getContext('2d');
-        if (sctx) {
-          const g = sctx.createRadialGradient(128, 128, 8, 128, 128, 128);
-          g.addColorStop(0, 'rgba(0,0,0,1)');
-          g.addColorStop(0.42, 'rgba(9,9,11,0.96)');
-          g.addColorStop(0.7, 'rgba(24,24,27,0.55)');
-          g.addColorStop(1, 'rgba(24,24,27,0)');
-          sctx.fillStyle = g;
-          sctx.fillRect(0, 0, 256, 256);
-        }
-        const shadowTex = new THREE.CanvasTexture(shadowMap);
-        shadowTex.needsUpdate = true;
-        const shadow = new THREE.Mesh(
-          new THREE.CircleGeometry(0.62, 64),
-          new THREE.MeshBasicMaterial({
-            map: shadowTex,
-            transparent: true,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          }),
-        );
-        shadow.rotation.x = -Math.PI / 2;
-        hole.add(shadow);
-
         const core = new THREE.Mesh(
-          new THREE.CircleGeometry(0.34, 48),
-          new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 0.92,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-          }),
+          new THREE.SphereGeometry(0.36, 48, 36),
+          new THREE.MeshBasicMaterial({ color: 0x000000 }),
         );
-        core.rotation.x = -Math.PI / 2;
         hole.add(core);
 
-        const photon = new THREE.Mesh(
-          new THREE.RingGeometry(0.36, 0.41, 80),
+        const shadow = new THREE.Mesh(
+          new THREE.SphereGeometry(0.58, 40, 28),
           new THREE.MeshBasicMaterial({
-            color: 0x27272a,
+            color: 0x09090b,
             transparent: true,
-            opacity: 0.85,
-            side: THREE.DoubleSide,
+            opacity: 0.38,
             depthWrite: false,
           }),
         );
-        photon.rotation.x = -Math.PI / 2;
+        hole.add(shadow);
+
+        const halo = new THREE.Mesh(
+          new THREE.SphereGeometry(0.78, 32, 24),
+          new THREE.MeshBasicMaterial({
+            color: 0x18181b,
+            transparent: true,
+            opacity: 0.12,
+            depthWrite: false,
+          }),
+        );
+        hole.add(halo);
+
+        const photon = new THREE.Mesh(
+          new THREE.TorusGeometry(0.4, 0.012, 12, 80),
+          new THREE.MeshBasicMaterial({ color: 0x27272a }),
+        );
+        photon.rotation.x = Math.PI / 2;
         hole.add(photon);
+
+        const bg = 0.965;
 
         function pack(count: number, rMin: number, rMax: number, ySpread: number) {
           const pos = new Float32Array(count * 3);
@@ -118,10 +97,6 @@ export default function BlackHole({
             rad[i] = r;
             y0[i] = (Math.random() - 0.5) * ySpread * (1 - t * 0.45);
             spd[i] = 0.016 / Math.pow(Math.max(r, 0.32), 1.35);
-            const shade = 0.16 + (1 - t) * 0.78;
-            col[i * 3] = shade;
-            col[i * 3 + 1] = shade;
-            col[i * 3 + 2] = shade;
           }
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -129,9 +104,19 @@ export default function BlackHole({
           return { pos, col, ang, rad, y0, spd, geo, count, rMin, rMax };
         }
 
-        const inner = pack(1000, 0.46, 0.86, 0.03);
-        const mid = pack(1500, 0.82, 1.34, 0.045);
-        const outer = pack(800, 1.28, 1.82, 0.06);
+        function paint(d: ReturnType<typeof pack>, i: number) {
+          const t = (d.rad[i] - d.rMin) / Math.max(d.rMax - d.rMin, 0.001);
+          const ink = 0.1 + (1 - Math.max(0, Math.min(1, t))) * 0.72;
+          const fade = Math.pow(Math.max(0, Math.min(1, t)), 1.65);
+          const s = ink * (1 - fade) + bg * fade;
+          d.col[i * 3] = s;
+          d.col[i * 3 + 1] = s;
+          d.col[i * 3 + 2] = s;
+        }
+
+        const inner = pack(1100, 0.48, 0.88, 0.03);
+        const mid = pack(1600, 0.84, 1.28, 0.045);
+        const outer = pack(900, 1.22, 1.62, 0.06);
 
         const mk = (geo: THREE.BufferGeometry, size: number, opacity: number) =>
           new THREE.Points(geo, new THREE.PointsMaterial({
@@ -144,13 +129,13 @@ export default function BlackHole({
           }));
 
         hole.add(
-          mk(inner.geo, 0.022, 0.96),
-          mk(mid.geo, 0.016, 0.78),
+          mk(inner.geo, 0.02, 0.95),
+          mk(mid.geo, 0.015, 0.72),
           mk(outer.geo, 0.012, 0.42),
         );
 
         const pick = new THREE.Mesh(
-          new THREE.CircleGeometry(1.9, 32),
+          new THREE.CircleGeometry(1.7, 32),
           new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
         );
         pick.rotation.x = -Math.PI / 2;
@@ -226,8 +211,10 @@ export default function BlackHole({
             d.pos[i * 3] = x;
             d.pos[i * 3 + 1] = y;
             d.pos[i * 3 + 2] = z;
+            paint(d, i);
           }
           (d.geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+          (d.geo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
         }
 
         const tick = () => {
@@ -261,15 +248,16 @@ export default function BlackHole({
           inner.geo.dispose();
           mid.geo.dispose();
           outer.geo.dispose();
-          shadow.geometry.dispose();
-          (shadow.material as THREE.Material).dispose();
           core.geometry.dispose();
           (core.material as THREE.Material).dispose();
+          shadow.geometry.dispose();
+          (shadow.material as THREE.Material).dispose();
+          halo.geometry.dispose();
+          (halo.material as THREE.Material).dispose();
           photon.geometry.dispose();
           (photon.material as THREE.Material).dispose();
           pick.geometry.dispose();
           (pick.material as THREE.Material).dispose();
-          shadowTex.dispose();
           renderer.dispose();
           host.innerHTML = '';
         };
@@ -282,20 +270,15 @@ export default function BlackHole({
   }, []);
 
   return (
-    <div className={`relative bg-transparent ${className}`}>
+    <div className={`relative overflow-visible bg-transparent ${className}`}>
       <div ref={hostRef} className="h-full w-full cursor-grab bg-transparent touch-none" />
-      {typeof percent === 'number' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold tabular-nums tracking-wide text-zinc-700">
-          {percent.toFixed(2)}%
-        </div>
-      )}
     </div>
   );
 }
 
 function drawFallback(host: HTMLDivElement) {
   const canvas = document.createElement('canvas');
-  const size = Math.max(host.clientWidth, host.clientHeight, 200);
+  const size = Math.max(host.clientWidth, host.clientHeight, 240);
   canvas.width = size;
   canvas.height = size;
   canvas.className = 'h-full w-full';
@@ -309,7 +292,7 @@ function drawFallback(host: HTMLDivElement) {
   const dots = Array.from({ length: 720 }, () => {
     const t = Math.pow(Math.random(), 0.55);
     return {
-      r: size * (0.16 + t * 0.34),
+      r: size * (0.14 + t * 0.28),
       a: Math.random() * Math.PI * 2,
       speed: 0.012 / Math.pow(0.2 + t, 1.2),
       s: 0.5 + Math.random() * 1.1,
@@ -319,23 +302,25 @@ function drawFallback(host: HTMLDivElement) {
   let spin = 0;
   const tick = () => {
     ctx.clearRect(0, 0, size, size);
-    const g = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.18);
+    const g = ctx.createRadialGradient(cx, cy, size * 0.06, cx, cy, size * 0.16);
     g.addColorStop(0, 'rgba(0,0,0,1)');
-    g.addColorStop(0.65, 'rgba(9,9,11,0.85)');
-    g.addColorStop(1, 'rgba(9,9,11,0)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0.85)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.18, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.16, 0, Math.PI * 2);
     ctx.fill();
     spin += 0.008;
     for (const d of dots) {
       d.a += d.speed;
-      d.r -= 0.12;
-      if (d.r < size * 0.15) d.r = size * 0.48;
+      d.r -= 0.1;
+      if (d.r < size * 0.13) d.r = size * 0.4;
       const a = d.a + spin;
+      const fade = Math.max(0, (d.r / (size * 0.42) - 0.45) / 0.55);
+      const s = Math.round(d.shade * (1 - fade) + 245 * fade);
       const x = cx + Math.cos(a) * d.r;
       const y = cy + Math.sin(a) * d.r * 0.38;
-      ctx.fillStyle = `rgba(${d.shade},${d.shade},${d.shade},0.85)`;
+      ctx.fillStyle = `rgba(${s},${s},${s},${0.85 * (1 - fade)})`;
       ctx.beginPath();
       ctx.arc(x, y, d.s, 0, Math.PI * 2);
       ctx.fill();

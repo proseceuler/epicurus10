@@ -5,6 +5,7 @@ import {
   dueTone, formatDue, isImageUrl, uniqueById, uniqueAttachments, resolveCover,
 } from '@/lib/kanban';
 import { compressImage, loadMedia, saveMedia } from '@/lib/mediaStore';
+import { confirmDelete } from '@/lib/confirm';
 import { Button, Input, Select } from '@/components/kit';
 import { Trash2, X, Calendar as CalIcon, Download, CheckSquare, Paperclip, MessageSquare, Activity, Tag, AlignLeft, Image as ImageIcon, GripVertical, Link2 } from 'lucide-react';
 
@@ -22,10 +23,10 @@ function useResolvedUrl(url: string | null) {
 
 function CoverFrame({ url, name, className, imgClass, onClick }: { url: string; name?: string; className?: string; imgClass?: string; onClick?: (e: React.MouseEvent) => void }) {
   const src = useResolvedUrl(url);
-  if (!src) return <div className={`bg-zinc-100 ${className || ''}`} />;
+  if (!src) return null;
   return (
-    <button type="button" onClick={onClick} className={`block overflow-hidden bg-zinc-100 ${className || ''}`}>
-      <img src={src} alt={name || ''} className={imgClass || 'max-h-full w-full object-contain'} />
+    <button type="button" onClick={onClick} className={`block w-full overflow-hidden bg-transparent p-0 ${className || ''}`}>
+      <img src={src} alt={name || ''} className={imgClass || 'block h-auto w-full object-contain'} />
     </button>
   );
 }
@@ -42,7 +43,7 @@ export function KanbanCardPreview({ task, dragging, onDragStart, onDragEnd, onOp
   const snippet = (task.description || '').trim();
   return (
     <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} className={`group cursor-pointer overflow-hidden rounded-xl border border-white/50 bg-white/85 shadow-sm ${dragging ? 'opacity-50' : ''}`}>
-      {cover ? <CoverFrame url={cover} className="max-h-36 w-full" imgClass="max-h-36 w-full object-contain" /> : null}
+      {cover ? <CoverFrame url={cover} className="w-full" imgClass="block h-auto w-full object-contain" /> : null}
       <div className="p-3">
         {subj && <div className="mb-1.5"><span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-zinc-800 text-white">{subj.shortName}</span></div>}
         <div className="flex items-start gap-1.5">
@@ -87,8 +88,8 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
   const coverFile = attachments.find((a) => a.url === cover);
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4" onClick={onClose}>
-      <div className="glass glass-shadow-lg relative my-8 w-full max-w-3xl overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        {cover ? <CoverFrame url={cover} name={coverFile?.name} className="max-h-64 w-full" imgClass="max-h-64 w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
+      <div className="glass glass-shadow-lg relative my-6 w-[min(96vw,72rem)] overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        {cover ? <CoverFrame url={cover} name={coverFile?.name} className="w-full" imgClass="block h-auto w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/50 px-5 py-3">
           <select value={task.status} onChange={(e) => onStatus(e.target.value as Status)} className="rounded-lg border border-zinc-200/80 bg-white/70 px-2 py-1.5 text-xs">{columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
           <div className="flex-1" />
@@ -105,7 +106,7 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-500"><CheckSquare className="mr-1 inline h-3.5 w-3.5" />Checklist {checklist.length > 0 && <span>{doneCount}/{checklist.length}</span>}</h3>
               {checklist.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} /><span className={`flex-1 text-sm ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span><button type="button" onClick={() => onSave({ checklist: checklist.filter((i) => i.id !== item.id) })}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button></div>
+                <div key={item.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} /><span className={`flex-1 text-sm ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span><button type="button" onClick={async () => { if (await confirmDelete(item.text || 'this checklist item')) onSave({ checklist: checklist.filter((i) => i.id !== item.id) }); }}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button></div>
               ))}
               <div className="mt-2 flex gap-2"><Input value={checkText} onChange={setCheckText} placeholder="Add an item" /><Button size="sm" onClick={() => { const text = checkText.trim(); if (!text) return; onSave({ checklist: [...checklist, { id: uid(), text, done: false }] }); setCheckText(''); }}>Add</Button></div>
             </section>
@@ -116,7 +117,7 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
                   {isImageUrl(file.url) ? <CoverFrame url={file.url} name={file.name} className="h-10 w-10 rounded-md" imgClass="h-10 w-10 object-contain" onClick={() => setPreview({ url: file.url, name: file.name })} /> : <Paperclip className="h-4 w-4 text-zinc-400" />}
                   <button type="button" className="min-w-0 flex-1 truncate text-left text-sm" onClick={() => isImageUrl(file.url) && setPreview({ url: file.url, name: file.name })}>{file.name}</button>
                   {isImageUrl(file.url) && <button type="button" className="text-[10px]" onClick={() => onSave({ cover_url: cover === file.url ? null : file.url, attachments })}>{cover === file.url ? 'Remove cover' : 'Set cover'}</button>}
-                  <button type="button" onClick={() => onSave({ attachments: attachments.filter((a) => a.id !== file.id), cover_url: task.cover_url === file.url ? null : cover })}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button>
+                  <button type="button" onClick={async () => { if (await confirmDelete(file.name || 'this attachment')) onSave({ attachments: attachments.filter((a) => a.id !== file.id), cover_url: task.cover_url === file.url ? null : cover }); }}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button>
                 </div>
               ))}
               <div className="mt-2 grid gap-2 sm:grid-cols-2"><Input value={attachName} onChange={setAttachName} placeholder="Label" /><Input value={attachUrl} onChange={setAttachUrl} placeholder="https://…" /></div>
@@ -126,7 +127,7 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
               </div>
             </section>
           </div>
-          <aside className="w-full border-t border-zinc-200/50 p-5 lg:w-64 lg:border-l lg:border-t-0">
+          <aside className="w-full border-t border-zinc-200/50 p-5 lg:w-80 lg:border-l lg:border-t-0">
             <h3 className="mb-3 text-xs font-semibold uppercase text-zinc-500"><MessageSquare className="mr-1 inline h-3.5 w-3.5" />Comments</h3>
             {comments.map((c) => <div key={c.id} className="mb-2 rounded-lg bg-white/70 px-2.5 py-2 text-xs">{c.text}</div>)}
             <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={3} className="w-full rounded-xl border border-zinc-200 px-2.5 py-2 text-xs" />

@@ -111,13 +111,11 @@ export function HomeView({
               ))}
             </ul>
           </div>
-
           <div className="min-w-0">
             <p className="ht-label mb-0.5">Completion %</p>
             <p className="mb-0.5 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
             <AreaChart values={wave.slice(-12)} labels={waveLabels} height={58} />
           </div>
-
           <div className="min-w-0">
             <p className="ht-label mb-0.5">Alerts</p>
             <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Daily Tasks</p>
@@ -127,12 +125,10 @@ export function HomeView({
             <AlertRow label="Done Top Priorities?" value={!priorities.length ? 'N/A' : prioDone ? 'Done' : 'Pending'} tone={alertTone(!priorities.length, prioDone)} />
             <AlertRow label="Done Top 3 Tasks?" value={!top3.length ? 'N/A' : top3Done ? 'Done' : 'Pending'} tone={alertTone(!top3.length, top3Done)} />
           </div>
-
           <div className="min-w-0">
             <p className="ht-label mb-0.5">Daily Score Distribution</p>
             <BarRow items={dist} height={64} showValue />
           </div>
-
           <div className="min-w-0">
             <p className="ht-label mb-0.5">Trend</p>
             <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-[10px]">
@@ -154,7 +150,6 @@ export function HomeView({
               })}
             </div>
           </div>
-
           <div className="min-w-0">
             <p className="ht-label mb-0.5">Progress ({monthName.slice(0, 3)})</p>
             <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
@@ -166,3 +161,5 @@ export function HomeView({
     </div>
   );
 }
+
+export { TrackView, DashView, InsightsView } from './views-rest';

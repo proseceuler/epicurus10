@@ -28,9 +28,6 @@ export const Route = createRootRoute({
         href: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
     ],
-    scripts: [
-      { src: "https://js.puter.com/v2/", defer: true },
-    ],
   }),
   component: () => (
     <html lang="en" className="antialiased" suppressHydrationWarning>

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
+import { upsertLinkedCalendarEvent, deleteCalendarEvent } from '@/lib/calendarStore';
+import { parseNaturalWhen } from '@/lib/parseWhen';
 import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
-import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag } from 'lucide-react';
+import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag, Pencil } from 'lucide-react';
 
 const PRIORITY_CONFIG = {
   urgent_important: { label: 'Urgent & Important', short: 'Do First', tone: 'high' as const, quadrant: 1 },
@@ -13,221 +15,142 @@ const PRIORITY_CONFIG = {
 
 type PriorityKey = keyof typeof PRIORITY_CONFIG;
 type Filter = 'all' | 'active' | 'completed' | PriorityKey;
+const emptyForm = {
+  title: '', subject_key: '', due_date: '', priority: 'not_urgent_important' as PriorityKey,
+  all_day: true, start_time: '', end_time: '', notes: '',
+};
 
 export default function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', subject_key: '', due_date: '', priority: 'not_urgent_important' as PriorityKey });
+  const [editing, setEditing] = useState<Todo | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const openEdit = (todo?: Todo) => {
+    if (todo) {
+      setEditing(todo);
+      setForm({
+        title: todo.title, subject_key: todo.subject_key || '', due_date: todo.due_date || '',
+        priority: todo.priority as PriorityKey, all_day: todo.all_day !== false && !todo.start_time,
+        start_time: todo.start_time || '', end_time: todo.end_time || '', notes: todo.notes || '',
+      });
+    } else { setEditing(null); setForm(emptyForm); }
+    setShowForm(true);
+  };
+
+  const persistCalendar = (todo: Todo) => {
+    const eventId = upsertLinkedCalendarEvent({
+      existingId: todo.calendar_event_id, title: todo.title, date: todo.due_date,
+      all_day: todo.all_day !== false && !todo.start_time, start_time: todo.start_time ?? null,
+      end_time: todo.end_time ?? null, subject_key: todo.subject_key, kind: 'deadline', linked_todo_id: todo.id,
+    });
+    if (eventId !== todo.calendar_event_id) void supabase.from('todos').update({ calendar_event_id: eventId }).eq('id', todo.id);
+  };
 
   const loadTodos = useCallback(async () => {
     const { data } = await supabase.from('todos').select('*').order('created_at', { ascending: false });
     if (data) setTodos(data as Todo[]);
     setLoading(false);
   }, []);
-
   useEffect(() => { loadTodos(); }, [loadTodos]);
 
-  const addTodo = async () => {
+  const saveTodo = async () => {
     if (!form.title.trim()) return;
-    const { data } = await supabase.from('todos').insert({
-      title: form.title.trim(),
-      subject_key: form.subject_key || null,
-      due_date: form.due_date || null,
-      priority: form.priority,
-    }).select().single();
-    if (data) {
-      setTodos([data as Todo, ...todos]);
-      setForm({ title: '', subject_key: '', due_date: '', priority: 'not_urgent_important' });
-      setShowForm(false);
+    const parsed = parseNaturalWhen(form.title);
+    const payload = {
+      title: parsed.title || form.title.trim(), subject_key: form.subject_key || null,
+      due_date: form.due_date || parsed.start_date || null, priority: form.priority,
+      all_day: form.all_day, start_time: form.all_day ? null : (form.start_time || parsed.start_time),
+      end_time: form.all_day ? null : (form.end_time || parsed.end_time), notes: form.notes || '',
+    };
+    if (editing) {
+      const { data } = await supabase.from('todos').update(payload).eq('id', editing.id).select().single();
+      if (data) { persistCalendar(data as Todo); setTodos(todos.map((t) => (t.id === editing.id ? data as Todo : t))); }
+    } else {
+      const { data } = await supabase.from('todos').insert({ ...payload, completed: false }).select().single();
+      if (data) { persistCalendar(data as Todo); setTodos([data as Todo, ...todos]); }
     }
+    setForm(emptyForm); setEditing(null); setShowForm(false);
   };
 
   const toggleTodo = async (todo: Todo) => {
     const { data } = await supabase.from('todos').update({ completed: !todo.completed }).eq('id', todo.id).select().single();
     if (data) setTodos(todos.map((t) => t.id === todo.id ? data as Todo : t));
   };
-
   const deleteTodo = async (id: string) => {
+    const row = todos.find((t) => t.id === id);
     await supabase.from('todos').delete().eq('id', id);
     setTodos(todos.filter((t) => t.id !== id));
+    if (row?.calendar_event_id) deleteCalendarEvent(row.calendar_event_id);
   };
 
-  const filtered = todos.filter((t) => {
-    if (filter === 'all') return true;
-    if (filter === 'active') return !t.completed;
-    if (filter === 'completed') return t.completed;
-    return t.priority === filter;
-  });
-
+  const filtered = todos.filter((t) => filter === 'all' ? true : filter === 'active' ? !t.completed : filter === 'completed' ? t.completed : t.priority === filter);
   const sorted = [...filtered].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     const pq = PRIORITY_CONFIG[a.priority as PriorityKey].quadrant - PRIORITY_CONFIG[b.priority as PriorityKey].quadrant;
     if (pq !== 0) return pq;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
-    if (a.due_date) return -1;
-    if (b.due_date) return 1;
-    return 0;
+    if (a.due_date) return -1; if (b.due_date) return 1; return 0;
   });
 
-  const activeCount = todos.filter((t) => !t.completed).length;
-  const completedCount = todos.filter((t) => t.completed).length;
-
-  if (loading) {
-    return <div className="flex items-center justify-center py-20"><CheckSquare className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
-  }
+  if (loading) return <div className="flex items-center justify-center py-20"><CheckSquare className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;
 
   return (
     <div>
-      <PageHeader
-        title="Master To-Do List"
-        subtitle="Eisenhower Matrix priority · Urgent vs Important"
-        action={<Button onClick={() => setShowForm(!showForm)}><Plus className="w-4 h-4" /> Add Task</Button>}
-      />
-
+      <PageHeader title="Master To-Do List" subtitle="Eisenhower Matrix priority · Urgent vs Important" action={<Button onClick={() => openEdit()}><Plus className="w-4 h-4" /> Add Task</Button>} />
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-zinc-800">{todos.length}</div>
-          <div className="text-xs text-zinc-500">Total Tasks</div>
-        </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-zinc-800">{activeCount}</div>
-          <div className="text-xs text-zinc-500">Pending</div>
-        </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-zinc-800">{completedCount}</div>
-          <div className="text-xs text-zinc-500">Completed</div>
-        </Card>
+        <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.length}</div><div className="text-xs text-zinc-500">Total Tasks</div></Card>
+        <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => !t.completed).length}</div><div className="text-xs text-zinc-500">Pending</div></Card>
+        <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => t.completed).length}</div><div className="text-xs text-zinc-500">Completed</div></Card>
       </div>
-
       {showForm && (
         <Card className="p-4 mb-6">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Title</label>
-              <Input value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="What needs to be done?" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Subject</label>
-              <Select
-                value={form.subject_key}
-                onChange={(v) => setForm({ ...form, subject_key: v })}
-                options={[{ value: '', label: 'None' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.shortName }))]}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Due Date</label>
-              <Input value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} type="date" />
+            <div className="sm:col-span-2"><label className="text-xs font-medium text-zinc-500 mb-1 block">Title</label><Input value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Chemistry Exam 2pm to 4pm on Sept 17" /></div>
+            <div><label className="text-xs font-medium text-zinc-500 mb-1 block">Subject</label><Select value={form.subject_key} onChange={(v) => setForm({ ...form, subject_key: v })} options={[{ value: '', label: 'None' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.shortName }))]} /></div>
+            <div><label className="text-xs font-medium text-zinc-500 mb-1 block">Due Date</label><Input value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} type="date" /></div>
+            <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-zinc-600"><input type="checkbox" checked={form.all_day} onChange={(e) => setForm({ ...form, all_day: e.target.checked })} /> All day</label>
+              {!form.all_day && (<><Input value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} type="time" /><Input value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} type="time" /></>)}
             </div>
             <div className="sm:col-span-2 lg:col-span-4">
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Priority (Eisenhower Matrix)</label>
+              <label className="text-xs font-medium text-zinc-500 mb-1 block">Priority</label>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                {(Object.keys(PRIORITY_CONFIG) as PriorityKey[]).map((key) => {
-                  const p = PRIORITY_CONFIG[key];
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setForm({ ...form, priority: key })}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all text-left ${
-                        form.priority === key
-                          ? 'bg-zinc-900 text-white border-zinc-900'
-                          : 'glass text-zinc-600 border-transparent glass-hover'
-                      }`}
-                    >
-                      <Flag className="w-3 h-3 inline mr-1" />
-                      {p.short}
-                    </button>
-                  );
-                })}
+                {(Object.keys(PRIORITY_CONFIG) as PriorityKey[]).map((key) => (
+                  <button key={key} onClick={() => setForm({ ...form, priority: key })} className={`px-3 py-2 rounded-xl text-xs font-medium border text-left ${form.priority === key ? 'bg-zinc-900 text-white border-zinc-900' : 'glass text-zinc-600 border-transparent'}`}><Flag className="w-3 h-3 inline mr-1" />{PRIORITY_CONFIG[key].short}</button>
+                ))}
               </div>
             </div>
           </div>
-          <div className="flex gap-2 mt-3">
-            <Button onClick={addTodo} size="sm">Add Task</Button>
-            <Button onClick={() => setShowForm(false)} variant="ghost" size="sm">Cancel</Button>
-          </div>
+          <div className="flex gap-2 mt-3"><Button onClick={saveTodo} size="sm">{editing ? 'Save changes' : 'Add Task'}</Button><Button onClick={() => { setShowForm(false); setEditing(null); }} variant="ghost" size="sm">Cancel</Button></div>
         </Card>
       )}
-
       <div className="flex flex-wrap gap-2 mb-4">
         {(['all', 'active', 'completed'] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all capitalize ${
-              filter === f ? 'bg-zinc-900 text-white' : 'glass text-zinc-600 glass-hover'
-            }`}
-          >
-            {f}
-          </button>
+          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-xl text-sm font-medium capitalize ${filter === f ? 'bg-zinc-900 text-white' : 'glass text-zinc-600'}`}>{f}</button>
         ))}
-        <div className="w-px h-6 bg-zinc-300 mx-1 self-center" />
-        {(Object.keys(PRIORITY_CONFIG) as PriorityKey[]).map((key) => {
-          const p = PRIORITY_CONFIG[key];
-          return (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
-                filter === key ? 'bg-zinc-700 text-white' : 'glass text-zinc-600 glass-hover'
-              }`}
-            >
-              {p.short}
-            </button>
-          );
-        })}
       </div>
-
-      {sorted.length === 0 ? (
-        <EmptyState icon={CheckSquare} title="No tasks found" subtitle="Add a task to get started with your to-do list." />
-      ) : (
+      {sorted.length === 0 ? <EmptyState icon={CheckSquare} title="No tasks found" subtitle="Add a task to get started." /> : (
         <div className="space-y-2">
           {sorted.map((todo) => {
             const subj = SUBJECTS.find((s) => s.key === todo.subject_key);
             const p = PRIORITY_CONFIG[todo.priority as PriorityKey];
             const overdue = todo.due_date && !todo.completed && new Date(todo.due_date) < new Date(new Date().toDateString());
-
             return (
               <Card key={todo.id} className={`p-3 flex items-center gap-3 group ${todo.completed ? 'opacity-50' : ''}`}>
-                <button
-                  onClick={() => toggleTodo(todo)}
-                  className={`shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                    todo.completed ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300 hover:border-zinc-600'
-                  }`}
-                >
-                  {todo.completed && <Check className="w-3 h-3 text-white" />}
-                </button>
-
+                <button onClick={() => toggleTodo(todo)} className={`shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.completed ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'}`}>{todo.completed && <Check className="w-3 h-3 text-white" />}</button>
                 <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-medium ${todo.completed ? 'line-through text-zinc-400' : 'text-zinc-700'}`}>
-                    {todo.title}
-                  </span>
+                  <span className={`text-sm font-medium ${todo.completed ? 'line-through text-zinc-400' : 'text-zinc-700'}`}>{todo.title}</span>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {subj && <SubjectBadge shortName={subj.shortName} />}
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                      p.tone === 'high' ? 'bg-zinc-900 text-white' :
-                      p.tone === 'mid' ? 'bg-zinc-700 text-white' :
-                      p.tone === 'low' ? 'bg-zinc-400 text-zinc-900' :
-                      'bg-zinc-200 text-zinc-600'
-                    }`}>
-                      {p.short}
-                    </span>
-                    {todo.due_date && (
-                      <span className={`text-xs flex items-center gap-1 ${overdue ? 'text-zinc-900 font-medium' : 'text-zinc-400'}`}>
-                        {overdue ? <AlertCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-                        {new Date(todo.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${p.tone === 'high' ? 'bg-zinc-900 text-white' : p.tone === 'mid' ? 'bg-zinc-700 text-white' : p.tone === 'low' ? 'bg-zinc-400 text-zinc-900' : 'bg-zinc-200 text-zinc-600'}`}>{p.short}</span>
+                    {todo.due_date && <span className={`text-xs flex items-center gap-1 ${overdue ? 'text-zinc-900 font-medium' : 'text-zinc-400'}`}>{overdue ? <AlertCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}{new Date(todo.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{!todo.all_day && todo.start_time ? ` ${todo.start_time}` : ''}</span>}
                   </div>
                 </div>
-
-                <button
-                  onClick={() => deleteTodo(todo.id)}
-                  className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <button onClick={() => openEdit(todo)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => deleteTodo(todo.id)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></button>
               </Card>
             );
           })}

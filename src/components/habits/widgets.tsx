@@ -3,7 +3,7 @@ import type { Habit } from '@/lib/types';
 import { WEEKDAYS, monthDays, isDone, lastNDays } from '@/lib/habit-stats';
 
 export function Card({
-  title, children, className = '', pad = true, variant = 'box',
+  title, children, className = '', pad = true, variant = 'flat',
 }: {
   title?: string;
   children: ReactNode;
@@ -11,10 +11,9 @@ export function Card({
   pad?: boolean;
   variant?: 'box' | 'flat';
 }) {
-  const box = variant === 'flat' ? 'ht-flat' : 'ht-card';
   return (
-    <section className={`${box} ${pad ? 'p-2.5' : 'p-0'} ${className}`}>
-      {title ? <h3 className={`ht-label mb-1.5 ${variant === 'flat' ? 'text-zinc-500' : ''}`}>{title}</h3> : null}
+    <section className={`ht-sheet ${pad ? 'p-1.5' : 'p-0'} ${className}`}>
+      {title ? <h3 className="ht-label mb-1.5 text-zinc-500">{title}</h3> : null}
       {children}
     </section>
   );
@@ -81,7 +80,7 @@ export function curvePath(values: number[], w: number, h: number, pad = 4) {
 }
 
 export function AreaChart({
-  values, labels, height = 92, width = 280, fill = true, ink = false,
+  values, labels, height = 92, width = 280, fill = true, ink = true,
 }: {
   values: number[];
   labels?: string[];
@@ -117,7 +116,29 @@ export function AreaChart({
   );
 }
 
-export function DualArea({ a, b, height = 88, ink = false }: { a: number[]; b: number[]; height?: number; ink?: boolean }) {
+export function MultiArea({
+  series, height = 120, ink = true,
+}: {
+  series: { values: number[]; color?: string }[];
+  height?: number;
+  ink?: boolean;
+}) {
+  const w = 320, h = height;
+  const colors = ink
+    ? ['#18181b', '#71717a', '#a1a1aa']
+    : ['#fafafa', '#a1a1aa', '#71717a'];
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} preserveAspectRatio="none">
+      {series.map((s, i) => {
+        const p = curvePath(s.values, w, h, 6);
+        if (!p) return null;
+        return <path key={i} d={p} fill="none" stroke={s.color ?? colors[i % colors.length]} strokeWidth={i === 0 ? 1.9 : 1.4} />;
+      })}
+    </svg>
+  );
+}
+
+export function DualArea({ a, b, height = 88, ink = true }: { a: number[]; b: number[]; height?: number; ink?: boolean }) {
   const id = useId().replace(/:/g, '');
   const w = 280, h = height;
   const pa = curvePath(a, w, h, 6);
@@ -144,11 +165,11 @@ export function DualArea({ a, b, height = 88, ink = false }: { a: number[]; b: n
   );
 }
 
-export function MiniArea({ values, height = 72, ink = false }: { values: number[]; height?: number; ink?: boolean }) {
+export function MiniArea({ values, height = 72, ink = true }: { values: number[]; height?: number; ink?: boolean }) {
   return <AreaChart values={values} height={height} ink={ink} />;
 }
 
-export function Spark({ values, width = 56, ink = false }: { values: number[]; width?: number; ink?: boolean }) {
+export function Spark({ values, width = 56, ink = true }: { values: number[]; width?: number; ink?: boolean }) {
   const w = width, h = 16;
   const path = curvePath(values, w, h, 2);
   if (!path) return null;
@@ -173,7 +194,7 @@ export function BarRow({
         return (
           <div key={it.key} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-0.5" style={{ height: '100%' }}>
             {showValue ? <span className="text-[8px] tabular-nums text-zinc-500">{raw ? it.value.toFixed(1) : Math.round(it.value * 100)}</span> : null}
-            <div className="w-[70%] rounded-t-md bg-zinc-700" style={{ height: `${Math.max(8, h * 100)}%`, opacity: 0.35 + h * 0.65 }} />
+            <div className="w-[70%] bg-zinc-800" style={{ height: `${Math.max(8, h * 100)}%`, opacity: 0.28 + h * 0.72 }} />
             {i % labelEvery === 0 ? <span className="max-w-full truncate text-[8px] text-zinc-500">{it.label}</span> : <span className="h-2.5" />}
           </div>
         );
@@ -257,7 +278,7 @@ export function Sheet({
   const rowTotals = grid.map((row) => row.reduce((a, b) => a + b, 0));
   return (
     <div className="overflow-x-auto text-[10px]">
-      <table className="w-full border-collapse tabular-nums">
+      <table className="ht-table w-full border-collapse tabular-nums">
         <thead>
           <tr>
             <th className="px-1 py-0.5 text-left font-medium text-zinc-500" />

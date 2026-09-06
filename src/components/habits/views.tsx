@@ -3,11 +3,11 @@ import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import BlackHole from '@/components/habits/BlackHole';
 import {
-  AlertRow, AreaChart, BarRow, DualArea, HeatDays, HeatRatio, MiniBar, MultiArea, Ring, ScatterTrend, Sheet, Spark,
-  chunkWeekly, countOn, dailyVector, habitWeekSeries, heatGrey, corrFill, rateOn,
+  AlertRow, AreaChart, BarRow, Ring, Spark,
+  chunkWeekly, habitWeekSeries, rateOn,
 } from '@/components/habits/widgets';
 import {
-  MONTHS, WEEKDAYS, isDone, lastNDays, pearson, monthDays, type DayCell,
+  MONTHS, WEEKDAYS, isDone, lastNDays, monthDays, type DayCell,
 } from '@/lib/habit-stats';
 
 export type View = 'home' | 'track' | 'dash' | 'insights';
@@ -33,11 +33,31 @@ function momDelta(h: Habit, done: Set<string>) {
   return { mtd: habitPct(h, tm, done), mom: habitPct(h, tm, done) - habitPct(h, lm, done) };
 }
 
-function weekChunks(weeks: number) {
-  const days = lastNDays(weeks * 7);
-  const out: string[][] = [];
-  for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
-  return out;
+function dayTone(pct: number) {
+  if (pct >= 0.85) return { bg: '#22c55e', fg: '#fff' };
+  if (pct >= 0.7) return { bg: '#84cc16', fg: '#18181b' };
+  if (pct >= 0.5) return { bg: '#eab308', fg: '#18181b' };
+  if (pct >= 0.3) return { bg: '#f97316', fg: '#fff' };
+  if (pct > 0) return { bg: '#ef4444', fg: '#fff' };
+  return { bg: '#f4f4f5', fg: '#a1a1aa' };
+}
+
+function barColor(pct: number) {
+  if (pct >= 0.7) return '#22c55e';
+  if (pct >= 0.4) return '#eab308';
+  return '#ef4444';
+}
+
+function CompBar({ value }: { value: number }) {
+  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-zinc-700">{pct}%</span>
+      <div className="h-2 min-w-0 flex-1 bg-zinc-100">
+        <div className="h-full" style={{ width: `${pct}%`, background: barColor(value) }} />
+      </div>
+    </div>
+  );
 }
 
 export function HomeView({
@@ -98,7 +118,6 @@ export function HomeView({
         <div className="w-[340px] shrink-0 sm:w-[430px] lg:w-[540px] xl:w-[580px]">
           <BlackHole className="aspect-square w-full bg-transparent" />
         </div>
-
         <div className="min-w-0 max-w-[860px] flex-1">
           <div className="grid grid-cols-3 items-start gap-x-6 gap-y-5 lg:gap-x-8 lg:gap-y-6">
             <div className="min-w-0">
@@ -163,4 +182,179 @@ export function HomeView({
   );
 }
 
-export { TrackView, DashView, InsightsView } from './views-rest';
+export function TrackView({
+  habits, weeks, days, done, today, year, month, showAdd, draft, setDraft, setShowAdd, onToggle, onAdd, onRemove, life,
+}: {
+  habits: Habit[];
+  weeks: DayCell[][];
+  days: DayCell[];
+  done: Set<string>;
+  today: string;
+  year: number;
+  month: number;
+  showAdd: boolean;
+  draft: { name: string; emoji: string; goal: string };
+  setDraft: Dispatch<SetStateAction<{ name: string; emoji: string; goal: string }>>;
+  setShowAdd: (v: boolean) => void;
+  onToggle: (habitId: string, dateStr: string) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  life: number;
+}) {
+  const monthWave = days.map((d) => rateOn(habits, d.dateStr, done));
+  const n = Math.max(weeks.length, 1);
+  const grid = {
+    display: 'grid',
+    gridTemplateColumns: `minmax(210px, 260px) repeat(${n}, minmax(140px, 1fr))`,
+    minWidth: 210 + n * 140,
+  } as const;
+  const lifePct = Math.max(0, Math.min(100, life));
+
+  return (
+    <div className="space-y-2 pb-6">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={() => setShowAdd(true)} className="text-[11px] text-zinc-500 underline">+ Add habit</button>
+        <p className="text-[10px] text-zinc-500">{year}/{MONTHS[month].slice(0, 3)}</p>
+      </div>
+
+      {showAdd ? (
+        <div className="flex items-center gap-1.5">
+          <input value={draft.emoji} onChange={(e) => setDraft((d) => ({ ...d, emoji: e.target.value }))} className="w-10 border border-zinc-200 bg-white px-1.5 py-1 text-center text-sm" />
+          <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Habit name" className="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-1 text-[12px]" />
+          <input value={draft.goal} onChange={(e) => setDraft((d) => ({ ...d, goal: e.target.value }))} className="w-12 border border-zinc-200 bg-white px-1.5 py-1 text-center text-[12px]" />
+          <button type="button" onClick={onAdd} className="bg-zinc-800 px-2 py-1 text-[11px] font-medium text-zinc-50">Add</button>
+          <button type="button" onClick={() => setShowAdd(false)} className="text-[11px] text-zinc-500">Cancel</button>
+        </div>
+      ) : null}
+
+      <div className="overflow-x-auto">
+        <div style={grid}>
+          <div className="flex items-end px-2 pb-1">
+            <span className="text-[13px] font-semibold text-zinc-700">Habits</span>
+          </div>
+          <div style={{ gridColumn: '2 / -1' }}>
+            <AreaChart values={monthWave} height={96} />
+          </div>
+
+          <div className="border-b border-zinc-200" />
+          {weeks.map((_, wi) => (
+            <div key={`wh-${wi}`} className="border-b border-zinc-200 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Week {wi + 1}
+            </div>
+          ))}
+
+          <div className="border-b border-zinc-200" />
+          {weeks.map((week, wi) => (
+            <div key={`wd-${wi}`} className="grid grid-cols-7 border-b border-zinc-200">
+              {Array.from({ length: 7 }, (_, wd) => {
+                const cell = week.find((d) => d.weekdayIdx === wd);
+                return (
+                  <div key={wd} className="px-0 py-0.5 text-center">
+                    <div className="text-[8px] font-medium text-zinc-500">{WEEKDAYS[wd]}</div>
+                    <div className="text-[9px] tabular-nums text-zinc-400">{cell ? cell.day : ''}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+
+          {habits.map((h) => (
+            <div key={h.id} className="contents">
+              <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-2 py-1">
+                <span className="truncate text-[12px] text-zinc-700">{h.emoji} {h.name}</span>
+                <button type="button" onClick={() => onRemove(h.id)} className="text-[10px] text-zinc-400 hover:text-zinc-700">×</button>
+              </div>
+              {weeks.map((week, wi) => (
+                <div key={`${h.id}-${wi}`} className="grid grid-cols-7 border-b border-zinc-100">
+                  {Array.from({ length: 7 }, (_, wd) => {
+                    const cell = week.find((d) => d.weekdayIdx === wd);
+                    if (!cell) return <div key={wd} />;
+                    const on = isDone(done, h.id, cell.dateStr);
+                    const isToday = cell.dateStr === today;
+                    return (
+                      <div key={cell.dateStr} className="flex items-center justify-center py-1">
+                        <button
+                          type="button"
+                          onClick={() => onToggle(h.id, cell.dateStr)}
+                          className={`inline-block h-[12px] w-[12px] ${isToday ? 'ring-1 ring-zinc-600' : ''}`}
+                          style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }}
+                          aria-label={`${h.name} ${cell.dateStr}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+
+          <div className="border-b border-zinc-200 px-2 py-1 text-[9px] uppercase tracking-wider text-zinc-400">Daily %</div>
+          {weeks.map((week, wi) => (
+            <div key={`dp-${wi}`} className="grid grid-cols-7 border-b border-zinc-200">
+              {Array.from({ length: 7 }, (_, wd) => {
+                const cell = week.find((d) => d.weekdayIdx === wd);
+                if (!cell) return <div key={wd} />;
+                const pct = rateOn(habits, cell.dateStr, done);
+                const tone = dayTone(pct);
+                return (
+                  <div key={cell.dateStr} className="flex items-center justify-center py-0.5">
+                    <span
+                      className="flex h-[16px] w-full items-center justify-center text-[8px] font-semibold tabular-nums"
+                      style={{ background: tone.bg, color: tone.fg }}
+                    >
+                      {Math.round(pct * 100)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div style={grid} className="items-start">
+          <div className="px-2 pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Lifetime Progress</p>
+            <div className="mx-auto mt-1 w-[176px]">
+              <BlackHole className="aspect-square w-full bg-transparent" />
+            </div>
+            <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800">{life.toFixed(2)}%</p>
+            <div className="mx-auto mt-1 h-1.5 w-[176px] bg-zinc-200">
+              <div className="h-full bg-zinc-800" style={{ width: `${lifePct}%` }} />
+            </div>
+          </div>
+
+          {weeks.map((week, wi) => {
+            const wp = weekPct(habits, week, done);
+            return (
+              <div key={`wc-${wi}`} className="border-l border-zinc-100 px-2 pt-3">
+                <div className="mb-1.5 flex items-end justify-between gap-2">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Completion %</p>
+                  <p className="text-[20px] font-semibold leading-none tabular-nums text-zinc-800">{Math.round(wp * 100)}%</p>
+                </div>
+                <div className="w-full text-[10px]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(78px,0.95fr)] border-b border-zinc-200 pb-0.5 text-[8px] font-semibold uppercase tracking-wider text-zinc-500">
+                    <span>Habits</span>
+                    <span>Weekly Completion %</span>
+                  </div>
+                  {habits.map((h) => {
+                    const pct = habitPct(h, week, done);
+                    return (
+                      <div key={h.id} className="grid grid-cols-[minmax(0,1fr)_minmax(78px,0.95fr)] items-center gap-1 border-b border-zinc-100 py-1">
+                        <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
+                        <CompBar value={pct} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { DashView, InsightsView } from './views-rest';

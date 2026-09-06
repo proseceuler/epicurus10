@@ -7,7 +7,44 @@ export const COLUMNS = [
   { id: 'done', label: 'Done', tint: 'bg-emerald-500' },
 ] as const;
 
-export type KanbanStatus = (typeof COLUMNS)[number]['id'];
+export type KanbanStatus = string;
+
+export interface BoardList {
+  id: string;
+  label: string;
+  tint: string;
+}
+
+const LISTS_KEY = 'epicure:kanban-lists';
+const TINTS = ['bg-zinc-400', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500', 'bg-violet-500', 'bg-rose-400', 'bg-teal-500'];
+
+export function loadLists(): BoardList[] {
+  if (typeof window === 'undefined') return COLUMNS.map((c) => ({ ...c }));
+  try {
+    const raw = window.localStorage.getItem(LISTS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoardList[]) : null;
+    if (Array.isArray(parsed) && parsed.length) {
+      return parsed.filter((l) => l?.id && l?.label);
+    }
+  } catch {
+    /* ignore */
+  }
+  return COLUMNS.map((c) => ({ ...c }));
+}
+
+export function saveLists(lists: BoardList[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
+}
+
+export function slugList(label: string) {
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'list';
+  return `${base}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function nextTint(index: number) {
+  return TINTS[index % TINTS.length];
+}
 
 export function kanbanUid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -33,6 +70,10 @@ export function formatDue(due: string) {
 }
 
 export function isImageUrl(url: string) {
+  if (!url) return false;
+  if (url.startsWith('data:image/')) return true;
+  if (url.startsWith('media:')) return true;
+  if (url.startsWith('blob:')) return true;
   return /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i.test(url)
     || /(?:unsplash|imgur|giphy|pinterest|wikimedia|googleusercontent|fbcdn|twimg)\./i.test(url);
 }
@@ -66,6 +107,7 @@ export function resolveCover(task: Pick<KanbanTask, 'cover_url' | 'attachments'>
   if (!url) return null;
   const attachments = uniqueAttachments(task.attachments);
   if (attachments.some((a) => a.url === url)) return url;
+  if (url.startsWith('data:image/') || url.startsWith('media:')) return url;
   return isImageUrl(url) ? url : null;
 }
 

@@ -203,14 +203,23 @@ export default function DrivePage() {
     tick();
   }, [load]);
 
+  const ctxRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    if (!ctx && !newOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (newRef.current && !newRef.current.contains(e.target as Node)) setNewOpen(false);
+      const target = e.target as Node;
+      if (newRef.current?.contains(target)) return;
+      if (ctxRef.current?.contains(target)) return;
+      setNewOpen(false);
       setCtx(null);
     };
-    document.addEventListener('click', onDoc);
-    return () => document.removeEventListener('click', onDoc);
-  }, []);
+    const id = window.setTimeout(() => document.addEventListener('click', onDoc), 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('click', onDoc);
+    };
+  }, [ctx, newOpen]);
 
   useEffect(() => {
     return () => {
@@ -449,7 +458,7 @@ export default function DrivePage() {
             <Plus className="h-3.5 w-3.5" /> New
           </button>
           {newOpen && (
-            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg">
+            <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50"
@@ -595,7 +604,7 @@ export default function DrivePage() {
                       <span className="text-[10px] text-zinc-400">{formatDate(item.modified || item.created)}</span>
                       <button
                         type="button"
-                        className="absolute right-1 top-1 rounded-md p-1 opacity-0 hover:bg-zinc-200 group-hover:opacity-100"
+                        className="absolute right-1 top-1 z-10 rounded-md p-1.5 opacity-70 hover:bg-zinc-200 hover:opacity-100 group-hover:opacity-100 sm:opacity-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCtx({ x: e.clientX, y: e.clientY, item });
@@ -673,9 +682,11 @@ export default function DrivePage() {
 
       {ctx && (
         <div
-          className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl"
+          ref={ctxRef}
+          className="fixed z-[80] min-w-[11rem] overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl"
           style={{ left: Math.min(ctx.x, window.innerWidth - 180), top: Math.min(ctx.y, window.innerHeight - 220) }}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"

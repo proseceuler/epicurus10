@@ -29,13 +29,20 @@
 }
 
 .ht-shell {
-  color: #e4e4e7;
+  color: #3f3f46;
 }
 
 .ht-card {
-  background: rgba(24, 24, 27, 0.78);
-  border: 1px solid rgba(228, 228, 231, 0.1);
-  border-radius: 12px;
+  background: rgba(24, 24, 27, 0.82);
+  border: 1px solid rgba(228, 228, 231, 0.08);
+  border-radius: 14px;
+  box-shadow: none;
+  color: #e4e4e7;
+}
+
+.ht-flat {
+  background: transparent;
+  border: 0;
   box-shadow: none;
 }
 

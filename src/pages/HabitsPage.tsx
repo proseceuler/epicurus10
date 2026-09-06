@@ -133,7 +133,7 @@ export default function HabitsPage() {
       </div>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
-      {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} />}
+      {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} year={year} />}
       {view === 'insights' && <InsightsView habits={habits} days={days} weeks={weeks} done={done} />}
     </div>
   );

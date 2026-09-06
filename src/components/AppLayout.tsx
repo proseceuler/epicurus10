@@ -5,12 +5,13 @@ import GlobalAssistant from '@/components/GlobalAssistant';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
-  Layers, Bot, Settings as SettingsIcon, Columns3,
+  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
 } from 'lucide-react';
 
 export type PageId =
   | 'dashboard' | 'grades' | 'forecast' | 'classhub'
   | 'assistant' | 'todos' | 'kanban' | 'calendar' | 'notes'
+  | 'drive'
   | 'pomodoro' | 'analytics'
   | 'habits' | 'finance' | 'flashcards'
   | 'settings';
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'kanban', label: 'Kanban Board', icon: Columns3, group: 'Work' },
   { id: 'calendar', label: 'Calendar', icon: Calendar, group: 'Work' },
   { id: 'notes', label: 'Notes & Board', icon: StickyNote, group: 'Work' },
+  { id: 'drive', label: 'Cloud Drive', icon: Cloud, group: 'Work' },
   { id: 'pomodoro', label: 'Focus', icon: Timer, group: 'Pulse' },
   { id: 'habits', label: 'Habit Tracker', icon: CalendarHeart, group: 'Pulse' },
   { id: 'finance', label: 'Baon Tracker', icon: Wallet, group: 'Pulse' },

@@ -41,7 +41,7 @@ function weekChunks(weeks: number) {
 }
 
 export function HomeView({
-  habits, done, today, life, todayLeft, dailyScores, completions, onGo,
+  habits, done, today, todayLeft, dailyScores, onGo,
 }: {
   habits: Habit[];
   done: Set<string>;
@@ -93,68 +93,69 @@ export function HomeView({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] items-center justify-center gap-6 pt-1 lg:gap-10">
-      <div className="w-[240px] shrink-0 px-3 py-2 sm:w-[280px] lg:w-[320px] lg:px-5">
-        <BlackHole className="aspect-square w-full bg-transparent" percent={life} />
-        <p className="mt-1 text-center text-[9px] text-zinc-500">{completions.length} lifetime logs</p>
-      </div>
+    <div className="flex min-h-[calc(100vh-8.5rem)] w-full items-center justify-center">
+      <div className="mx-auto flex w-full max-w-[1280px] items-center justify-center gap-8 px-4 lg:gap-14">
+        <div className="w-[300px] shrink-0 sm:w-[380px] lg:w-[460px]">
+          <BlackHole className="aspect-square w-full bg-transparent" />
+        </div>
 
-      <div className="min-w-0 max-w-[720px] flex-1">
-        <div className="grid grid-cols-3 items-center gap-x-5 gap-y-3 lg:gap-x-7">
-          <div className="min-w-0">
-            <p className="ht-label mb-1.5">Quick Actions</p>
-            <ul className="space-y-1 text-[12px] leading-snug text-zinc-700">
-              {links.map((l) => (
-                <li key={l.view}>
-                  <button type="button" onClick={() => onGo(l.view)} className="text-left underline decoration-zinc-400 underline-offset-4 hover:text-zinc-950">{l.label}</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="min-w-0">
-            <p className="ht-label mb-0.5">Completion %</p>
-            <p className="mb-0.5 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
-            <AreaChart values={wave.slice(-12)} labels={waveLabels} height={58} />
-          </div>
-          <div className="min-w-0">
-            <p className="ht-label mb-0.5">Alerts</p>
-            <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Daily Tasks</p>
-            <AlertRow label="Done today's Habits?" value={todayLeft.length ? 'Pending' : 'Done'} tone={todayLeft.length ? 'pending' : 'ok'} />
-            <AlertRow label="Today's Habit Completion %" value={`${Math.round(todayScore * 100)}%`} tone={todayScore >= 0.8 ? 'ok' : 'pending'} />
-            <p className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Tasks</p>
-            <AlertRow label="Done Top Priorities?" value={!priorities.length ? 'N/A' : prioDone ? 'Done' : 'Pending'} tone={alertTone(!priorities.length, prioDone)} />
-            <AlertRow label="Done Top 3 Tasks?" value={!top3.length ? 'N/A' : top3Done ? 'Done' : 'Pending'} tone={alertTone(!top3.length, top3Done)} />
-          </div>
-          <div className="min-w-0">
-            <p className="ht-label mb-0.5">Daily Score Distribution</p>
-            <BarRow items={dist} height={64} showValue />
-          </div>
-          <div className="min-w-0">
-            <p className="ht-label mb-0.5">Trend</p>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-[10px]">
-              <span className="text-[8px] uppercase tracking-wider text-zinc-500">Habit</span>
-              <span className="text-[8px] uppercase tracking-wider text-zinc-500">MTD %</span>
-              <span className="text-[8px] uppercase tracking-wider text-zinc-500">MoM %</span>
-              <span className="text-[8px] uppercase tracking-wider text-zinc-500">12 Wk</span>
-              {habits.map((h) => {
-                const { mtd, mom } = momDelta(h, done);
-                const up = mom >= 0;
-                return (
-                  <Fragment key={h.id}>
-                    <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
-                    <span className="tabular-nums text-zinc-600">{Math.round(mtd * 100)}%</span>
-                    <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(mom * 100))}%</span>
-                    <span><Spark values={habitWeekSeries(h.id, done)} width={42} /></span>
-                  </Fragment>
-                );
-              })}
+        <div className="min-w-0 max-w-[720px] flex-1">
+          <div className="grid grid-cols-3 items-center gap-x-5 gap-y-3 lg:gap-x-7">
+            <div className="min-w-0">
+              <p className="ht-label mb-1.5">Quick Actions</p>
+              <ul className="space-y-1 text-[12px] leading-snug text-zinc-700">
+                {links.map((l) => (
+                  <li key={l.view}>
+                    <button type="button" onClick={() => onGo(l.view)} className="text-left underline decoration-zinc-400 underline-offset-4 hover:text-zinc-950">{l.label}</button>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-          <div className="min-w-0">
-            <p className="ht-label mb-0.5">Progress ({monthName.slice(0, 3)})</p>
-            <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
-            <p className="ht-label mt-1 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
-            <BarRow items={monthBars} height={36} labelEvery={5} />
+            <div className="min-w-0">
+              <p className="ht-label mb-0.5">Completion %</p>
+              <p className="mb-0.5 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
+              <AreaChart values={wave.slice(-12)} labels={waveLabels} height={58} />
+            </div>
+            <div className="min-w-0">
+              <p className="ht-label mb-0.5">Alerts</p>
+              <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Daily Tasks</p>
+              <AlertRow label="Done today's Habits?" value={todayLeft.length ? 'Pending' : 'Done'} tone={todayLeft.length ? 'pending' : 'ok'} />
+              <AlertRow label="Today's Habit Completion %" value={`${Math.round(todayScore * 100)}%`} tone={todayScore >= 0.8 ? 'ok' : 'pending'} />
+              <p className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Tasks</p>
+              <AlertRow label="Done Top Priorities?" value={!priorities.length ? 'N/A' : prioDone ? 'Done' : 'Pending'} tone={alertTone(!priorities.length, prioDone)} />
+              <AlertRow label="Done Top 3 Tasks?" value={!top3.length ? 'N/A' : top3Done ? 'Done' : 'Pending'} tone={alertTone(!top3.length, top3Done)} />
+            </div>
+            <div className="min-w-0">
+              <p className="ht-label mb-0.5">Daily Score Distribution</p>
+              <BarRow items={dist} height={64} showValue />
+            </div>
+            <div className="min-w-0">
+              <p className="ht-label mb-0.5">Trend</p>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-[10px]">
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">Habit</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MTD %</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MoM %</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">12 Wk</span>
+                {habits.map((h) => {
+                  const { mtd, mom } = momDelta(h, done);
+                  const up = mom >= 0;
+                  return (
+                    <Fragment key={h.id}>
+                      <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
+                      <span className="tabular-nums text-zinc-600">{Math.round(mtd * 100)}%</span>
+                      <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(mom * 100))}%</span>
+                      <span><Spark values={habitWeekSeries(h.id, done)} width={42} /></span>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="ht-label mb-0.5">Progress ({monthName.slice(0, 3)})</p>
+              <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
+              <p className="ht-label mt-1 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
+              <BarRow items={monthBars} height={36} labelEvery={5} />
+            </div>
           </div>
         </div>
       </div>

@@ -1,10 +1,16 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Light-page dotted accretion disk: dense point cloud, empty core,
- * pointer-repulsion, slow spin. Matches the dashboard black-hole graphic.
+ * Interactable accretion disk: Doppler-beamed orange disk, photon ring,
+ * gravitationally lensed far side + underside, empty shadow.
  */
-export default function BlackHole({ className = '', percent, ink = true }: { className?: string; percent?: number; ink?: boolean }) {
+export default function BlackHole({
+  className = '',
+  percent,
+}: {
+  className?: string;
+  percent?: number;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -17,12 +23,12 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
       try {
         const THREE = await import('three');
         if (stop || !hostRef.current) return;
-        const w = host.clientWidth || 160;
-        const h = host.clientHeight || 160;
+        const w = host.clientWidth || 320;
+        const h = host.clientHeight || 320;
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(32, w / h, 0.1, 40);
-        camera.position.set(0, 1.55, 2.35);
-        camera.lookAt(0, 0, 0);
+        const camera = new THREE.PerspectiveCamera(38, w / h, 0.05, 40);
+        camera.position.set(0, 1.72, 2.55);
+        camera.lookAt(0, -0.08, 0);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.setSize(w, h);
@@ -31,42 +37,82 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
         host.appendChild(renderer.domElement);
 
         const group = new THREE.Group();
-        group.rotation.x = 0.18;
+        group.rotation.x = 1.12;
         scene.add(group);
 
-        function makeDisk(count: number, rMin: number, rMax: number, thickness: number) {
+        const shadow = new THREE.Mesh(
+          new THREE.CircleGeometry(0.42, 64),
+          new THREE.MeshBasicMaterial({ color: 0x000000 }),
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        group.add(shadow);
+
+        const ringGeo = new THREE.RingGeometry(0.445, 0.475, 96);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xffc27a,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85,
+        });
+        const photon = new THREE.Mesh(ringGeo, ringMat);
+        photon.rotation.x = -Math.PI / 2;
+        group.add(photon);
+
+        function packDisk(count: number, rMin: number, rMax: number, ySpread: number, underside = false) {
+          const pos = new Float32Array(count * 3);
+          const col = new Float32Array(count * 3);
           const base = new Float32Array(count * 3);
+          const vel = new Float32Array(count * 3);
           for (let i = 0; i < count; i++) {
-            const t = Math.pow(Math.random(), 0.72);
+            const t = Math.pow(Math.random(), 0.55);
             const r = rMin + t * (rMax - rMin);
             const a = Math.random() * Math.PI * 2;
-            const squash = 0.72 + t * 0.18;
-            base[i * 3] = Math.cos(a) * r;
-            base[i * 3 + 1] = (Math.random() - 0.5) * thickness * (1 - t * 0.5);
-            base[i * 3 + 2] = Math.sin(a) * r * squash;
+            const squash = 0.92 + t * 0.08;
+            let x = Math.cos(a) * r;
+            let z = Math.sin(a) * r * squash;
+            let y = (Math.random() - 0.5) * ySpread * (1 - t * 0.45);
+            if (underside) {
+              const fold = Math.max(0, -z);
+              y = -0.02 - fold * 0.55 - Math.abs(y) * 0.4;
+              z = Math.abs(z) * 0.22 + 0.08;
+              x *= 0.92;
+            } else if (z < 0) {
+              y += Math.min(0.28, -z * 0.22);
+            }
+            pos[i * 3] = x;
+            pos[i * 3 + 1] = y;
+            pos[i * 3 + 2] = z;
+            base[i * 3] = x;
+            base[i * 3 + 1] = y;
+            base[i * 3 + 2] = z;
+            const approach = 0.55 + 0.45 * Math.max(0, Math.sin(a));
+            const hot = 1 - t * 0.55;
+            col[i * 3] = Math.min(1, 0.55 + hot * 0.45) * approach;
+            col[i * 3 + 1] = (0.08 + hot * 0.22) * approach;
+            col[i * 3 + 2] = 0.02 * approach;
           }
-          const pos = base.slice();
-          const vel = new Float32Array(count * 3);
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
           return { base, pos, vel, geo, count };
         }
 
-        const core = makeDisk(420, 0.38, 0.78, 0.04);
-        const mid = makeDisk(720, 0.78, 1.35, 0.07);
-        const halo = makeDisk(380, 1.32, 1.95, 0.12);
+        const inner = packDisk(900, 0.48, 0.92, 0.03);
+        const mid = packDisk(1400, 0.9, 1.55, 0.05);
+        const outer = packDisk(700, 1.5, 2.15, 0.08);
+        const under = packDisk(800, 0.5, 1.45, 0.04, true);
 
-        const inkCol = ink ? 0x18181b : 0xe4e4e7;
-        const midCol = ink ? 0x3f3f46 : 0xa1a1aa;
-        const haloCol = ink ? 0x71717a : 0x71717a;
-        const mk = (geo: THREE.BufferGeometry, color: number, size: number, opacity: number) =>
-          new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity, sizeAttenuation: true }));
+        const mk = (geo: THREE.BufferGeometry, size: number, opacity: number) =>
+          new THREE.Points(geo, new THREE.PointsMaterial({
+            size,
+            transparent: true,
+            opacity,
+            vertexColors: true,
+            sizeAttenuation: true,
+            depthWrite: false,
+          }));
 
-        group.add(
-          mk(core.geo, inkCol, 0.022, 0.92),
-          mk(mid.geo, midCol, 0.018, 0.7),
-          mk(halo.geo, haloCol, 0.014, 0.32),
-        );
+        group.add(mk(inner.geo, 0.028, 0.95), mk(mid.geo, 0.022, 0.82), mk(outer.geo, 0.018, 0.42), mk(under.geo, 0.02, 0.7));
 
         const mouseNDC = new THREE.Vector2(99, 99);
         const raycaster = new THREE.Raycaster();
@@ -86,8 +132,8 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
         host.addEventListener('pointermove', onMove);
         host.addEventListener('pointerleave', onLeave);
 
-        const INFLUENCE = 0.62;
-        const STRENGTH = 0.022;
+        const INFLUENCE = 0.7;
+        const STRENGTH = 0.028;
         const DAMPING = 0.88;
 
         function settle(d: { base: Float32Array; pos: Float32Array; vel: Float32Array; geo: THREE.BufferGeometry; count: number }) {
@@ -118,10 +164,11 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
         const tick = () => {
           if (stop) return;
           frame += 1;
-          group.rotation.y = frame * 0.0028;
-          settle(core);
+          group.rotation.z = frame * 0.0032;
+          settle(inner);
           settle(mid);
-          settle(halo);
+          settle(outer);
+          settle(under);
           renderer.render(scene, camera);
           requestAnimationFrame(tick);
         };
@@ -139,25 +186,27 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
           window.removeEventListener('resize', onResize);
           host.removeEventListener('pointermove', onMove);
           host.removeEventListener('pointerleave', onLeave);
-          core.geo.dispose();
+          inner.geo.dispose();
           mid.geo.dispose();
-          halo.geo.dispose();
+          outer.geo.dispose();
+          under.geo.dispose();
+          ringGeo.dispose();
           renderer.dispose();
           host.innerHTML = '';
         };
       } catch {
-        drawFallback(host, ink);
+        drawFallback(host);
       }
     };
     void run();
     return () => { stop = true; dispose(); };
-  }, [ink]);
+  }, []);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative overflow-hidden bg-black ${className}`}>
       <div ref={hostRef} className="h-full w-full" />
       {typeof percent === 'number' && (
-        <div className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-[12px] font-semibold tabular-nums tracking-wide ${ink ? 'text-zinc-800' : 'text-zinc-200'}`}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[13px] font-semibold tabular-nums tracking-wide text-zinc-200">
           {percent.toFixed(2)}%
         </div>
       )}
@@ -165,9 +214,9 @@ export default function BlackHole({ className = '', percent, ink = true }: { cla
   );
 }
 
-function drawFallback(host: HTMLDivElement, ink: boolean) {
+function drawFallback(host: HTMLDivElement) {
   const canvas = document.createElement('canvas');
-  const size = Math.max(host.clientWidth, host.clientHeight, 160);
+  const size = Math.max(host.clientWidth, host.clientHeight, 240);
   canvas.width = size;
   canvas.height = size;
   canvas.className = 'h-full w-full';
@@ -177,22 +226,30 @@ function drawFallback(host: HTMLDivElement, ink: boolean) {
   if (!ctx) return;
   const cx = size / 2;
   const cy = size / 2;
-  const dots = Array.from({ length: 320 }, () => {
-    const t = Math.pow(Math.random(), 0.7);
+  const dots = Array.from({ length: 900 }, () => {
+    const t = Math.pow(Math.random(), 0.6);
     return {
       r: size * (0.12 + t * 0.38),
       a: Math.random() * Math.PI * 2,
-      speed: 0.0015 + Math.random() * 0.002,
-      s: 0.7 + Math.random() * 0.8,
+      speed: 0.004 + Math.random() * 0.006,
+      s: 0.6 + Math.random() * 1.2,
+      under: Math.random() < 0.28,
     };
   });
   const tick = () => {
-    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, size * 0.11, size * 0.11, 0, 0, Math.PI * 2);
+    ctx.fill();
     for (const d of dots) {
-      d.a += d.speed;
+      d.a += d.speed * (d.under ? 0.7 : 1);
+      const beam = 0.45 + 0.55 * Math.max(0, Math.sin(d.a));
       const x = cx + Math.cos(d.a) * d.r;
-      const y = cy + Math.sin(d.a) * d.r * 0.55;
-      ctx.fillStyle = ink ? `rgba(24,24,27,${0.35 + d.s * 0.4})` : 'rgba(228,228,231,0.7)';
+      let y = cy + Math.sin(d.a) * d.r * 0.38;
+      if (d.under && Math.sin(d.a) > 0) y = cy + Math.sin(d.a) * d.r * 0.22 + size * 0.08;
+      ctx.fillStyle = `rgba(${220 + beam * 35 | 0},${40 + beam * 50 | 0},8,${0.25 + beam * 0.55})`;
       ctx.beginPath();
       ctx.arc(x, y, d.s, 0, Math.PI * 2);
       ctx.fill();

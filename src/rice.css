@@ -32,12 +32,13 @@
   color: #3f3f46;
 }
 
-.ht-card {
-  background: rgba(24, 24, 27, 0.82);
-  border: 1px solid rgba(228, 228, 231, 0.08);
-  border-radius: 14px;
+.ht-card,
+.ht-sheet {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
-  color: #e4e4e7;
+  color: #3f3f46;
 }
 
 .ht-flat {
@@ -51,7 +52,36 @@
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #a1a1aa;
+  color: #71717a;
+}
+
+.ht-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ht-table th,
+.ht-table td {
+  border: 1px solid #e4e4e7;
+  vertical-align: middle;
+}
+
+.ht-table thead th {
+  background: #fafafa;
+}
+
+.ht-hscroll {
+  display: flex;
+  gap: 2.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 1.5rem;
+}
+
+.ht-pane {
+  flex: 0 0 100%;
+  min-width: 100%;
+  scroll-snap-align: start;
 }
 
 .hud-panel {

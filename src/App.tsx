@@ -15,6 +15,7 @@ import FinancePage from '@/pages/FinancePage';
 import NotesPage from '@/pages/NotesPage';
 import FlashcardsPage from '@/pages/FlashcardsPage';
 import SettingsPage from '@/pages/SettingsPage';
+import DrivePage from '@/pages/DrivePage';
 import './rice.css';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
     kanban: <KanbanPage />,
     calendar: <CalendarPage />,
     notes: <NotesPage />,
+    drive: <DrivePage />,
     pomodoro: <PomodoroPage />,
     analytics: <PomodoroPage />,
     habits: <HabitsPage />,

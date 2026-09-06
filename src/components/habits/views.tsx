@@ -42,24 +42,6 @@ function dayTone(pct: number) {
   return { bg: '#f4f4f5', fg: '#a1a1aa' };
 }
 
-function barColor(pct: number) {
-  if (pct >= 0.7) return '#22c55e';
-  if (pct >= 0.4) return '#eab308';
-  return '#ef4444';
-}
-
-function CompBar({ value }: { value: number }) {
-  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
-  return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-zinc-700">{pct}%</span>
-      <div className="h-2 min-w-0 flex-1 bg-zinc-100">
-        <div className="h-full" style={{ width: `${pct}%`, background: barColor(value) }} />
-      </div>
-    </div>
-  );
-}
-
 export function HomeView({
   habits, done, today, todayLeft, dailyScores, onGo,
 }: {
@@ -208,7 +190,7 @@ export function TrackView({
     gridTemplateColumns: `minmax(210px, 260px) repeat(${n}, minmax(140px, 1fr))`,
     minWidth: 210 + n * 140,
   } as const;
-  const lifePct = Math.max(0, Math.min(100, life));
+  const lifeSeries = lastNDays(48).map((d) => rateOn(habits, d, done));
 
   return (
     <div className="space-y-2 pb-6">
@@ -238,9 +220,7 @@ export function TrackView({
 
           <div className="border-b border-zinc-200" />
           {weeks.map((_, wi) => (
-            <div key={`wh-${wi}`} className="border-b border-zinc-200 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Week {wi + 1}
-            </div>
+            <div key={`wh-${wi}`} className="border-b border-zinc-200 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Week {wi + 1}</div>
           ))}
 
           <div className="border-b border-zinc-200" />
@@ -273,13 +253,7 @@ export function TrackView({
                     const isToday = cell.dateStr === today;
                     return (
                       <div key={cell.dateStr} className="flex items-center justify-center py-1">
-                        <button
-                          type="button"
-                          onClick={() => onToggle(h.id, cell.dateStr)}
-                          className={`inline-block h-[12px] w-[12px] ${isToday ? 'ring-1 ring-zinc-600' : ''}`}
-                          style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }}
-                          aria-label={`${h.name} ${cell.dateStr}`}
-                        />
+                        <button type="button" onClick={() => onToggle(h.id, cell.dateStr)} className={`inline-block h-[12px] w-[12px] ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`} />
                       </div>
                     );
                   })}
@@ -298,12 +272,7 @@ export function TrackView({
                 const tone = dayTone(pct);
                 return (
                   <div key={cell.dateStr} className="flex items-center justify-center py-0.5">
-                    <span
-                      className="flex h-[16px] w-full items-center justify-center text-[8px] font-semibold tabular-nums"
-                      style={{ background: tone.bg, color: tone.fg }}
-                    >
-                      {Math.round(pct * 100)}
-                    </span>
+                    <span className="flex h-[16px] w-full items-center justify-center text-[8px] font-semibold tabular-nums" style={{ background: tone.bg, color: tone.fg }}>{Math.round(pct * 100)}</span>
                   </div>
                 );
               })}
@@ -316,37 +285,32 @@ export function TrackView({
         <div style={grid} className="items-start">
           <div className="px-2 pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Lifetime Progress</p>
-            <div className="mx-auto mt-1 w-[176px]">
-              <BlackHole className="aspect-square w-full bg-transparent" />
-            </div>
+            <div className="mx-auto mt-1 w-[176px]"><BlackHole className="aspect-square w-full bg-transparent" /></div>
             <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800">{life.toFixed(2)}%</p>
-            <div className="mx-auto mt-1 h-1.5 w-[176px] bg-zinc-200">
-              <div className="h-full bg-zinc-800" style={{ width: `${lifePct}%` }} />
+            <div className="mx-auto mt-1 flex h-8 w-[176px] items-end gap-px">
+              {lifeSeries.map((v, i) => (
+                <div key={i} className="flex-1 bg-zinc-800" style={{ height: `${Math.max(6, Math.round(v * 100))}%`, opacity: 0.25 + v * 0.75 }} />
+              ))}
             </div>
           </div>
-
           {weeks.map((week, wi) => {
             const wp = weekPct(habits, week, done);
+            const slots = Math.max(1, habits.length * week.length);
+            const got = week.reduce((s, d) => s + habits.filter((h) => isDone(done, h.id, d.dateStr)).length, 0);
+            const spark = week.map((d) => rateOn(habits, d.dateStr, done));
+            const prev = wi > 0 ? weekPct(habits, weeks[wi - 1], done) : wp;
+            const delta = wp - prev;
+            const up = delta >= 0;
             return (
               <div key={`wc-${wi}`} className="border-l border-zinc-100 px-2 pt-3">
-                <div className="mb-1.5 flex items-end justify-between gap-2">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Completion %</p>
-                  <p className="text-[20px] font-semibold leading-none tabular-nums text-zinc-800">{Math.round(wp * 100)}%</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Completion %</p>
+                <div className="mt-1 flex items-start justify-between gap-2">
+                  <p className="text-[26px] font-semibold leading-none tabular-nums text-zinc-800">{Math.round(wp * 100)}%</p>
+                  <Spark values={spark} width={64} />
                 </div>
-                <div className="w-full text-[10px]">
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(78px,0.95fr)] border-b border-zinc-200 pb-0.5 text-[8px] font-semibold uppercase tracking-wider text-zinc-500">
-                    <span>Habits</span>
-                    <span>Weekly Completion %</span>
-                  </div>
-                  {habits.map((h) => {
-                    const pct = habitPct(h, week, done);
-                    return (
-                      <div key={h.id} className="grid grid-cols-[minmax(0,1fr)_minmax(78px,0.95fr)] items-center gap-1 border-b border-zinc-100 py-1">
-                        <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
-                        <CompBar value={pct} />
-                      </div>
-                    );
-                  })}
+                <div className="mt-1 flex items-center justify-between text-[10px]">
+                  <span className="tabular-nums text-zinc-500">({got}/{slots})</span>
+                  <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(delta * 100))}%</span>
                 </div>
               </div>
             );

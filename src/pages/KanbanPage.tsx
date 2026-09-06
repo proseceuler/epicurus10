@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Habit, type KanbanTask, type Note, type Todo } from '@/lib/types';
 import { type KanbanStatus as Status, type BoardList, normalizeTask, loadLists, saveLists, slugList, nextTint } from '@/lib/kanban';
 import { upsertLinkedCalendarEvent } from '@/lib/calendarStore';
+import { confirmDelete } from '@/lib/confirm';
 import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
 import { KanbanCardPreview, CardDetailModal } from '@/components/KanbanCards';
 import { FolderTree, Plus, X, GripVertical } from 'lucide-react';
@@ -73,9 +74,17 @@ export default function KanbanPage() {
   };
 
   const deleteTask = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!(await confirmDelete(task?.title || 'this card'))) return;
     await supabase.from('kanban_tasks').delete().eq('id', id);
     setTasks((list) => list.filter((t) => t.id !== id));
     if (selectedId === id) setSelectedId(null);
+  };
+
+  const deleteList = async (id: string) => {
+    const col = lists.find((l) => l.id === id);
+    if (!(await confirmDelete(col?.label || 'this list'))) return;
+    persistLists(lists.filter((l) => l.id !== id));
   };
   const updateStatus = async (taskId: string, newStatus: Status) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -109,7 +118,7 @@ export default function KanbanPage() {
                 <span className={`h-2 w-2 rounded-full ${col.tint}`} />
                 {renaming === col.id ? <input autoFocus defaultValue={col.label} className="w-28 rounded border px-1 text-sm" onBlur={(e) => { const label = e.target.value.trim(); if (label) persistLists(lists.map((l) => (l.id === col.id ? { ...l, label } : l))); setRenaming(null); }} /> : <button type="button" className="text-sm font-semibold" onDoubleClick={() => setRenaming(col.id)}>{col.label}</button>}
                 <span className="rounded-full bg-zinc-200/70 px-1.5 text-[10px]">{colTasks.length}</span>
-                {lists.length > 1 && <button type="button" className="ml-auto text-zinc-300" onClick={() => persistLists(lists.filter((l) => l.id !== col.id))}><X className="h-3.5 w-3.5" /></button>}
+                {lists.length > 1 && <button type="button" className="ml-auto text-zinc-300" onClick={() => void deleteList(col.id)}><X className="h-3.5 w-3.5" /></button>}
               </div>
               <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
                 {colTasks.map((task) => (

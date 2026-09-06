@@ -72,6 +72,11 @@ export interface Todo {
   due_date: string | null;
   priority: 'urgent_important' | 'not_urgent_important' | 'urgent_not_important' | 'not_urgent_not_important';
   completed: boolean;
+  all_day?: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string;
+  calendar_event_id?: string | null;
 }
 
 export interface KanbanCheckItem {
@@ -97,13 +102,17 @@ export interface KanbanTask {
   title: string;
   description: string;
   subject_key: SubjectKey | null;
-  status: 'todo' | 'in_progress' | 'review' | 'done';
+  status: string;
   due_date: string | null;
   sort_order: number;
   cover_url?: string | null;
   checklist?: KanbanCheckItem[];
   attachments?: KanbanAttachment[];
   comments?: KanbanComment[];
+  linked_todo_id?: string | null;
+  linked_note_id?: string | null;
+  linked_habit_id?: string | null;
+  linked_event_id?: string | null;
 }
 
 export interface PomodoroSession {

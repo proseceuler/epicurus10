@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 
 export function Card({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
-    <div onClick={onClick} className={`glass rounded-2xl ${className} ${onClick ? 'cursor-pointer' : ''}`}>
+    <div onClick={onClick} className={`glass rounded-2xl ${className} ${onClick ? 'cursor-pointer glass-hover epic-press' : ''}`}>
       {children}
     </div>
   );
@@ -47,7 +47,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[color,background-color,box-shadow,transform,opacity] duration-150 ease-out ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : 'epic-press'} ${className}`}
     >
       {children}
     </button>
@@ -109,7 +109,7 @@ export function Select({
 
 export function EmptyState({ icon: Icon, title, subtitle }: { icon: LucideIcon; title: string; subtitle?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-center">
+    <div className="epic-fade-in flex flex-col items-center justify-center py-14 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl glass">
         <Icon className="h-6 w-6 text-zinc-400" />
       </div>

@@ -191,7 +191,7 @@ export default function KanbanPage() {
           )}
         </div>
       </div>
-      {selected && <CardDetailModal task={selected} lists={lists} links={links} onClose={() => setSelectedId(null)} onDelete={() => deleteTask(selected.id)} onStatus={(status) => updateStatus(selected.id, status)} onSave={(patch) => persist(selected.id, patch)} />}
+      {selected && <CardDetailModal task={selected} lists={lists} links={links} recentLinks={tasks.flatMap((t) => t.attachments ?? [])} onClose={() => setSelectedId(null)} onDelete={() => deleteTask(selected.id)} onStatus={(status) => updateStatus(selected.id, status)} onSave={(patch) => persist(selected.id, patch)} />}
     </div>
   );
 }

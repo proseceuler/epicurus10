@@ -88,10 +88,10 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
   const coverFile = attachments.find((a) => a.url === cover);
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4" onClick={onClose}>
-      <div className="glass glass-shadow-lg relative my-6 w-[min(96vw,72rem)] overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="epic-glass-sheet relative my-6 w-[min(96vw,72rem)]" onClick={(e) => e.stopPropagation()}>
         {cover ? <CoverFrame url={cover} name={coverFile?.name} className="mx-auto max-h-52 w-full overflow-hidden bg-zinc-100" imgClass="mx-auto block max-h-52 w-auto max-w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/50 px-5 py-3">
-          <select value={task.status} onChange={(e) => onStatus(e.target.value as Status)} className="rounded-lg border border-zinc-200/80 bg-white/70 px-2 py-1.5 text-xs">{columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+          <Select value={task.status} onChange={(v) => onStatus(v as Status)} className="w-40" options={columns.map((c) => ({ value: c.id, label: c.label }))} />
           <div className="flex-1" />
           <button type="button" onClick={onDelete} className="rounded-lg p-2 text-zinc-400"><Trash2 className="h-4 w-4" /></button>
           <button type="button" onClick={onClose} className="rounded-lg p-2 text-zinc-400"><X className="h-4 w-4" /></button>

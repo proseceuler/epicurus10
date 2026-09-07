@@ -37,47 +37,67 @@
   perspective: 900px;
 }
 
-/* Solid surfaces — no glass border / blur stack (that hairline). */
-.epic-popover,
-.epic-menu,
-.epic-sheet {
+/* Menus stay opaque so list items never paint outside the rounded card. */
+.epic-menu {
+  display: flex;
+  flex-direction: column;
+  max-height: min(20rem, calc(100vh - 1.5rem));
+  overflow: hidden;
   background: #fff;
   background-clip: padding-box;
-  border: 0 !important;
-  outline: none;
-  isolation: auto;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.12);
-}
-
-.epic-popover {
-  border-radius: 1.25rem;
-  overflow: visible;
-}
-
-/* Clip list items to the rounded card. Inner panes scroll. */
-.epic-menu {
+  border: 0;
   border-radius: 0.9rem;
-  overflow: hidden;
-}
-
-.epic-sheet {
-  border-radius: 1.25rem;
-  overflow: visible;
-  box-shadow: 0 24px 64px rgba(24, 24, 27, 0.18);
+  outline: none;
+  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.14);
 }
 
 .epic-menu-scroll {
-  max-height: 14.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(18.5rem, calc(100vh - 2.5rem));
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding: 0.35rem;
 }
 
 .epic-time-col {
-  max-height: 13.5rem;
+  max-height: 12.25rem;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.epic-time-col::-webkit-scrollbar {
+  width: 6px;
+}
+.epic-time-col::-webkit-scrollbar-thumb {
+  background: rgba(24, 24, 27, 0.18);
+  border-radius: 999px;
+}
+
+.epic-popover {
+  background: #fff;
+  background-clip: padding-box;
+  border: 0;
+  border-radius: 1.25rem;
+  outline: none;
+  overflow: visible;
+  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.12);
+}
+
+/* Calendar-style glass sheets for every modal / popup. */
+.epic-sheet,
+.epic-glass-sheet {
+  background: rgba(255, 255, 255, 0.62);
+  background-clip: padding-box;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 1.25rem;
+  outline: none;
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 24px 64px rgba(24, 24, 27, 0.16);
 }
 
 select.glass-input,

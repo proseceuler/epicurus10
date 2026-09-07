@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MotionSwap } from '@/components/MotionUI';
 import { supabase } from '@/lib/supabase';
 import type { Habit, HabitCompletion } from '@/lib/types';
 import { HomeView, TrackView, DashView, InsightsView, type View } from '@/components/habits/views';
@@ -125,7 +126,7 @@ export default function HabitsPage() {
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
           {VIEWS.map((v) => (
-            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
+            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`epic-press rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
           ))}
           <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
             {MONTHS.map((m, i) => <option key={m} value={i}>{m.slice(0, 3)}</option>)}
@@ -135,10 +136,12 @@ export default function HabitsPage() {
           </select>
         </div>
       </div>
+      <MotionSwap id={view}>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
       {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} year={year} />}
       {view === 'insights' && <InsightsView habits={habits} days={days} weeks={weeks} done={done} />}
+      </MotionSwap>
     </div>
   );
 }

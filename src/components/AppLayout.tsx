@@ -287,7 +287,11 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">
+          <div className={page === 'dashboard' ? 'mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center' : 'contents'}>
+            {children}
+          </div>
+        </main>
       </div>
 
       <GlobalAssistant

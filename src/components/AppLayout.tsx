@@ -146,6 +146,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         window.dispatchEvent(new CustomEvent('epicure-toggle-inbox'));
         return;
       }
+      const navPairs: [keyof typeof shortcuts, PageId][] = [
+        ['dashboard', 'dashboard'],
+        ['notes', 'notes'],
+        ['todos', 'todos'],
+        ['kanban', 'kanban'],
+        ['calendar', 'calendar'],
+        ['habits', 'habits'],
+        ['focus', 'pomodoro'],
+      ];
+      for (const [sid, pageId] of navPairs) {
+        if (matchShortcut(e, shortcuts[sid])) {
+          e.preventDefault();
+          navigate(pageId);
+          return;
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('epicure-shortcuts-changed', syncSc);
@@ -159,10 +175,10 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       window.removeEventListener('epicure-shortcuts-changed', syncSc);
       window.removeEventListener('epicure-open-arrodes', onArrodes);
     };
-  }, []);
+  }, [navigate]);
 
   return (
-    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
+    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''} ${page === 'notes' ? 'rice-shell--color' : 'rice-shell--mono'}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
       <div className="film-grain" aria-hidden />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />

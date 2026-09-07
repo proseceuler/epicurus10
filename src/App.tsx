@@ -19,6 +19,14 @@ import DrivePage from '@/pages/DrivePage';
 import './rice.css';
 import './styles.css';
 
+function registerPwa() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+registerPwa();
+
 function App() {
   const [page, navigate] = usePageState();
 

@@ -39,6 +39,30 @@ const DEFAULT_COLORS: GraphColors = {
 };
 
 const COLOR_KEY = 'epicure:graph-colors';
+const GRAPH_SETTINGS_KEY = 'epicure:graph-settings:v1';
+
+type GraphSettings = {
+  bg: 'plain' | 'dots' | 'grid';
+  charge: number;
+  linkDist: number;
+  showLabels: boolean;
+};
+
+const DEFAULT_GSET: GraphSettings = {
+  bg: 'plain',
+  charge: -220,
+  linkDist: 90,
+  showLabels: true,
+};
+
+function loadGraphSettings(): GraphSettings {
+  try {
+    const raw = localStorage.getItem(GRAPH_SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_GSET, ...JSON.parse(raw) };
+  } catch { /* */ }
+  return { ...DEFAULT_GSET };
+}
+
 
 function loadColors(): GraphColors {
   try {
@@ -99,6 +123,16 @@ export default function NotesGraph({
     typeof window === 'undefined' ? DEFAULT_COLORS : loadColors(),
   );
   const [colorOpen, setColorOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [gset, setGset] = useState<GraphSettings>(() =>
+    typeof window === 'undefined' ? DEFAULT_GSET : loadGraphSettings(),
+  );
+  const persistGset = (next: GraphSettings) => {
+    setGset(next);
+    try {
+      localStorage.setItem(GRAPH_SETTINGS_KEY, JSON.stringify(next));
+    } catch { /* */ }
+  };
   const [, setTick] = useState(0);
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<ReturnType<typeof forceSimulation<GNode>> | null>(null);
@@ -205,10 +239,10 @@ export default function NotesGraph({
         'link',
         forceLink<GNode, GLink>(linksRef.current)
           .id((d) => d.id)
-          .distance(90)
+          .distance(gset.linkDist)
           .strength(0.4),
       )
-      .force('charge', forceManyBody().strength(-220))
+      .force('charge', forceManyBody().strength(gset.charge))
       .force('center', forceCenter(w / 2, h / 2))
       .force(
         'collide',
@@ -308,11 +342,33 @@ export default function NotesGraph({
     });
   };
 
+
+  useEffect(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    sim.force('charge', forceManyBody().strength(gset.charge));
+    const lf = sim.force('link') as any;
+    if (lf && typeof lf.distance === 'function') lf.distance(gset.linkDist);
+    sim.alpha(0.55).restart();
+  }, [gset.charge, gset.linkDist]);
+
   const selectedNode = selectedId ? nodesRef.current.find((n) => n.id === selectedId) : null;
   const selectedNote = selectedId && !selectedId.startsWith('board:') ? notes.find((n) => n.id === selectedId) : null;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+    <div
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200"
+      style={{
+        backgroundColor: '#fafafa',
+        backgroundImage:
+          gset.bg === 'dots'
+            ? 'radial-gradient(rgba(24,24,27,0.14) 1.1px, transparent 1.1px)'
+            : gset.bg === 'grid'
+              ? 'linear-gradient(to right, rgba(24,24,27,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(24,24,27,0.07) 1px, transparent 1px)'
+              : 'none',
+        backgroundSize: gset.bg === 'dots' ? '18px 18px' : gset.bg === 'grid' ? '24px 24px' : undefined,
+      }}
+    >
       <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
         {(Object.keys(KIND_LABEL) as NodeKind[]).map((k) => (
           <span
@@ -325,7 +381,15 @@ export default function NotesGraph({
         ))}
         <button
           type="button"
-          onClick={() => setColorOpen((v) => !v)}
+          onClick={() => { setPanelOpen((v) => !v); setColorOpen(false); }}
+          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50"
+          title="Graph settings"
+        >
+          Settings
+        </button>
+        <button
+          type="button"
+          onClick={() => { setColorOpen((v) => !v); setPanelOpen(false); }}
           className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50"
           title="Customize colors"
         >
@@ -364,6 +428,39 @@ export default function NotesGraph({
         Drag to move · double-click to open
       </p>
 
+
+      {panelOpen && (
+        <div className="absolute left-3 top-12 z-20 w-56 space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
+          <p className="text-[11px] font-semibold text-zinc-700">Graph settings</p>
+          <div>
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Background</p>
+            <div className="flex gap-1">
+              {(['plain', 'dots', 'grid'] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => persistGset({ ...gset, bg: b })}
+                  className={`rounded-md px-2 py-1 text-[10px] capitalize ${gset.bg === b ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block text-[10px] text-zinc-500">
+            Charge ({gset.charge})
+            <input type="range" min={-500} max={-40} value={gset.charge} onChange={(e) => persistGset({ ...gset, charge: Number(e.target.value) })} className="mt-1 w-full" />
+          </label>
+          <label className="block text-[10px] text-zinc-500">
+            Link distance ({gset.linkDist})
+            <input type="range" min={40} max={200} value={gset.linkDist} onChange={(e) => persistGset({ ...gset, linkDist: Number(e.target.value) })} className="mt-1 w-full" />
+          </label>
+          <label className="flex items-center gap-2 text-[11px] text-zinc-600">
+            <input type="checkbox" checked={gset.showLabels} onChange={(e) => persistGset({ ...gset, showLabels: e.target.checked })} />
+            Show labels
+          </label>
+        </div>
+      )}
       <svg
         ref={svgRef}
         className="h-full w-full touch-none"
@@ -452,15 +549,17 @@ export default function NotesGraph({
                   strokeWidth={isFocus ? 2.5 : 1.2}
                 />
               )}
-              <text
-                y={r + 13}
-                textAnchor="middle"
-                fontSize={11}
-                fill={dim ? '#a1a1aa' : '#18181b'}
-                style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}
-              >
-                {n.label.length > 18 ? `${n.label.slice(0, 16)}…` : n.label}
-              </text>
+              {gset.showLabels && (
+                <text
+                  y={r + 13}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill={dim ? '#a1a1aa' : '#18181b'}
+                  style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}
+                >
+                  {n.label.length > 18 ? `${n.label.slice(0, 16)}…` : n.label}
+                </text>
+              )}
             </g>
           );
         })}

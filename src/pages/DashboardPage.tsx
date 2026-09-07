@@ -16,6 +16,7 @@ import { usePomodoro } from '@/context/PomodoroContext';
 import { doneSet, isDone, monthDays, todayIso } from '@/lib/habit-stats';
 import { getXP } from '@/lib/xp';
 import WeeklyRecapSlideshow, { shouldShowSundayRecap } from '@/components/WeeklyRecapSlideshow';
+import { fetchWeather, type WeatherSnapshot } from '@/lib/weather';
 import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
@@ -156,6 +157,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const [editingSigil, setEditingSigil] = useState(false);
   const [awake, setAwake] = useState(false);
   const [showSundayRecap, setShowSundayRecap] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
   const loadData = useCallback(async () => {
     const [
@@ -267,6 +269,12 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     if (!loading && shouldShowSundayRecap()) setShowSundayRecap(true);
   }, [loading]);
 
+  useEffect(() => {
+    void fetchWeather()
+      .then((w) => setWeather(w))
+      .catch(() => setWeather(null));
+  }, []);
+
 
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
@@ -350,6 +358,14 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
               <span className="text-3xl font-semibold tabular-nums tracking-tight text-zinc-900">{clock.time}</span>
               <span className="text-[11px] uppercase tracking-wider text-zinc-500">{clock.dateLabel}</span>
             </div>
+            {weather ? (
+              <p className="mb-2 font-mono text-[11px] text-zinc-600">
+                {weather.tempC}°C · {weather.description}
+                <span className="text-zinc-400"> · {weather.city}</span>
+              </p>
+            ) : (
+              <p className="mb-2 font-mono text-[10px] text-zinc-400">weather · set key in Settings</p>
+            )}
             <p className="text-zinc-800">
               user<span className="text-zinc-500">@</span>
               {host}

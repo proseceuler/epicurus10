@@ -94,6 +94,12 @@ export default function Whiteboard({
         /* styles optional */
       }
       try {
+        ed.updateInstanceState({ isReadonly: false });
+        ed.setCurrentTool('draw');
+      } catch {
+        /* ok */
+      }
+      try {
         const raw = localStorage.getItem(persistenceKey);
         if (raw) {
           const snap = JSON.parse(raw);
@@ -299,8 +305,11 @@ export default function Whiteboard({
         </div>
       </div>
 
-      <div className="relative z-0 min-h-[420px] w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>
-        <div className="epicure-tldraw absolute inset-0 h-full min-h-[420px] w-full">
+      <div
+        className="relative z-0 min-h-[420px] w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm"
+        style={{ ...bgCss(bg), pointerEvents: 'auto', touchAction: 'none' }}
+      >
+        <div className="epicure-tldraw absolute inset-0 h-full min-h-[420px] w-full" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
           {active ? (
             <Tldraw
               key={persistenceKey}

@@ -7,6 +7,7 @@ import {
   getShortcuts, setShortcut, resetShortcuts, formatShortcut,
   SHORTCUT_LABELS, type ShortcutId, type ShortcutMap,
 } from '@/lib/shortcuts';
+import { getWeatherKey, setWeatherKey, getWeatherCity, setWeatherCity } from '@/lib/weather';
 
 const AI_MODELS = [
   { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest (free)' },
@@ -24,6 +25,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [shortcuts, setShortcuts] = useState<ShortcutMap>(() => getShortcuts());
   const [listening, setListening] = useState<ShortcutId | null>(null);
+  const [owKey, setOwKey] = useState(() => getWeatherKey());
+  const [wCity, setWCity] = useState(() => getWeatherCity());
   const [sigil, setSigil] = useState(() => {
     try { return localStorage.getItem('epicure-ascii-sigil') || ''; } catch { return ''; }
   });
@@ -42,7 +45,7 @@ export default function SettingsPage() {
       e.preventDefault();
       e.stopPropagation();
       if (['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) return;
-      setShortcut(listening, { mod: e.metaKey || e.ctrlKey, key: e.key.toLowerCase() });
+      setShortcut(listening, { mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, key: e.key.toLowerCase() });
       setListening(null);
       flash();
     };
@@ -90,6 +93,35 @@ export default function SettingsPage() {
           </div>
           <textarea value={sigil} onChange={(e) => { setSigil(e.target.value); try { localStorage.setItem('epicure-ascii-sigil', e.target.value); } catch { /* ignore */ } flash(); }} rows={8} placeholder="paste or draw an original glyph…" className="w-full rounded-lg bg-white p-3 font-mono text-[11px] leading-[1.2] text-zinc-800 outline-none ring-1 ring-zinc-200" />
         </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm font-semibold text-zinc-800">Weather</span>
+          </div>
+          <p className="mb-3 text-xs text-zinc-400">
+            OpenWeatherMap key for the dashboard clock card. Free at openweathermap.org.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-600">API key</label>
+              <Input
+                type="password"
+                value={owKey}
+                onChange={(v) => { setOwKey(v); setWeatherKey(v); flash(); }}
+                placeholder="OpenWeatherMap API key"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-600">City</label>
+              <Input
+                value={wCity}
+                onChange={(v) => { setWCity(v); setWeatherCity(v); flash(); }}
+                placeholder="Manila"
+              />
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Key className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">API Keys</h3></div>
           <div className="space-y-4">

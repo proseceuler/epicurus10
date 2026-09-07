@@ -433,7 +433,7 @@ function DockButton({
     >
       <Icon className="h-4 w-4" />
       {show && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[8px] font-bold text-white">
+        <span className="chrome-badge absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-zinc-600 px-0.5 text-[8px] font-bold text-white">
           {typeof badge === 'number' && badge > 9 ? '9+' : badge}
         </span>
       )}

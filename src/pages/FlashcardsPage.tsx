@@ -3,15 +3,10 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type FlashcardDeck, type Flashcard, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
 import { Plus, Trash2, Layers, ChevronLeft, ChevronRight, RotateCcw, Check, X, BookOpen } from 'lucide-react';
+import { scheduleSM2, isDue, type SM2Rating } from '@/lib/sm2';
+import { awardXP } from '@/lib/xp';
 
-type ReviewRating = 'again' | 'hard' | 'good' | 'easy';
-
-const RATING_INTERVALS: Record<ReviewRating, (card: Flashcard) => { interval: number; ease: number }> = {
-  again: () => ({ interval: 0, ease: 0 }),
-  hard: (card) => ({ interval: Math.max(1, card.interval_days * 0.8), ease: Math.max(1.3, card.ease_factor - 0.15) }),
-  good: (card) => ({ interval: card.interval_days === 0 ? 1 : Math.round(card.interval_days * card.ease_factor), ease: card.ease_factor }),
-  easy: (card) => ({ interval: card.interval_days === 0 ? 2 : Math.round(card.interval_days * card.ease_factor * 1.3), ease: Math.min(2.5, card.ease_factor + 0.15) }),
-};
+type ReviewRating = SM2Rating;
 
 export default function FlashcardsPage() {
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
@@ -101,17 +96,23 @@ export default function FlashcardsPage() {
   const rateCard = async (rating: ReviewRating) => {
     const card = reviewQueue[reviewIndex];
     if (!card) return;
-    const { interval, ease } = RATING_INTERVALS[rating](card);
-    const newDue = new Date();
-    newDue.setDate(newDue.getDate() + Math.ceil(interval));
+    const sm = scheduleSM2(
+      {
+        interval_days: card.interval_days || 0,
+        ease_factor: card.ease_factor || 2.5,
+        review_count: card.review_count || 0,
+      },
+      rating,
+    );
     const updated = {
-      interval_days: Math.ceil(interval),
-      ease_factor: ease,
-      due_date: newDue.toISOString().split('T')[0],
-      review_count: card.review_count + 1,
+      interval_days: sm.interval_days,
+      ease_factor: sm.ease_factor,
+      due_date: sm.due_date,
+      review_count: sm.review_count,
     };
     await supabase.from('flashcards').update(updated).eq('id', card.id);
-    setCards(cards.map((c) => c.id === card.id ? { ...c, ...updated } : c));
+    setCards(cards.map((c) => (c.id === card.id ? { ...c, ...updated } : c)));
+    awardXP({ type: 'flashcard_review' });
 
     if (reviewIndex + 1 < reviewQueue.length) {
       setReviewIndex(reviewIndex + 1);
@@ -121,7 +122,7 @@ export default function FlashcardsPage() {
     }
   };
 
-  const totalDue = cards.filter((c) => c.due_date <= today).length;
+  const totalDue = cards.filter((c) => isDue(c.due_date)).length;
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Layers className="w-8 h-8 text-zinc-300 animate-pulse" /></div>;

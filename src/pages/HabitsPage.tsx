@@ -5,6 +5,7 @@ import { HomeView, TrackView, DashView, InsightsView, type View } from '@/compon
 import {
   MONTHS, monthDays, doneSet, isDone, todayIso, lastNDays, lifetimePct,
 } from '@/lib/habit-stats';
+import { awardXP } from '@/lib/xp';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -82,7 +83,10 @@ export default function HabitsPage() {
       setCompletions((cur) => cur.filter((c) => c.id !== existing.id));
     } else {
       const { data } = await supabase.from('habit_completions').insert({ habit_id: habitId, completion_date: dateStr }).select().single();
-      if (data) setCompletions((cur) => [...cur, data as HabitCompletion]);
+      if (data) {
+        setCompletions((cur) => [...cur, data as HabitCompletion]);
+        awardXP({ type: 'habit_complete', date: dateStr });
+      }
     }
   };
 

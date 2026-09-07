@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { awardXP } from '@/lib/xp';
 import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
 import { upsertLinkedCalendarEvent, deleteCalendarEvent } from '@/lib/calendarStore';
 import { parseNaturalWhen } from '@/lib/parseWhen';
@@ -76,7 +77,9 @@ export default function TodosPage() {
   };
 
   const toggleTodo = async (todo: Todo) => {
-    const { data } = await supabase.from('todos').update({ completed: !todo.completed }).eq('id', todo.id).select().single();
+    const next = !todo.completed;
+    const { data } = await supabase.from('todos').update({ completed: next }).eq('id', todo.id).select().single();
+    if (next) awardXP({ type: 'todo_complete' });
     if (data) setTodos(todos.map((t) => t.id === todo.id ? data as Todo : t));
   };
   const deleteTodo = async (id: string) => {

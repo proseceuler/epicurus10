@@ -4,6 +4,7 @@ import { SUBJECTS, type Note } from '@/lib/types';
 import { Button, EmptyState, Input, Select } from '@/components/kit';
 import Whiteboard from '@/components/board/Whiteboard';
 import NotesGraph from '@/components/notes/NotesGraph';
+import { NOTE_TEMPLATES } from '@/lib/note-templates';
 import NoteMarkdown from '@/components/notes/NoteMarkdown';
 import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle, escapeRegex } from '@/lib/wiki';
 /* boards loaded in NotesGraph/Whiteboard */
@@ -204,6 +205,7 @@ function NotesVault({
   const [activeFolder, setActiveFolder] = useState('All');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  // templates handled in NotesVault
   const [draft, setDraft] = useState<Note | null>(null);
   const [linkPicker, setLinkPicker] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -329,6 +331,32 @@ function NotesVault({
             ))}
           </div>
         </div>
+        <div className="glass rounded-2xl p-3">
+          <div className="mb-2 text-sm font-semibold text-zinc-700">Templates</div>
+          <div className="space-y-1">
+            {NOTE_TEMPLATES.map((tmpl) => (
+              <button
+                key={tmpl.id}
+                type="button"
+                className="flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left hover:bg-zinc-100"
+                onClick={() => {
+                  const title =
+                    tmpl.id === 'reflection'
+                      ? new Date().toISOString().slice(0, 10)
+                      : tmpl.title;
+                  void onCreate({
+                    title: title || tmpl.name,
+                    folder: tmpl.folder || 'Vault',
+                    content: tmpl.content,
+                  });
+                }}
+              >
+                <span className="text-xs font-medium text-zinc-800">{tmpl.name}</span>
+                <span className="text-[10px] text-zinc-400">{tmpl.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         {allTags.length > 0 && (
           <div className="glass rounded-2xl p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700">
@@ -405,7 +433,7 @@ function NotesVault({
                 <Button
                   onClick={async () => {
                     if (!newTitle.trim()) return;
-                    await onCreate({ title: newTitle.trim(), folder: newFolder || 'Vault' });
+                    await onCreate({ title: newTitle.trim(), folder: newFolder || 'Vault', content: '' });
                     setShowNew(false);
                   }}
                 >

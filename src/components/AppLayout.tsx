@@ -1,10 +1,16 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
+import GlobalSearch from '@/components/GlobalSearch';
+import InboxPanel from '@/components/InboxPanel';
+import { unreadCount, INBOX_CHANGED } from '@/lib/inbox';
+import { refreshInboxFromData } from '@/lib/inboxRefresh';
+import { getXP } from '@/lib/xp';
+import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
-  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
+  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud, Bell, Search,
 } from 'lucide-react';
 
 export type PageId =
@@ -74,7 +80,49 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantRail, setAssistantRail] = useState(false);
   const [assistantWidth, setAssistantWidth] = useState(340);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const [badgeTodos, setBadgeTodos] = useState(0);
+  const [badgeCards, setBadgeCards] = useState(0);
+  const [xpLevel, setXpLevel] = useState(1);
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
+
+  useEffect(() => {
+    const syncInbox = () => setInboxUnread(unreadCount());
+    syncInbox();
+    void refreshInboxFromData().then(syncInbox);
+    window.addEventListener(INBOX_CHANGED, syncInbox);
+    const id = window.setInterval(() => void refreshInboxFromData().then(syncInbox), 5 * 60_000);
+    return () => {
+      window.removeEventListener(INBOX_CHANGED, syncInbox);
+      window.clearInterval(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadBadges = async () => {
+      try {
+        const today = new Date().toLocaleDateString('en-CA');
+        const [{ data: todos }, { data: cards }] = await Promise.all([
+          supabase.from('todos').select('id,due_date,completed,priority'),
+          supabase.from('flashcards').select('id,due_date'),
+        ]);
+        const openHigh = (todos || []).filter(
+          (t) => !t.completed && (t.due_date && t.due_date <= today || t.priority === 'urgent_important' || t.priority === 'high'),
+        ).length;
+        setBadgeTodos(openHigh);
+        setBadgeCards((cards || []).filter((c) => !c.due_date || c.due_date <= today).length);
+      } catch {
+        /* ignore */
+      }
+      setXpLevel(getXP().level);
+    };
+    void loadBadges();
+    const onXp = () => setXpLevel(getXP().level);
+    window.addEventListener('epicure-xp-changed', onXp);
+    return () => window.removeEventListener('epicure-xp-changed', onXp);
+  }, [page]);
 
   useEffect(() => {
     document.title = `${currentLabel} — epicure`;
@@ -83,6 +131,10 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         setAssistantOpen((v) => !v);
         setAssistantRail(false);
@@ -116,9 +168,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                 {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const active = page === item.id;
+                  const badge =
+                    item.id === 'todos' || item.id === 'kanban'
+                      ? badgeTodos
+                      : item.id === 'flashcards'
+                        ? badgeCards
+                        : 0;
                   return (
-                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
-                      <Icon className="h-4 w-4 shrink-0" />
+                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                      <span className="relative shrink-0">
+                        <Icon className="h-4 w-4" />
+                        {badge > 0 && (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                            {badge > 9 ? '9+' : badge}
+                          </span>
+                        )}
+                      </span>
                       <span className="rice-nav-label truncate">{item.label}</span>
                     </button>
                   );
@@ -148,8 +213,20 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
             <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
           </div>
-          <div className="ml-auto">
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘K)" aria-label="Toggle assistant">
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="hidden rounded-full glass px-2.5 py-1 font-mono text-[10px] text-zinc-500 sm:inline">Lv {xpLevel}</span>
+            <button type="button" onClick={() => setSearchOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-full glass text-zinc-700 hover:bg-white/80" title="Search (⌘K)" aria-label="Search">
+              <Search className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => setInboxOpen(true)} className="relative flex h-10 w-10 items-center justify-center rounded-full glass text-zinc-700 hover:bg-white/80" title="Inbox" aria-label="Inbox">
+              <Bell className="h-4 w-4" />
+              {inboxUnread > 0 && (
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                  {inboxUnread > 9 ? '9+' : inboxUnread}
+                </span>
+              )}
+            </button>
+            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘J)" aria-label="Toggle assistant">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>
@@ -170,6 +247,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         onRail={() => { setAssistantOpen(false); setAssistantRail(true); }}
         navigate={navigate}
       />
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} navigate={navigate} />
+      <InboxPanel open={inboxOpen} onClose={() => setInboxOpen(false)} navigate={navigate} />
       <GlobalDock navigate={navigate} page={page} />
     </div>
   );

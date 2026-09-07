@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type Dispatch, SetStateAction } from 'react';
+import { Fragment, useEffect, useMemo, useState, type Dispatch, SetStateAction } from 'react';
 import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import BlackHole from '@/components/habits/BlackHole';
@@ -9,6 +9,7 @@ import {
 import {
   MONTHS, WEEKDAYS, isDone, lastNDays, monthDays, type DayCell,
 } from '@/lib/habit-stats';
+import { getWellnessMap, setWellnessDay } from '@/lib/wellness';
 
 export type View = 'home' | 'track' | 'dash' | 'insights';
 
@@ -158,6 +159,137 @@ export function HomeView({
               <BarRow items={monthBars} height={44} labelEvery={5} />
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function WellnessCurve({ days }: { days: DayCell[] }) {
+  const [map, setMap] = useState(() => getWellnessMap());
+  useEffect(() => {
+    const sync = () => setMap(getWellnessMap());
+    window.addEventListener('epicure-wellness-changed', sync);
+    return () => window.removeEventListener('epicure-wellness-changed', sync);
+  }, []);
+
+  const series = useMemo(() => {
+    return days.map((d) => {
+      const w = map.get(d.dateStr);
+      return {
+        date: d.dateStr,
+        label: String(d.day),
+        sleep: w?.sleep ?? null,
+        mood: w?.mood ?? null,
+      };
+    });
+  }, [days, map]);
+
+  const W = Math.max(280, days.length * 28);
+  const H = 120;
+  const pad = { t: 12, r: 12, b: 24, l: 28 };
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+  const xAt = (i: number) => pad.l + (days.length <= 1 ? innerW / 2 : (i / (days.length - 1)) * innerW);
+  const sleepY = (v: number) => pad.t + innerH - (Math.min(14, Math.max(0, v)) / 14) * innerH;
+  const moodY = (v: number) => pad.t + innerH - (Math.min(5, Math.max(1, v)) / 5) * innerH;
+
+  const sleepPts = series
+    .map((s, i) => (s.sleep != null ? `${xAt(i)},${sleepY(s.sleep)}` : null))
+    .filter(Boolean) as string[];
+  const moodPts = series
+    .map((s, i) => (s.mood != null ? `${xAt(i)},${moodY(s.mood)}` : null))
+    .filter(Boolean) as string[];
+
+  const setSleep = (date: string, raw: string) => {
+    const n = raw === '' ? null : Math.min(14, Math.max(0, Number(raw)));
+    setWellnessDay(date, { sleep: n != null && !Number.isNaN(n) ? n : null });
+  };
+  const setMood = (date: string, raw: string) => {
+    const n = raw === '' ? null : Math.min(5, Math.max(1, Math.round(Number(raw))));
+    setWellnessDay(date, { mood: n != null && !Number.isNaN(n) ? n : null });
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-zinc-200/80 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Sleep & Mood</p>
+        <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-zinc-800" /> Sleep (hrs)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 border-t border-dashed border-blue-500" /> Mood (1–5)
+          </span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-28 w-full" preserveAspectRatio="none">
+        {[0.25, 0.5, 0.75].map((g) => (
+          <line
+            key={g}
+            x1={pad.l}
+            x2={W - pad.r}
+            y1={pad.t + innerH * g}
+            y2={pad.t + innerH * g}
+            stroke="#e4e4e7"
+            strokeWidth={1}
+          />
+        ))}
+        {sleepPts.length > 1 && (
+          <polyline fill="none" stroke="#18181b" strokeWidth={2} points={sleepPts.join(' ')} />
+        )}
+        {moodPts.length > 1 && (
+          <polyline
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            points={moodPts.join(' ')}
+          />
+        )}
+        {series.map((s, i) => (
+          <g key={s.date}>
+            {s.sleep != null && <circle cx={xAt(i)} cy={sleepY(s.sleep)} r={2.5} fill="#18181b" />}
+            {s.mood != null && <circle cx={xAt(i)} cy={moodY(s.mood)} r={2.5} fill="#3b82f6" />}
+            <text x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fill="#a1a1aa">
+              {s.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="mt-2 overflow-x-auto">
+        <div className="inline-grid min-w-full gap-1" style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(36px, 1fr))` }}>
+          <span className="text-[10px] font-medium text-zinc-500">Sleep</span>
+          {series.map((s) => (
+            <input
+              key={`s-${s.date}`}
+              type="number"
+              min={0}
+              max={14}
+              step={0.5}
+              placeholder="—"
+              value={s.sleep ?? ''}
+              onChange={(e) => setSleep(s.date, e.target.value)}
+              className="w-full rounded border border-zinc-200 bg-zinc-50 px-0.5 py-0.5 text-center text-[10px] tabular-nums"
+            />
+          ))}
+          <span className="text-[10px] font-medium text-zinc-500">Mood</span>
+          {series.map((s) => (
+            <select
+              key={`m-${s.date}`}
+              value={s.mood ?? ''}
+              onChange={(e) => setMood(s.date, e.target.value)}
+              className="w-full rounded border border-zinc-200 bg-zinc-50 px-0.5 py-0.5 text-center text-[10px]"
+            >
+              <option value="">—</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          ))}
         </div>
       </div>
     </div>
@@ -337,6 +469,8 @@ export function TrackView({
           })}
         </div>
       </div>
+
+      <WellnessCurve days={days} />
     </div>
   );
 }

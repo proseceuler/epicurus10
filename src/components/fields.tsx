@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
@@ -50,7 +50,7 @@ function Menu({
     const place = () => {
       const r = triggerRef.current!.getBoundingClientRect();
       const width = Math.max(r.width, minWidth ?? r.width);
-      const estH = Math.min(280, window.innerHeight * 0.45);
+      const estH = Math.min(320, window.innerHeight * 0.5);
       let top = r.bottom + 6;
       let left = r.left;
       if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 6);
@@ -74,7 +74,7 @@ function Menu({
       {open && (
         <motion.div
           ref={menuRef}
-          className={`epic-menu fixed z-[120] ${className}`}
+          className={`epic-menu fixed z-[200] ${className}`}
           style={{ top: pos.top, left: pos.left, width: minWidth ? undefined : pos.width, minWidth: minWidth ?? pos.width }}
           initial={reduce ? false : { opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -129,28 +129,35 @@ export function Select({
   const [open, setOpen] = useState(false);
   const { triggerRef, menuRef } = useDismiss(open, () => setOpen(false));
   const current = options.find((o) => o.value === value)?.label ?? 'Select';
+  const activeRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (open) activeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [open]);
   return (
     <div ref={triggerRef} className={`relative ${className}`}>
       <FieldButton onClick={() => setOpen((v) => !v)} empty={!value}>
         {current}
       </FieldButton>
-      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} className="max-h-56 overflow-y-auto py-1">
-        {options.map((o) => (
-          <button
-            key={o.value || 'empty'}
-            type="button"
-            onClick={() => {
-              onChange(o.value);
-              setOpen(false);
-            }}
-            className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
-              o.value === value ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
-            }`}
-          >
-            <span className="truncate">{o.label}</span>
-            {o.value === value && <Check className="h-3.5 w-3.5" />}
-          </button>
-        ))}
+      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef}>
+        <div className="epic-menu-scroll py-1">
+          {options.map((o) => (
+            <button
+              key={o.value || 'empty'}
+              ref={o.value === value ? activeRef : undefined}
+              type="button"
+              onClick={() => {
+                onChange(o.value);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
+                o.value === value ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <span className="truncate">{o.label}</span>
+              {o.value === value && <Check className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </div>
       </Menu>
     </div>
   );
@@ -247,27 +254,34 @@ export function DateField({
   );
 }
 
-function times() {
-  const out: string[] = [];
-  for (let h = 0; h < 24; h += 1) {
-    for (const m of [0, 15, 30, 45]) {
-      out.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
-  }
-  return out;
+function pad(n: number) {
+  return String(n).padStart(2, '0');
 }
 
-const TIME_OPTS = times();
+function splitTime(value: string) {
+  const raw = (value || '').slice(0, 5);
+  const [hs, ms] = raw.split(':').map(Number);
+  const hour24 = Number.isFinite(hs) ? hs : 9;
+  const minute = Number.isFinite(ms) ? Math.min(59, Math.max(0, ms)) : 0;
+  const pm = hour24 >= 12;
+  const hour12 = hour24 % 12 || 12;
+  return { hour12, minute, pm };
+}
+
+function joinTime(hour12: number, minute: number, pm: boolean) {
+  let hour24 = hour12 % 12;
+  if (pm) hour24 += 12;
+  return `${pad(hour24)}:${pad(minute)}`;
+}
 
 function prettyTime(value: string) {
   if (!value) return 'Pick a time';
-  const [hRaw, m] = value.split(':');
-  const h = Number(hRaw);
-  if (Number.isNaN(h)) return value;
-  const am = h < 12;
-  const hr = h % 12 || 12;
-  return `${hr}:${m} ${am ? 'AM' : 'PM'}`;
+  const { hour12, minute, pm } = splitTime(value);
+  return `${hour12}:${pad(minute)} ${pm ? 'PM' : 'AM'}`;
 }
+
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
 export function TimeField({
   value,
@@ -280,32 +294,86 @@ export function TimeField({
 }) {
   const [open, setOpen] = useState(false);
   const { triggerRef, menuRef } = useDismiss(open, () => setOpen(false));
-  const list = useMemo(() => {
-    if (value && !TIME_OPTS.includes(value.slice(0, 5))) return [value.slice(0, 5), ...TIME_OPTS];
-    return TIME_OPTS;
-  }, [value]);
+  const parsed = splitTime(value);
+  const hourRef = useRef<HTMLButtonElement>(null);
+  const minuteRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    hourRef.current?.scrollIntoView({ block: 'center' });
+    minuteRef.current?.scrollIntoView({ block: 'center' });
+  }, [open, parsed.hour12, parsed.minute]);
+
+  const commit = (next: { hour12?: number; minute?: number; pm?: boolean }, close = false) => {
+    const hour12 = next.hour12 ?? parsed.hour12;
+    const minute = next.minute ?? parsed.minute;
+    const pm = next.pm ?? parsed.pm;
+    onChange(joinTime(hour12, minute, pm));
+    if (close) setOpen(false);
+  };
+
   return (
     <div ref={triggerRef} className={`relative ${className}`}>
       <FieldButton onClick={() => setOpen((v) => !v)} icon={Clock} empty={!value}>
         {prettyTime(value)}
       </FieldButton>
-      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} className="max-h-52 overflow-y-auto py-1">
-        {list.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => {
-              onChange(t);
-              setOpen(false);
-            }}
-            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm ${
-              t === value ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
-            }`}
-          >
-            {prettyTime(t)}
-            {t === value && <Check className="h-3.5 w-3.5" />}
-          </button>
-        ))}
+      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} minWidth={220} className="w-[13.5rem] p-2">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <p className="text-sm font-medium tabular-nums text-zinc-800">{prettyTime(value || '09:00')}</p>
+          <div className="flex rounded-lg bg-zinc-100 p-0.5">
+            {(['AM', 'PM'] as const).map((label) => {
+              const on = label === 'PM' ? parsed.pm : !parsed.pm;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => commit({ pm: label === 'PM' })}
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${on ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          <div>
+            <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Hour</p>
+            <div className="epic-time-col rounded-lg bg-zinc-50">
+              {HOURS.map((h) => (
+                <button
+                  key={h}
+                  ref={h === parsed.hour12 ? hourRef : undefined}
+                  type="button"
+                  onClick={() => commit({ hour12: h })}
+                  className={`flex h-8 w-full items-center justify-center text-sm tabular-nums ${
+                    h === parsed.hour12 ? 'bg-zinc-900 font-medium text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Min</p>
+            <div className="epic-time-col rounded-lg bg-zinc-50">
+              {MINUTES.map((m) => (
+                <button
+                  key={m}
+                  ref={m === parsed.minute ? minuteRef : undefined}
+                  type="button"
+                  onClick={() => commit({ minute: m }, true)}
+                  className={`flex h-8 w-full items-center justify-center text-sm tabular-nums ${
+                    m === parsed.minute ? 'bg-zinc-900 font-medium text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                  }`}
+                >
+                  {pad(m)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </Menu>
     </div>
   );

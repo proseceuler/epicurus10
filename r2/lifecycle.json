@@ -1,0 +1,43 @@
+{
+  "rules": [
+    {
+      "id": "abort-incomplete-multipart",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "maxAge": 7,
+          "type": "Age"
+        }
+      }
+    },
+    {
+      "id": "expire-trash-30d",
+      "enabled": true,
+      "conditions": {
+        "prefix": "trash/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "maxAge": 30,
+          "type": "Age"
+        }
+      }
+    },
+    {
+      "id": "expire-tmp-3d",
+      "enabled": true,
+      "conditions": {
+        "prefix": "tmp/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "maxAge": 3,
+          "type": "Age"
+        }
+      }
+    }
+  ]
+}

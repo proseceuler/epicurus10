@@ -680,3 +680,28 @@
   font-style: italic;
   margin: 0.75rem 0;
 }
+
+/* tldraw — grey film-grain board chrome */
+.epicure-tldraw {
+  --tl-color-background: transparent;
+}
+.epicure-tldraw .tl-background {
+  background: transparent !important;
+}
+.epicure-tldraw .tlui-layout {
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+}
+.epicure-tldraw .tlui-button,
+.epicure-tldraw .tlui-toolbar,
+.epicure-tldraw .tlui-menu,
+.epicure-tldraw .tlui-style-panel {
+  --tl-color-panel: rgba(255, 255, 255, 0.88);
+  --tl-color-panel-contrast: #18181b;
+}
+.epicure-tldraw .tlui-toolbar__inner,
+.epicure-tldraw .tlui-style-panel {
+  backdrop-filter: blur(12px);
+  border-radius: 14px !important;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  box-shadow: 0 8px 24px rgba(24, 24, 27, 0.06);
+}

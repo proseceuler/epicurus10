@@ -39,7 +39,9 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function findNoteByTitle<T extends { title: string }>(notes: T[], title: string): T | undefined {
+export function findNoteByTitle<T extends { title: string }>(notes: T[], title?: string | null): T | undefined {
+  if (title == null || typeof title !== 'string') return undefined;
   const q = title.trim().toLowerCase();
-  return notes.find((n) => n.title.toLowerCase() === q);
+  if (!q) return undefined;
+  return notes.find((n) => (n.title || '').toLowerCase() === q);
 }

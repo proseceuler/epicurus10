@@ -68,7 +68,7 @@ export default function Whiteboard({
 
   useEffect(() => {
     if (!openBoardName) return;
-    const found = findBoardByName(openBoardName);
+    const found = findBoardByName(loadBoards(), openBoardName);
     if (found) setActiveId(found.id);
   }, [openBoardName]);
 
@@ -133,27 +133,50 @@ export default function Whiteboard({
     });
   };
 
-  const insertChart = () => {
+  const [chartMenu, setChartMenu] = useState(false);
+
+  const insertChart = (kind: string) => {
     if (!editor) return;
     const b = editor.getViewportPageBounds();
+    const titles: Record<string, string> = {
+      area: 'Area',
+      bar: 'Bar',
+      column: 'Column',
+      donut: 'Donut',
+      histogram: 'Histogram',
+      line: 'Line',
+      pie: 'Pie',
+      scatter: 'Scatter',
+    };
     editor.createShape({
       type: 'chart',
-      x: b.center.x - 180,
-      y: b.center.y - 120,
+      x: b.center.x - 190,
+      y: b.center.y - 130,
       props: {
-        w: 360,
-        h: 240,
-        kind: 'bar',
-        title: 'Chart',
-        data: JSON.stringify([
-          { label: 'Mon', value: 4 },
-          { label: 'Tue', value: 7 },
-          { label: 'Wed', value: 3 },
-          { label: 'Thu', value: 9 },
-          { label: 'Fri', value: 6 },
-        ]),
+        w: 380,
+        h: 260,
+        kind,
+        title: titles[kind] || 'Chart',
+        data: JSON.stringify(
+          kind === 'scatter'
+            ? [
+                { label: 'A', x: 1, y: 4 },
+                { label: 'B', x: 2, y: 7 },
+                { label: 'C', x: 3, y: 3 },
+                { label: 'D', x: 4, y: 9 },
+                { label: 'E', x: 5, y: 6 },
+              ]
+            : [
+                { label: 'Mon', value: 4 },
+                { label: 'Tue', value: 7 },
+                { label: 'Wed', value: 3 },
+                { label: 'Thu', value: 9 },
+                { label: 'Fri', value: 6 },
+              ],
+        ),
       },
     });
+    setChartMenu(false);
   };
 
   void notes;
@@ -161,7 +184,7 @@ export default function Whiteboard({
   void onCreateNote;
 
   return (
-    <div className="flex h-[min(78vh,820px)] min-h-[520px] w-full flex-col gap-2">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden">
       <div className="glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
         <LayoutGrid className="h-4 w-4 shrink-0 text-zinc-500" />
         <div className="flex max-w-full flex-1 items-center gap-1 overflow-x-auto">
@@ -214,13 +237,40 @@ export default function Whiteboard({
         >
           <Table2 className="h-3.5 w-3.5" /> Table
         </button>
-        <button
-          type="button"
-          onClick={insertChart}
-          className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          <PieChart className="h-3.5 w-3.5" /> Chart
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setChartMenu((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <PieChart className="h-3.5 w-3.5" /> Chart
+          </button>
+          {chartMenu && (
+            <div className="absolute right-0 top-full z-40 mt-1 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
+              {(
+                [
+                  'area',
+                  'bar',
+                  'column',
+                  'donut',
+                  'histogram',
+                  'line',
+                  'pie',
+                  'scatter',
+                ] as const
+              ).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="block w-full px-3 py-1.5 text-left text-xs capitalize text-zinc-700 hover:bg-zinc-50"
+                  onClick={() => insertChart(k)}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>

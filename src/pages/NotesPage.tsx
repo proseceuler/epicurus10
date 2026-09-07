@@ -3,9 +3,10 @@ import { supabase, DB_CHANGED } from '@/lib/supabase';
 import { SUBJECTS, type Note } from '@/lib/types';
 import { Button, EmptyState, Input, Select } from '@/components/kit';
 import Whiteboard from '@/components/board/Whiteboard';
+import NotesGraph from '@/components/notes/NotesGraph';
 import NoteMarkdown from '@/components/notes/NoteMarkdown';
 import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle, escapeRegex } from '@/lib/wiki';
-import { loadBoards, BOARDS_CHANGED, findBoardByName } from '@/lib/board-store';
+/* boards loaded in NotesGraph/Whiteboard */
 import {
   FileText,
   Folder,
@@ -103,8 +104,10 @@ export default function NotesPage() {
     return createNote({ title, folder: 'Vault' });
   };
 
-  const openBoard = (name: string) => {
-    setOpenBoardName(name);
+  const openBoard = (name?: string | null) => {
+    const n = (name ?? '').trim();
+    if (!n) return;
+    setOpenBoardName(n);
     setTab('board');
   };
 
@@ -115,8 +118,8 @@ export default function NotesPage() {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className={`flex min-h-0 flex-col ${tab === 'notes' ? 'h-full' : 'h-[calc(100vh-5.5rem)] overflow-hidden'}`}>
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-xl p-1 glass">
           {tabs.map((t) => {
             const Icon = t.icon;
@@ -135,11 +138,6 @@ export default function NotesPage() {
             );
           })}
         </div>
-        <p className="text-sm text-zinc-500">
-          {tab === 'notes' && 'Obsidian-style vault — wiki-links, backlinks, folders'}
-          {tab === 'board' && 'Scratchpad + whiteboard in one canvas'}
-          {tab === 'graph' && 'How notes and boards connect'}
-        </p>
       </div>
 
       {tab === 'notes' && (
@@ -155,7 +153,7 @@ export default function NotesPage() {
         />
       )}
       {tab === 'board' && (
-        <div className="min-h-0 w-full flex-1" style={{ minHeight: 'min(78vh, 820px)', height: 'min(78vh, 820px)' }}>
+        <div className="min-h-0 w-full flex-1 overflow-hidden">
           <Whiteboard
             notes={notes}
             openBoardName={openBoardName}
@@ -168,14 +166,16 @@ export default function NotesPage() {
         </div>
       )}
       {tab === 'graph' && (
-        <GraphView
-          notes={notes}
-          onOpenNote={(n) => {
-            setSelectedId(n.id);
-            setTab('notes');
-          }}
-          onOpenBoard={openBoard}
-        />
+        <div className="min-h-0 w-full flex-1 overflow-hidden">
+          <NotesGraph
+            notes={notes}
+            onOpenNote={(n) => {
+              setSelectedId(n.id);
+              setTab('notes');
+            }}
+            onOpenBoard={openBoard}
+          />
+        </div>
       )}
     </div>
   );
@@ -592,90 +592,6 @@ function NotesVault({
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function GraphView({
-  notes,
-  onOpenNote,
-  onOpenBoard,
-}: {
-  notes: Note[];
-  onOpenNote: (n: Note) => void;
-  onOpenBoard: (name: string) => void;
-}) {
-  const [boards, setBoards] = useState(() => (typeof window === 'undefined' ? [] : loadBoards()));
-  useEffect(() => {
-    const on = () => setBoards(loadBoards());
-    window.addEventListener(BOARDS_CHANGED, on);
-    return () => window.removeEventListener(BOARDS_CHANGED, on);
-  }, []);
-
-  const nodes = [
-    ...notes.map((n) => ({ id: n.id, label: n.title, kind: 'note' as const })),
-    ...boards.map((b) => ({ id: `board:${b.id}`, label: b.name, kind: 'board' as const })),
-  ];
-  const edges: { from: string; to: string }[] = [];
-  for (const n of notes) {
-    for (const t of wikiLinkTitles(n.content || '')) {
-      const dest = findNoteByTitle(notes, t);
-      if (dest) edges.push({ from: n.id, to: dest.id });
-    }
-    for (const t of wikiBoardTitles(n.content || '')) {
-      const b = findBoardByName(boards, t);
-      if (b) edges.push({ from: n.id, to: `board:${b.id}` });
-    }
-  }
-
-  const w = 900;
-  const h = 520;
-  const cx = w / 2;
-  const cy = h / 2;
-  const r = Math.min(w, h) * 0.36;
-  const pos = new Map<string, { x: number; y: number }>();
-  nodes.forEach((n, i) => {
-    const a = (i / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    pos.set(n.id, { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
-  });
-
-  return (
-    <div className="glass overflow-hidden rounded-2xl">
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-[70vh] w-full">
-        {edges.map((e, i) => {
-          const a = pos.get(e.from);
-          const b = pos.get(e.to);
-          if (!a || !b) return null;
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(24,24,27,0.18)" strokeWidth="1.2" />;
-        })}
-        {nodes.map((n) => {
-          const p = pos.get(n.id)!;
-          const isBoard = n.kind === 'board';
-          return (
-            <g
-              key={n.id}
-              transform={`translate(${p.x},${p.y})`}
-              className="cursor-pointer"
-              onClick={() => {
-                if (isBoard) onOpenBoard(n.label);
-                else {
-                  const note = notes.find((x) => x.id === n.id);
-                  if (note) onOpenNote(note);
-                }
-              }}
-            >
-              {isBoard ? (
-                <rect x={-9} y={-9} width={18} height={18} rx={3} transform="rotate(45)" fill="#18181b" />
-              ) : (
-                <circle r={10} fill="#18181b" />
-              )}
-              <text y={26} textAnchor="middle" fontSize="11" fill="#3f3f46">
-                {n.label.slice(0, 22)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
     </div>
   );
 }

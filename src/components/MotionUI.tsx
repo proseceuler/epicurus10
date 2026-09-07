@@ -7,7 +7,7 @@ export function MotionOverlay({
   onClose,
   children,
   zClass = 'z-50',
-  panelClassName = 'max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl',
+  panelClassName = 'epic-sheet max-h-[88vh] w-full max-w-md overflow-visible p-5',
 }: {
   open: boolean;
   onClose?: () => void;
@@ -27,9 +27,9 @@ export function MotionOverlay({
           exit={fadeMotion.exit}
           transition={motionTransition(reduce, 0.18)}
         >
-          <div className="absolute inset-0 bg-zinc-900/40" onClick={onClose} />
+          <div className="absolute inset-0 bg-zinc-900/30" onClick={onClose} />
           <motion.div
-            className={`epic-popover relative ${panelClassName}`}
+            className={`relative ${panelClassName}`}
             initial={reduce ? false : sheetMotion.initial}
             animate={sheetMotion.animate}
             exit={sheetMotion.exit}

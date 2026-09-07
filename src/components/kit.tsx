@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { DateField, TimeField } from '@/components/fields';
 
 export function Card({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
@@ -69,6 +70,8 @@ export function Input({
   className?: string;
   size?: 'sm' | 'lg';
 }) {
+  if (type === 'date') return <DateField value={value} onChange={onChange} className={className} />;
+  if (type === 'time') return <TimeField value={value} onChange={onChange} className={className} />;
   const sizing = size === 'lg'
     ? 'h-14 min-h-14 px-3.5 py-3 text-lg font-semibold'
     : 'h-9 px-3 py-2 text-sm';
@@ -83,29 +86,7 @@ export function Input({
   );
 }
 
-export function Select({
-  value,
-  onChange,
-  options,
-  className = '',
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  className?: string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full rounded-xl px-3 py-2 text-sm text-zinc-800 glass-input ${className}`}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
+export { Select, DateField, TimeField } from '@/components/fields';
 
 export function EmptyState({ icon: Icon, title, subtitle }: { icon: LucideIcon; title: string; subtitle?: string }) {
   return (

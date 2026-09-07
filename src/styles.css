@@ -681,27 +681,47 @@
   margin: 0.75rem 0;
 }
 
-/* tldraw — grey film-grain board chrome */
+/* tldraw — full-size editor + readable grey chrome */
 .epicure-tldraw {
-  --tl-color-background: transparent;
+  height: 100%;
+  width: 100%;
+  min-height: 480px;
+  position: absolute;
+  inset: 0;
+}
+.epicure-tldraw .tl-container,
+.epicure-tldraw .tl-theme__light,
+.epicure-tldraw [data-tldraw] {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 480px;
 }
 .epicure-tldraw .tl-background {
   background: transparent !important;
 }
 .epicure-tldraw .tlui-layout {
   font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  color: #18181b;
 }
-.epicure-tldraw .tlui-button,
 .epicure-tldraw .tlui-toolbar,
-.epicure-tldraw .tlui-menu,
-.epicure-tldraw .tlui-style-panel {
-  --tl-color-panel: rgba(255, 255, 255, 0.88);
-  --tl-color-panel-contrast: #18181b;
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-navigation-panel,
+.epicure-tldraw .tlui-menu-zone {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 .epicure-tldraw .tlui-toolbar__inner,
-.epicure-tldraw .tlui-style-panel {
-  backdrop-filter: blur(12px);
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-navigation-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(24, 24, 27, 0.12) !important;
   border-radius: 14px !important;
-  border: 1px solid rgba(24, 24, 27, 0.08);
-  box-shadow: 0 8px 24px rgba(24, 24, 27, 0.06);
+  box-shadow: 0 8px 28px rgba(24, 24, 27, 0.1) !important;
+  backdrop-filter: blur(10px);
+}
+.epicure-tldraw .tlui-button {
+  color: #18181b !important;
+}
+.epicure-tldraw .tlui-button__icon {
+  color: #18181b !important;
 }

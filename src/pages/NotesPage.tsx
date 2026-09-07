@@ -155,7 +155,7 @@ export default function NotesPage() {
         />
       )}
       {tab === 'board' && (
-        <div className="min-h-0 flex-1" style={{ minHeight: '70vh' }}>
+        <div className="min-h-0 w-full flex-1" style={{ minHeight: 'min(78vh, 820px)', height: 'min(78vh, 820px)' }}>
           <Whiteboard
             notes={notes}
             openBoardName={openBoardName}

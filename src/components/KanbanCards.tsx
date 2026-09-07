@@ -3,10 +3,12 @@ import { SUBJECTS, type Habit, type KanbanAttachment, type KanbanTask, type Note
 import {
   COLUMNS, type BoardList, type KanbanStatus as Status, kanbanUid as uid,
   dueTone, formatDue, isImageUrl, uniqueById, uniqueAttachments, resolveCover,
+  splitDue, joinDue,
 } from '@/lib/kanban';
 import { compressImage, loadMedia, saveMedia } from '@/lib/mediaStore';
 import { confirmDelete } from '@/lib/confirm';
-import { Button, Input, Select, DateField } from '@/components/kit';
+import { Button, Input, Select } from '@/components/kit';
+import { DateGrid, TimeField } from '@/components/fields';
 import { MotionPopover } from '@/components/MotionUI';
 import {
   Trash2, X, Calendar as CalIcon, Download, CheckSquare, Paperclip,
@@ -151,6 +153,9 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
   const [description, setDescription] = useState(task.description || '');
   const [editingDesc, setEditingDesc] = useState(false);
   const [due, setDue] = useState(task.due_date || '');
+  const [dueOn, setDueOn] = useState(Boolean(task.due_date));
+  const [dueTimeOn, setDueTimeOn] = useState(Boolean(splitDue(task.due_date).time));
+  const [reminder, setReminder] = useState('1 Day before');
   const [subject, setSubject] = useState(task.subject_key || '');
   const [checkText, setCheckText] = useState('');
   const [attachUrl, setAttachUrl] = useState('');
@@ -165,6 +170,8 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
     setTitle(task.title);
     setDescription(task.description || '');
     setDue(task.due_date || '');
+    setDueOn(Boolean(task.due_date));
+    setDueTimeOn(Boolean(splitDue(task.due_date).time));
     setSubject(task.subject_key || '');
     setEditingDesc(false);
     setPanel(null);
@@ -213,12 +220,27 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
           <div className="min-w-0 flex-1 space-y-5 p-5 pt-3">
             <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveBasics} className="w-full bg-transparent text-xl font-semibold outline-none" />
 
-            {(subj || due) && (
-              <div className="flex flex-wrap gap-1.5">
-                {subj && <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-white">{subj.shortName}</span>}
-                {due && <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${dueTone(due)}`}><CalIcon className="h-3 w-3" />{formatDue(due)}</span>}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setPanel(panel === 'labels' ? null : 'labels')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50">
+                <Tag className="h-3.5 w-3.5" /> + Add
+              </button>
+              <button type="button" onClick={() => setPanel(panel === 'dates' ? null : 'dates')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50">
+                <CalIcon className="h-3.5 w-3.5" /> Dates
+              </button>
+              <button type="button" onClick={() => setPanel(panel === 'checklist' ? null : 'checklist')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50">
+                <CheckSquare className="h-3.5 w-3.5" /> Checklist
+              </button>
+              <button type="button" onClick={() => setPanel(panel === 'attach' ? null : 'attach')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50">
+                <Paperclip className="h-3.5 w-3.5" /> Attachment
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-zinc-500">Labels</span>
+              {subj ? <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-white">{subj.shortName}</span> : null}
+              <button type="button" onClick={() => setPanel('labels')} className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-100 text-zinc-500 hover:bg-zinc-200">+</button>
+              {due ? <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${dueTone(due)}`}><CalIcon className="h-3 w-3" />{formatDue(due)}</span> : null}
+            </div>
 
             <section>
               <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -292,15 +314,15 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
             )}
           </div>
 
-          <aside className="relative w-full overflow-visible border-t border-zinc-200/50 p-5 lg:w-56 lg:border-l lg:border-t-0">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Add to card</p>
-            <div className="space-y-1.5">
-              <ActionChip icon={Tag} label="Labels" active={panel === 'labels'} onClick={() => setPanel(panel === 'labels' ? null : 'labels')} />
-              <ActionChip icon={CalIcon} label="Dates" active={panel === 'dates'} onClick={() => setPanel(panel === 'dates' ? null : 'dates')} />
-              <ActionChip icon={CheckSquare} label="Checklist" active={panel === 'checklist'} onClick={() => setPanel(panel === 'checklist' ? null : 'checklist')} />
-              <ActionChip icon={Paperclip} label="Attachment" active={panel === 'attach'} onClick={() => setPanel(panel === 'attach' ? null : 'attach')} />
-              {links && <ActionChip icon={Link2} label="Connect" active={panel === 'connect'} onClick={() => setPanel(panel === 'connect' ? null : 'connect')} />}
-            </div>
+          <aside className="relative w-full overflow-visible border-t border-zinc-200/50 p-5 lg:w-64 lg:border-l lg:border-t-0">
+            {links && (
+              <>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Add to card</p>
+                <div className="space-y-1.5">
+                  <ActionChip icon={Link2} label="Connect" active={panel === 'connect'} onClick={() => setPanel(panel === 'connect' ? null : 'connect')} />
+                </div>
+              </>
+            )}
 
             <MiniSheet title="Labels" open={panel === 'labels'} onClose={() => setPanel(null)}>
               <p className="mb-2 text-[11px] text-zinc-500">Pick a subject label for this card.</p>
@@ -320,11 +342,66 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
             </MiniSheet>
 
             <MiniSheet title="Dates" open={panel === 'dates'} onClose={() => setPanel(null)}>
-              <p className="mb-2 text-[11px] font-medium text-zinc-600">Due date</p>
-              <DateField value={due} onChange={setDue} />
-              <div className="mt-3 flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => { setDue(''); onSave({ due_date: null }); setPanel(null); }}>Remove</Button>
-                <Button size="sm" onClick={() => { onSave({ due_date: due || null }); setPanel(null); }}>Save</Button>
+              <DateGrid
+                value={splitDue(due).date}
+                onChange={(iso) => {
+                  const t = splitDue(due).time;
+                  setDueOn(true);
+                  setDue(joinDue(iso, dueTimeOn ? (t || '09:00') : '') || iso);
+                }}
+              />
+              <label className="mt-3 flex items-center gap-2 text-xs font-medium text-zinc-600">
+                <input type="checkbox" checked={false} readOnly className="rounded border-zinc-300" />
+                Start date
+                <span className="rounded-md bg-zinc-100 px-2 py-1 text-[11px] text-zinc-400">M/D/YYYY</span>
+              </label>
+              <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-zinc-600">
+                <input
+                  type="checkbox"
+                  checked={dueOn}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setDueOn(on);
+                    if (!on) setDue('');
+                    else if (!splitDue(due).date) {
+                      const today = new Date();
+                      const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                      setDue(joinDue(iso, dueTimeOn ? (splitDue(due).time || '09:00') : '') || iso);
+                    }
+                  }}
+                />
+                Due date
+                <span className="rounded-md bg-zinc-100 px-2 py-1 font-mono text-[11px] text-zinc-700">
+                  {splitDue(due).date
+                    ? new Date(splitDue(due).date + 'T00:00:00').toLocaleDateString('en-US')
+                    : 'M/D/YYYY'}
+                </span>
+                {dueTimeOn ? (
+                  <div className="w-[7.5rem]">
+                    <TimeField
+                      value={splitDue(due).time || '09:00'}
+                      onChange={(t) => setDue(joinDue(splitDue(due).date, t) || due)}
+                    />
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => { setDueTimeOn(true); const { date, time } = splitDue(due); setDue(joinDue(date || new Date().toISOString().slice(0, 10), time || '09:00') || ''); }} className="rounded-md bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500">
+                    Add time
+                  </button>
+                )}
+              </label>
+              <label className="mt-3 block text-[11px] font-medium text-zinc-600">Recurring</label>
+              <Select value="never" onChange={() => undefined} options={[{ value: 'never', label: 'Never' }]} />
+              <label className="mt-3 block text-[11px] font-medium text-zinc-600">Set due date reminder</label>
+              <Select value={reminder} onChange={setReminder} options={[
+                { value: 'None', label: 'None' },
+                { value: 'At time of due date', label: 'At time of due date' },
+                { value: '1 Day before', label: '1 Day before' },
+                { value: '2 Days before', label: '2 Days before' },
+              ]} />
+              <p className="mt-1 text-[10px] text-zinc-400">Reminders stay on this card.</p>
+              <div className="mt-3 grid gap-2">
+                <Button size="sm" className="w-full" onClick={() => { onSave({ due_date: dueOn ? (due || null) : null }); setPanel(null); }}>Save</Button>
+                <Button size="sm" variant="ghost" className="w-full" onClick={() => { setDue(''); setDueOn(false); onSave({ due_date: null }); setPanel(null); }}>Remove</Button>
               </div>
             </MiniSheet>
 
@@ -419,7 +496,7 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
             )}
 
             <h3 className="mb-3 mt-6 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-              <MessageSquare className="mr-1 inline h-3.5 w-3.5" /> Comments
+              <MessageSquare className="mr-1 inline h-3.5 w-3.5" /> Comments and activity
             </h3>
             {comments.map((c) => <div key={c.id} className="mb-2 rounded-lg bg-white/70 px-2.5 py-2 text-xs">{c.text}</div>)}
             <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={3} placeholder="Write a comment…" className="w-full rounded-xl border border-zinc-200 bg-white/80 px-2.5 py-2 text-xs outline-none" />

@@ -702,6 +702,15 @@
 .epicure-tldraw .tlui-layout {
   font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
   color: #18181b;
+  pointer-events: auto;
+  z-index: 2;
+}
+.epicure-tldraw .tlui-menu-zone,
+.epicure-tldraw .tlui-navigation-panel,
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-toolbar {
+  pointer-events: auto !important;
+  z-index: 3;
 }
 .epicure-tldraw .tlui-toolbar,
 .epicure-tldraw .tlui-style-panel,

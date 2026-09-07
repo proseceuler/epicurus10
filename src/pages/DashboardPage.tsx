@@ -91,28 +91,31 @@ function computeHabitStreak(
   return { current, best: Math.max(best, current) };
 }
 
+/** Official DepEd SY 2026–2027 term windows (Order No. 009, s. 2026). */
 function termWeekProgress(term: number): { week: number; total: number; pct: number; label: string } {
   const now = new Date();
-  const y = now.getFullYear();
-  // Approximate term windows matching currentTerm()
-  let start: Date;
-  let end: Date;
-  if (term === 1) {
-    start = new Date(y, 5, 1);
-    end = new Date(y, 9, 30);
-  } else if (term === 2) {
-    start = now.getMonth() <= 1 ? new Date(y - 1, 9, 1) : new Date(y, 9, 1);
-    end = now.getMonth() <= 1 ? new Date(y, 1, 28) : new Date(y + 1, 1, 28);
-  } else {
-    start = new Date(y, 1, 1);
-    end = new Date(y, 4, 31);
-  }
+  // T1: Jun 8 – Sep 15, 2026 | T2: Sep 16 – Dec 18, 2026 | T3: Jan 4 – Apr 8, 2027
+  const windows: Record<number, [Date, Date]> = {
+    1: [new Date(2026, 5, 8), new Date(2026, 8, 15)],
+    2: [new Date(2026, 8, 16), new Date(2026, 11, 18)],
+    3: [new Date(2027, 0, 4), new Date(2027, 3, 8)],
+  };
+  const pair = windows[term] || windows[1];
+  const start = pair[0];
+  const end = pair[1];
   const totalMs = Math.max(1, end.getTime() - start.getTime());
   const elapsed = Math.min(totalMs, Math.max(0, now.getTime() - start.getTime()));
   const totalWeeks = Math.max(1, Math.round(totalMs / (7 * 86400000)));
   const week = Math.min(totalWeeks, Math.max(1, Math.floor(elapsed / (7 * 86400000)) + 1));
   const pct = Math.round((elapsed / totalMs) * 100);
   return { week, total: totalWeeks, pct, label: `Week ${week}/${totalWeeks}` };
+}
+
+function currentDepEdTerm(now = new Date()): number {
+  const t = now.getTime();
+  if (t < new Date(2026, 8, 16).getTime()) return 1; // before T2 start
+  if (t < new Date(2027, 0, 4).getTime()) return 2;
+  return 3;
 }
 
 function useMilitaryClock() {
@@ -197,12 +200,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     return diff >= 0 && diff <= 7;
   }).length;
 
-  const currentTerm = (() => {
-    const month = new Date().getMonth();
-    if (month >= 5 && month <= 9) return 1;
-    if (month >= 10 || month <= 1) return 2;
-    return 3;
-  })();
+  const currentTerm = currentDepEdTerm();
 
   const done = useMemo(() => doneSet(completions), [completions]);
   const monthCells = useMemo(() => {

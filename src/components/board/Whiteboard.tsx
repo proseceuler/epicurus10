@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Tldraw,
   defaultShapeUtils,
-  DefaultColorStyle,
   DefaultSizeStyle,
   type Editor,
 } from 'tldraw';
@@ -16,26 +15,10 @@ import { LayoutGrid, Plus, Table2, PieChart, Grid3x3, CircleDot, Square } from '
 const shapeUtils = [...defaultShapeUtils, TableShapeUtil, ChartShapeUtil];
 const STORAGE_PREFIX = 'epicure:tldraw:';
 
-/** tldraw named colors (style system) — real hues, not monochrome */
-const PEN_COLORS: { id: string; hex: string; label: string }[] = [
-  { id: 'black', hex: '#1d1d1d', label: 'Black' },
-  { id: 'grey', hex: '#9ca3af', label: 'Grey' },
-  { id: 'white', hex: '#ffffff', label: 'White' },
-  { id: 'red', hex: '#e03131', label: 'Red' },
-  { id: 'light-red', hex: '#ff8787', label: 'Light red' },
-  { id: 'orange', hex: '#f76707', label: 'Orange' },
-  { id: 'yellow', hex: '#f59f00', label: 'Yellow' },
-  { id: 'green', hex: '#2f9e44', label: 'Green' },
-  { id: 'light-green', hex: '#8ce99a', label: 'Light green' },
-  { id: 'blue', hex: '#1971c2', label: 'Blue' },
-  { id: 'light-blue', hex: '#74c0fc', label: 'Light blue' },
-  { id: 'violet', hex: '#7048e8', label: 'Violet' },
-  { id: 'light-violet', hex: '#b197fc', label: 'Light violet' },
-];
 
 type BgMode = 'dots' | 'grid' | 'plain';
 
-function bgCss(mode: BgMode): React.CSSProperties {
+function bgCss(mode: BgMode): CSSProperties {
   if (mode === 'plain') return { backgroundColor: '#f4f4f5' };
   if (mode === 'grid') {
     return {
@@ -67,7 +50,6 @@ export default function Whiteboard({
   const [activeId, setActiveId] = useState(() => loadBoards()[0]?.id || '');
   const [bg, setBg] = useState<BgMode>('dots');
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [penColor, setPenColor] = useState('black');
 
   const active = useMemo(
     () => boards.find((b) => b.id === activeId) || boards[0],
@@ -140,22 +122,6 @@ export default function Whiteboard({
     setActiveId(b.id);
   };
 
-  const applyColor = (colorId: string) => {
-    setPenColor(colorId);
-    if (!editor) return;
-    try {
-      // @ts-expect-error tldraw color style union
-      editor.setStyleForNextShapes(DefaultColorStyle, colorId);
-      const selected = editor.getSelectedShapeIds();
-      if (selected.length) {
-        // @ts-expect-error tldraw color style union
-        editor.setStyleForSelectedShapes(DefaultColorStyle, colorId);
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-
   const insertTable = () => {
     if (!editor) return;
     const b = editor.getViewportPageBounds();
@@ -223,7 +189,7 @@ export default function Whiteboard({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden">
-      <div className="glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-2 rounded-2xl glass px-3 py-2">
         <LayoutGrid className="h-4 w-4 shrink-0 text-zinc-500" />
         <div className="flex max-w-full flex-1 items-center gap-1 overflow-x-auto">
           {boards.map((b) => (
@@ -268,20 +234,6 @@ export default function Whiteboard({
             );
           })}
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-1.5 py-1">
-          {PEN_COLORS.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              title={c.label}
-              onClick={() => applyColor(c.id)}
-              className={`h-5 w-5 rounded-full border transition-transform ${
-                penColor === c.id ? 'scale-110 ring-2 ring-zinc-900 ring-offset-1' : 'border-zinc-300'
-              }`}
-              style={{ backgroundColor: c.hex }}
-            />
-          ))}
-        </div>
         <button
           type="button"
           onClick={insertTable}
@@ -298,7 +250,7 @@ export default function Whiteboard({
             <PieChart className="h-3.5 w-3.5" /> Chart
           </button>
           {chartMenu && (
-            <div className="absolute right-0 top-full z-[9999] mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
+            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
               {(
                 [
                   'area',
@@ -325,7 +277,7 @@ export default function Whiteboard({
         </div>
       </div>
 
-      <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>
+      <div className="relative z-0 min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>
         <div className="epicure-tldraw absolute inset-0 h-full w-full">
           <Tldraw
             key={persistenceKey}

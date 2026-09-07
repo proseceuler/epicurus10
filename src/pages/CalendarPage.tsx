@@ -6,6 +6,7 @@ import {
   addCalendarEvent,
   deleteCalendarEvent,
   updateCalendarEvent,
+  seedDepEdCalendarIfNeeded,
   CALENDAR_EVENTS_UPDATED,
   type CalendarEvent,
 } from '@/lib/calendarStore';
@@ -155,6 +156,7 @@ export default function CalendarPage() {
     setNotes((noteRes.data ?? []) as Note[]);
     setHabits((habitRes.data ?? []) as Habit[]);
     setCompletions((doneRes.data ?? []) as HabitCompletion[]);
+    seedDepEdCalendarIfNeeded();
     setEvents(getCalendarEvents());
     setLoading(false);
   }, []);

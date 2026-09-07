@@ -234,23 +234,34 @@ export default function Whiteboard({
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={insertTable}
-          className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          <Table2 className="h-3.5 w-3.5" /> Table
-        </button>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setChartMenu((v) => !v)}
-            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            <PieChart className="h-3.5 w-3.5" /> Chart
-          </button>
+        <div className="flex flex-wrap items-center gap-1">
+          {!chartMenu && (
+            <>
+              <button
+                type="button"
+                onClick={insertTable}
+                className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                <Table2 className="h-3.5 w-3.5" /> Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMenu(true)}
+                className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                <PieChart className="h-3.5 w-3.5" /> Chart
+              </button>
+            </>
+          )}
           {chartMenu && (
-            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
+            <>
+              <button
+                type="button"
+                onClick={() => setChartMenu(false)}
+                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50"
+              >
+                ←
+              </button>
               {(
                 [
                   'area',
@@ -266,13 +277,13 @@ export default function Whiteboard({
                 <button
                   key={k}
                   type="button"
-                  className="block w-full px-3 py-1.5 text-left text-xs capitalize text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs capitalize text-zinc-700 hover:bg-zinc-900 hover:text-white"
                   onClick={() => insertChart(k)}
                 >
                   {k}
                 </button>
               ))}
-            </div>
+            </>
           )}
         </div>
       </div>

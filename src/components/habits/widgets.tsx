@@ -132,7 +132,16 @@ export function MultiArea({
       {series.map((s, i) => {
         const p = curvePath(s.values, w, h, 6);
         if (!p) return null;
-        return <path key={i} d={p} fill="none" stroke={s.color ?? colors[i % colors.length]} strokeWidth={i === 0 ? 1.9 : 1.4} />;
+        return (
+          <path
+            key={i}
+            d={p}
+            fill="none"
+            stroke={s.color ?? colors[i % colors.length]}
+            strokeWidth={i === 0 ? 1.9 : 1.4}
+            strokeDasharray={i === 2 ? '5 4' : undefined}
+          />
+        );
       })}
     </svg>
   );

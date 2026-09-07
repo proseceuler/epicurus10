@@ -14,7 +14,8 @@ import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { doneSet, isDone, monthDays, todayIso } from '@/lib/habit-stats';
-import { getXP, xpForNextLevel } from '@/lib/xp';
+import { getXP } from '@/lib/xp';
+import WeeklyRecapSlideshow, { shouldShowSundayRecap } from '@/components/WeeklyRecapSlideshow';
 import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
@@ -154,6 +155,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   });
   const [editingSigil, setEditingSigil] = useState(false);
   const [awake, setAwake] = useState(false);
+  const [showSundayRecap, setShowSundayRecap] = useState(false);
 
   const loadData = useCallback(async () => {
     const [
@@ -261,6 +263,10 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     };
   }, [activeTodos, weekFocus, habitStreak, todayHabitDone, habits.length]);
 
+  useEffect(() => {
+    if (!loading && shouldShowSundayRecap()) setShowSundayRecap(true);
+  }, [loading]);
+
 
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
@@ -295,6 +301,20 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   }
 
   return (
+    <>
+    {showSundayRecap && (
+      <WeeklyRecapSlideshow
+        stats={{
+          focusLabel: weekRecap.focusLabel,
+          streak: weekRecap.streak,
+          habitsToday: weekRecap.habitsToday,
+          habitsTotal: weekRecap.habitsTotal,
+          openTasks: weekRecap.openTasks,
+          focusMinutes: weekFocus,
+        }}
+        onClose={() => setShowSundayRecap(false)}
+      />
+    )}
     <div>
       <section className={`hud-hero mb-8 ${awake ? 'hud-awake' : ''}`}>
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-14">
@@ -400,37 +420,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
         />
       </div>
 
-      <Card className="mb-8 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-800">Weekly recap</h3>
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-mono text-[10px] text-zinc-500">
-            Lv {weekRecap.level} · {weekRecap.xp} XP
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Focus</p>
-            <p className="text-lg font-semibold tabular-nums text-zinc-900">{weekRecap.focusLabel}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Streak</p>
-            <p className="text-lg font-semibold tabular-nums text-zinc-900">{weekRecap.streak}d</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Habits today</p>
-            <p className="text-lg font-semibold tabular-nums text-zinc-900">
-              {weekRecap.habitsTotal ? `${weekRecap.habitsToday}/${weekRecap.habitsTotal}` : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Open tasks</p>
-            <p className="text-lg font-semibold tabular-nums text-zinc-900">{weekRecap.openTasks}</p>
-          </div>
-        </div>
-        <p className="mt-3 text-[11px] text-zinc-500">
-          Auto-generated from focus sessions, habit streak, and open work. Keep the streak alive to earn XP.
-        </p>
-      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-4">
@@ -535,6 +524,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
         </Card>
       </div>
     </div>
+    </>
   );
 }
 

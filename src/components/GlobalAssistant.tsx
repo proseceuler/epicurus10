@@ -224,7 +224,7 @@ export default function GlobalAssistant({
               <Bot className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-zinc-800">Assistant</p>
+              <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
               <p className="truncate text-[11px] text-zinc-500">
                 {listening ? 'Listening…' : speaking ? 'Speaking…' : recording ? 'Recording audio…' : 'One chat for answers and actions'}
               </p>

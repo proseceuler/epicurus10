@@ -1,16 +1,12 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
-import GlobalSearch from '@/components/GlobalSearch';
-import InboxPanel from '@/components/InboxPanel';
-import { unreadCount, INBOX_CHANGED } from '@/lib/inbox';
-import { refreshInboxFromData } from '@/lib/inboxRefresh';
-import { getXP } from '@/lib/xp';
+import { getXP, xpForNextLevel } from '@/lib/xp';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
-  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud, Bell, Search,
+  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
 } from 'lucide-react';
 
 export type PageId =
@@ -80,25 +76,10 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantRail, setAssistantRail] = useState(false);
   const [assistantWidth, setAssistantWidth] = useState(340);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [inboxOpen, setInboxOpen] = useState(false);
-  const [inboxUnread, setInboxUnread] = useState(0);
   const [badgeTodos, setBadgeTodos] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
-  const [xpLevel, setXpLevel] = useState(1);
+  const [xpProgress, setXpProgress] = useState(() => xpForNextLevel());
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
-
-  useEffect(() => {
-    const syncInbox = () => setInboxUnread(unreadCount());
-    syncInbox();
-    void refreshInboxFromData().then(syncInbox);
-    window.addEventListener(INBOX_CHANGED, syncInbox);
-    const id = window.setInterval(() => void refreshInboxFromData().then(syncInbox), 5 * 60_000);
-    return () => {
-      window.removeEventListener(INBOX_CHANGED, syncInbox);
-      window.clearInterval(id);
-    };
-  }, []);
 
   useEffect(() => {
     const loadBadges = async () => {
@@ -116,10 +97,10 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       } catch {
         /* ignore */
       }
-      setXpLevel(getXP().level);
+      setXpProgress(xpForNextLevel());
     };
     void loadBadges();
-    const onXp = () => setXpLevel(getXP().level);
+    const onXp = () => setXpProgress(xpForNextLevel());
     window.addEventListener('epicure-xp-changed', onXp);
     return () => window.removeEventListener('epicure-xp-changed', onXp);
   }, [page]);
@@ -132,7 +113,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setSearchOpen((v) => !v);
+        window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
@@ -141,7 +122,15 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onArrodes = () => {
+      setAssistantOpen(true);
+      setAssistantRail(false);
+    };
+    window.addEventListener('epicure-open-arrodes', onArrodes);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('epicure-open-arrodes', onArrodes);
+    };
   }, []);
 
   return (
@@ -213,20 +202,16 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
             <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="hidden rounded-full glass px-2.5 py-1 font-mono text-[10px] text-zinc-500 sm:inline">Lv {xpLevel}</span>
-            <button type="button" onClick={() => setSearchOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-full glass text-zinc-700 hover:bg-white/80" title="Search (⌘K)" aria-label="Search">
-              <Search className="h-4 w-4" />
-            </button>
-            <button type="button" onClick={() => setInboxOpen(true)} className="relative flex h-10 w-10 items-center justify-center rounded-full glass text-zinc-700 hover:bg-white/80" title="Inbox" aria-label="Inbox">
-              <Bell className="h-4 w-4" />
-              {inboxUnread > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
-                  {inboxUnread > 9 ? '9+' : inboxUnread}
-                </span>
-              )}
-            </button>
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Assistant (⌘J)" aria-label="Toggle assistant">
+          <div className="ml-auto flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex" title={`Level ${xpProgress.level}`}>
+              <div className="h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80">
+                <div
+                  className="h-full rounded-full bg-zinc-800 transition-[width] duration-300"
+                  style={{ width: `${Math.round(xpProgress.progress * 100)}%` }}
+                />
+              </div>
+            </div>
+            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes (⌘J)" aria-label="Toggle Arrodes">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>
@@ -247,8 +232,6 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         onRail={() => { setAssistantOpen(false); setAssistantRail(true); }}
         navigate={navigate}
       />
-      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} navigate={navigate} />
-      <InboxPanel open={inboxOpen} onClose={() => setInboxOpen(false)} navigate={navigate} />
       <GlobalDock navigate={navigate} page={page} />
     </div>
   );

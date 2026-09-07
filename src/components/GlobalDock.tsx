@@ -5,52 +5,60 @@ import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
 import ScientificCalculator from '@/components/ScientificCalculator';
 import DictionaryWidget from '@/components/DictionaryWidget';
+import InboxPanel from '@/components/InboxPanel';
+import GlobalSearch from '@/components/GlobalSearch';
+import { unreadCount, INBOX_CHANGED } from '@/lib/inbox';
 import QuickImportModal from '@/components/QuickImportModal';
-import CodsworthPanel from '@/components/CodsworthPanel';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
-  GripHorizontal, X, StickyNote, Bot, Sparkles,
+  GripHorizontal, X, StickyNote, Bot, Sparkles, Bell, Search,
 } from 'lucide-react';
 
-type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote';
+type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote' | 'inbox' | 'search';
 
 const TASKS_PAGES: PageId[] = ['todos', 'kanban', 'calendar', 'notes'];
 
 export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) => void; page: PageId }) {
   const pomodoro = usePomodoro();
   const [open, setOpen] = useState(false);
-  const [codsworthOpen, setCodsworthOpen] = useState(false);
   const onTasksPage = TASKS_PAGES.includes(page);
-  const [codsworthVisible, setCodsworthVisible] = useState(onTasksPage);
-  const [codsworthLeaving, setCodsworthLeaving] = useState(false);
   const [activeTab, setActiveTab] = useState<DockTab>('main');
   const [calcDetached, setCalcDetached] = useState(false);
   const [dictDetached, setDictDetached] = useState(false);
+  const [inboxDetached, setInboxDetached] = useState(false);
+  const [inboxUnread, setInboxUnread] = useState(0);
   const [quickTask, setQuickTask] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const [importOpen, setImportOpen] = useState(false);
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (onTasksPage) {
-      setCodsworthLeaving(false);
-      setCodsworthVisible(true);
-    } else {
-      setCodsworthOpen(false);
-      setCodsworthLeaving(true);
-      timer = setTimeout(() => {
-        setCodsworthVisible(false);
-        setCodsworthLeaving(false);
-      }, 320);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [onTasksPage]);
 
   const minutes = Math.floor(pomodoro.timeLeft / 60);
   const seconds = pomodoro.timeLeft % 60;
   const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+
+  useEffect(() => {
+    const sync = () => setInboxUnread(unreadCount());
+    sync();
+    window.addEventListener(INBOX_CHANGED, sync);
+    return () => window.removeEventListener(INBOX_CHANGED, sync);
+  }, []);
+
+  useEffect(() => {
+    const onSearch = () => {
+      setOpen((was) => {
+        // toggle: if already on search and open, close
+        if (was && activeTab === 'search') {
+          setActiveTab('main');
+          return false;
+        }
+        setActiveTab('search');
+        return true;
+      });
+    };
+    window.addEventListener('epicure-toggle-search', onSearch);
+    return () => window.removeEventListener('epicure-toggle-search', onSearch);
+  }, [activeTab]);
 
   const openTab = (tab: DockTab) => {
     setOpen(true);
@@ -123,8 +131,22 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
         />
       )}
 
-      {codsworthVisible && codsworthOpen && (
-        <CodsworthPanel page={page} onClose={() => setCodsworthOpen(false)} />
+      {inboxDetached && (
+        <InboxPanel
+          open
+          detached
+          navigate={navigate}
+          onDetach={() => setInboxDetached(true)}
+          onSnapBack={() => {
+            setInboxDetached(false);
+            setActiveTab('inbox');
+            setOpen(true);
+          }}
+          onClose={() => {
+            setInboxDetached(false);
+            setActiveTab('main');
+          }}
+        />
       )}
 
       <div data-global-dock className="fixed bottom-4 right-4 z-40">
@@ -145,13 +167,20 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                   <DockButton icon={BookOpen} label="Dictionary" onClick={() => openTab('dictionary')} />
                   <DockButton icon={StickyNote} label="Sticky Note" onClick={() => openTab('quicknote')} />
                   <DockButton icon={Plus} label="Quick Task" onClick={() => openTab('quicktask')} />
+                  <DockButton icon={Search} label="Search" onClick={() => openTab('search')} />
+                  <DockButton
+                    icon={Bell}
+                    label="Inbox"
+                    onClick={() => openTab('inbox')}
+                    badge={inboxUnread}
+                  />
                   <div className="mx-0.5 h-8 w-px bg-zinc-300/40" />
                   <DockButton
                     icon={Bot}
-                    label="Ask AI"
+                    label="Arrodes"
                     onClick={() => {
                       setOpen(false);
-                      navigate('assistant');
+                      window.dispatchEvent(new CustomEvent('epicure-open-arrodes'));
                     }}
                   />
                   <DockButton
@@ -234,6 +263,33 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                     detached={false}
                     onDetach={() => setDictDetached(true)}
                     onSnapBack={() => setDictDetached(false)}
+                    onClose={closeTab}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'search' && (
+                <GlobalSearch
+                  open
+                  mode="dock"
+                  navigate={navigate}
+                  onClose={() => {
+                    setActiveTab('main');
+                    setOpen(false);
+                  }}
+                />
+              )}
+
+              {activeTab === 'inbox' && !inboxDetached && (
+                <div className="relative">
+                  <InboxPanel
+                    open
+                    embedded
+                    navigate={navigate}
+                    onDetach={() => {
+                      setInboxDetached(true);
+                      setOpen(false);
+                    }}
                     onClose={closeTab}
                   />
                 </div>
@@ -335,24 +391,10 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                 <Plus className="h-6 w-6 transition-transform duration-200" />
               )}
             </motion.button>
-
-            {codsworthVisible && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                key="codsworth-fab"
-                type="button"
-                onClick={() => setCodsworthOpen((v) => !v)}
-                aria-label={codsworthOpen ? 'Close Codsworth' : 'Open Codsworth'}
                 className={
-                  (codsworthOpen
                     ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
                     : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
-                  (codsworthLeaving ? ' codsworth-split-out' : ' codsworth-split-in')
                 }
-                title="Codsworth — drag the panel header to move it"
               >
                 <Bot className="h-5 w-5" />
               </motion.button>
@@ -368,33 +410,28 @@ function DockButton({
   icon: Icon,
   label,
   onClick,
-  active,
   badge,
 }: {
   icon: typeof Calculator;
   label: string;
   onClick: () => void;
-  active?: boolean;
-  badge?: string;
+  badge?: number | string;
 }) {
+  const show = badge != null && badge !== 0 && badge !== '';
   return (
-    <motion.button
-      whileTap={{ scale: 0.92 }}
-      whileHover={{ y: -2 }}
+    <button
       type="button"
-      onClick={onClick}
-      className={`flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-all ${
-        active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200/50'
-      }`}
       title={label}
+      onClick={onClick}
+      className="relative flex h-10 w-10 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900"
     >
-      <Icon className="h-5 w-5" />
-      {badge ? (
-        <span className="text-[10px] font-bold tabular-nums">{badge}</span>
-      ) : (
-        <span className="text-[10px] font-medium">{label}</span>
+      <Icon className="h-4 w-4" />
+      {show && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[8px] font-bold text-white">
+          {typeof badge === 'number' && badge > 9 ? '9+' : badge}
+        </span>
       )}
-    </motion.button>
+    </button>
   );
 }
 

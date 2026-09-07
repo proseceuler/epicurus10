@@ -29,7 +29,9 @@
 .rice-shell .chrome-badge,
 .rice-shell [data-chrome-badge],
 .rice-shell--notes .chrome-badge,
-.rice-shell--notes [data-chrome-badge] {
+.rice-shell--notes [data-chrome-badge],
+.rice-shell--notes .rice-sidebar .chrome-badge,
+.rice-shell--notes [data-global-dock] .chrome-badge {
   background: #3f3f46 !important;
   color: #fff !important;
   filter: grayscale(1) !important;

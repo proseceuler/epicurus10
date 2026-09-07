@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { listItemMotion, motionTransition } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import { awardXP } from '@/lib/xp';
 import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
@@ -28,6 +30,7 @@ export default function TodosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Todo | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const reduceMotion = useReducedMotion();
 
   const openEdit = (todo?: Todo) => {
     if (todo) {
@@ -102,7 +105,7 @@ export default function TodosPage() {
 
   return (
     <div>
-      <PageHeader title="Master To-Do List" subtitle="Eisenhower Matrix priority · Urgent vs Important" action={<Button onClick={() => openEdit()}><Plus className="w-4 h-4" /> Add Task</Button>} />
+      <PageHeader title="Master To-Do List" subtitle="Eisenhower Matrix priority \u00b7 Urgent vs Important" action={<Button onClick={() => openEdit()}><Plus className="w-4 h-4" /> Add Task</Button>} />
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.length}</div><div className="text-xs text-zinc-500">Total Tasks</div></Card>
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => !t.completed).length}</div><div className="text-xs text-zinc-500">Pending</div></Card>
@@ -137,15 +140,24 @@ export default function TodosPage() {
       </div>
       {sorted.length === 0 ? <EmptyState icon={CheckSquare} title="No tasks found" subtitle="Add a task to get started." /> : (
         <div className="space-y-2">
+          <AnimatePresence initial={false}>
           {sorted.map((todo) => {
             const subj = SUBJECTS.find((s) => s.key === todo.subject_key);
             const p = PRIORITY_CONFIG[todo.priority as PriorityKey];
             const overdue = todo.due_date && !todo.completed && new Date(todo.due_date) < new Date(new Date().toDateString());
             return (
-              <Card key={todo.id} className={`p-3 flex items-center gap-3 group ${todo.completed ? 'opacity-50' : ''}`}>
-                <button onClick={() => toggleTodo(todo)} className={`shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.completed ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'}`}>{todo.completed && <Check className="w-3 h-3 text-white" />}</button>
-                <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-medium ${todo.completed ? 'line-through text-zinc-400' : 'text-zinc-700'}`}>{todo.title}</span>
+              <motion.div
+                key={todo.id}
+                layout={!reduceMotion}
+                initial={reduceMotion ? false : listItemMotion.initial}
+                animate={listItemMotion.animate}
+                exit={reduceMotion ? listItemMotion.animate : listItemMotion.exit}
+                transition={motionTransition(reduceMotion, 0.18)}
+              >
+              <Card className={`flex items-center gap-3 p-3 group transition-opacity duration-200 ${todo.completed ? 'opacity-50' : ''}`}>
+                <button onClick={() => toggleTodo(todo)} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors duration-150 ${todo.completed ? 'border-zinc-900 bg-zinc-900' : 'border-zinc-300'}`}>{todo.completed && <Check className="h-3 w-3 text-white" />}</button>
+                <div className="min-w-0 flex-1">
+                  <span className={`text-sm font-medium transition-colors duration-150 ${todo.completed ? 'text-zinc-400 line-through' : 'text-zinc-700'}`}>{todo.title}</span>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {subj && <SubjectBadge shortName={subj.shortName} />}
                     <span className={`text-xs font-medium px-2 py-0.5 rounded ${p.tone === 'high' ? 'bg-zinc-900 text-white' : p.tone === 'mid' ? 'bg-zinc-700 text-white' : p.tone === 'low' ? 'bg-zinc-400 text-zinc-900' : 'bg-zinc-200 text-zinc-600'}`}>{p.short}</span>
@@ -155,8 +167,10 @@ export default function TodosPage() {
                 <button onClick={() => openEdit(todo)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => deleteTodo(todo.id)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></button>
               </Card>
+              </motion.div>
             );
           })}
+          </AnimatePresence>
         </div>
       )}
     </div>

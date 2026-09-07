@@ -1,0 +1,49 @@
+/* Epicure motion tokens (P0) */
+:root {
+  --epic-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --epic-micro: 150ms;
+  --epic-ui: 200ms;
+  --epic-sheet: 280ms;
+}
+
+.epic-press:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.epic-press:not(:disabled):active {
+  transform: scale(0.98) translateY(0);
+}
+
+.epic-fade-in {
+  animation: epicFadeIn var(--epic-ui) var(--epic-ease) both;
+}
+
+@keyframes epicFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.epic-skeleton {
+  background: linear-gradient(90deg, rgba(24, 24, 27, 0.06) 25%, rgba(24, 24, 27, 0.12) 37%, rgba(24, 24, 27, 0.06) 63%);
+  background-size: 400% 100%;
+  animation: epicShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes epicShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .epic-press:not(:disabled):hover,
+  .epic-press:not(:disabled):active {
+    transform: none;
+  }
+}

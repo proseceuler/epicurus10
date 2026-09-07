@@ -19,6 +19,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import DrivePage from '@/pages/DrivePage';
 import './rice.css';
 import './styles.css';
+import './motion.css';
 
 function registerPwa() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;

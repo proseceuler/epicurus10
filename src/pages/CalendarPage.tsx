@@ -22,3 +22,20 @@ import {
 } from 'lucide-react';
 
 export type { CalendarEvent };
+
+type CalView = 'month' | 'week' | 'day';
+type Density = 'compact' | 'comfortable';
+type DragPayload =
+  | { kind: 'event'; id: string }
+  | { kind: 'todo'; id: string }
+  | { kind: 'kanban'; id: string }
+  | { kind: 'note'; id: string }
+  | { kind: 'habit'; id: string };
+
+const KINDS = [
+  { value: 'event', label: 'Event' },
+  { value: 'deadline', label: 'Deadline' },
+  { value: 'exam', label: 'Exam' },
+  { value: 'reminder', label: 'Reminder' },
+  { value: 'holiday', label: 'Holiday / No class' },
+];

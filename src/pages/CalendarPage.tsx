@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Todo, type KanbanTask, type SubjectKey, type Note, type Habit, type HabitCompletion } from '@/lib/types';
 import {
@@ -57,6 +57,15 @@ const iso = (d: Date) => d.toLocaleDateString('en-CA');
 const parse = (s: string) => new Date(s + 'T00:00:00');
 const pad = (n: number) => String(n).padStart(2, '0');
 const hm = (h: number, m = 0) => `${pad(h)}:${pad(m)}`;
+const addOneHour = (label: string) => {
+  const [hs, ms] = label.split(':').map(Number);
+  const total = (hs || 0) * 60 + (ms || 0) + 60;
+  return hm(Math.min(23, Math.floor(total / 60)), total % 60);
+};
+const labelToMinutes = (label: string) => {
+  const [hs, ms] = label.split(':').map(Number);
+  return (hs || 0) * 60 + (ms || 0);
+};
 
 function startOfWeek(d: Date) {
   const x = new Date(d);
@@ -126,6 +135,12 @@ export default function CalendarPage() {
   const [draft, setDraft] = useState(emptyDraft(iso(new Date())));
   const [showForm, setShowForm] = useState(false);
   const [showLinks, setShowLinks] = useState(false);
+  const [slotDrag, setSlotDrag] = useState<{ dayIso: string; start: string; end: string } | null>(null);
+  const [monthDrag, setMonthDrag] = useState<{ start: string; end: string } | null>(null);
+  const slotDragRef = useRef(slotDrag);
+  const monthDragRef = useRef(monthDrag);
+  slotDragRef.current = slotDrag;
+  monthDragRef.current = monthDrag;
 
   const loadData = useCallback(async () => {
     const [todoRes, kanbanRes, noteRes, habitRes, doneRes] = await Promise.all([
@@ -175,12 +190,18 @@ export default function CalendarPage() {
     return habits.filter((h) => !completions.some((c) => c.habit_id === h.id && c.completion_date === dayIso));
   };
 
-  const openForm = (date: string, timed?: { start: string; end?: string }) => {
+  const openForm = (date: string, timed?: { start: string; end?: string }, endDate?: string) => {
     const next = emptyDraft(date);
+    if (endDate) next.end_date = endDate;
     if (timed) {
       next.all_day = false;
-      next.start_time = timed.start;
-      next.end_time = timed.end || '';
+      const start = timed.start;
+      const end = timed.end || addOneHour(start);
+      // ensure end >= start
+      const sMin = labelToMinutes(start);
+      const eMin = labelToMinutes(end);
+      next.start_time = start;
+      next.end_time = eMin > sMin ? end : addOneHour(start);
     }
     setDraft(next);
     setSelectedDay(date);
@@ -377,11 +398,50 @@ export default function CalendarPage() {
     );
   };
 
+  const inSlotRange = (dayIso: string, label: string) => {
+    if (!slotDrag || slotDrag.dayIso !== dayIso) return false;
+    const a = labelToMinutes(slotDrag.start);
+    const b = labelToMinutes(slotDrag.end);
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const t = labelToMinutes(label);
+    return t >= lo && t <= hi;
+  };
+
   const TimedCell = ({ dayIso, label }: { dayIso: string; label: string }) => {
     const timed = eventsForDay(dayIso).filter((e) => !e.all_day && (e.start_time || '00:00').slice(0, 5) === label);
     const rowH = density === 'compact' ? 'min-h-[22px]' : 'min-h-[32px]';
+    const selected = inSlotRange(dayIso, label);
     return (
-      <div className={`${rowH} border-l border-t border-zinc-100 p-0.5`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void dropOn(readDrag(e), dayIso, label); }} onDoubleClick={() => openForm(dayIso, { start: label })}>
+      <div
+        className={`${rowH} border-l border-t border-zinc-100 p-0.5 select-none ${selected ? 'bg-zinc-900/10' : ''}`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); void dropOn(readDrag(e), dayIso, label); }}
+        onDoubleClick={() => openForm(dayIso, { start: label })}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // don't start drag when clicking an event button
+          if ((e.target as HTMLElement).closest('button')) return;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          setSlotDrag({ dayIso, start: label, end: label });
+        }}
+        onPointerEnter={() => {
+          const cur = slotDragRef.current;
+          if (!cur || cur.dayIso !== dayIso) return;
+          setSlotDrag({ ...cur, end: label });
+        }}
+        onPointerUp={(e) => {
+          const cur = slotDragRef.current;
+          if (!cur || cur.dayIso !== dayIso) return;
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+          const a = labelToMinutes(cur.start);
+          const b = labelToMinutes(cur.end);
+          const start = a <= b ? cur.start : cur.end;
+          const end = a <= b ? cur.end : cur.start;
+          setSlotDrag(null);
+          openForm(dayIso, { start, end: addOneHour(end) });
+        }}
+      >
         {timed.map((e) => (
           <button key={e.id} type="button" draggable onDragStart={(ev) => writeDrag(ev, { kind: 'event', id: e.id })} onClick={() => openEvent(e)} className={`mb-0.5 block w-full truncate rounded px-1 text-left text-[10px] ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}>{e.start_time?.slice(0, 5)} {e.title}</button>
         ))}
@@ -433,7 +493,37 @@ export default function CalendarPage() {
                     const dayEvents = eventsForDay(dayIso);
                     const due = [...todosForDay(dayIso), ...kanbanForDay(dayIso)];
                     return (
-                      <button key={day} type="button" onClick={() => setSelectedDay(dayIso)} onDoubleClick={() => openForm(dayIso)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void dropOn(readDrag(e), dayIso); }} className={`min-h-[72px] rounded-xl border p-1 text-left text-xs ${isSelected ? 'border-zinc-800 bg-white/70' : isToday ? 'border-zinc-800 bg-zinc-100/50' : 'border-zinc-200/30 hover:bg-white/40'}`}>
+                      <button key={day} type="button"
+                        onClick={() => setSelectedDay(dayIso)}
+                        onDoubleClick={() => openForm(dayIso)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); void dropOn(readDrag(e), dayIso); }}
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return;
+                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                          setMonthDrag({ start: dayIso, end: dayIso });
+                        }}
+                        onPointerEnter={() => {
+                          const cur = monthDragRef.current;
+                          if (!cur) return;
+                          setMonthDrag({ ...cur, end: dayIso });
+                        }}
+                        onPointerUp={(e) => {
+                          const cur = monthDragRef.current;
+                          if (!cur) return;
+                          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+                          const a = cur.start <= cur.end ? cur.start : cur.end;
+                          const b = cur.start <= cur.end ? cur.end : cur.start;
+                          setMonthDrag(null);
+                          setSelectedDay(a);
+                          // only open form when user dragged across days
+                          if (a !== b) openForm(a, undefined, b);
+                        }}
+                        className={`min-h-[72px] rounded-xl border p-1 text-left text-xs ${
+                          (monthDrag && dayIso >= (monthDrag.start <= monthDrag.end ? monthDrag.start : monthDrag.end) && dayIso <= (monthDrag.start <= monthDrag.end ? monthDrag.end : monthDrag.start))
+                            ? 'border-zinc-800 bg-zinc-900/10'
+                            : isSelected ? 'border-zinc-800 bg-white/70' : isToday ? 'border-zinc-800 bg-zinc-100/50' : 'border-zinc-200/30 hover:bg-white/40'
+                        }`}>
                         <div className={`text-right font-medium ${isToday ? 'text-zinc-900' : 'text-zinc-500'}`}>{day}</div>
                         {dayEvents.slice(0, 2).map((e) => <div key={e.id} className={`mt-0.5 truncate rounded px-1 py-0.5 text-[10px] ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}>{e.title}</div>)}
                         {due.slice(0, 2).map((d) => <div key={d.id} className="mt-0.5 truncate rounded bg-zinc-200/70 px-1 py-0.5 text-[10px] text-zinc-600">{d.title}</div>)}

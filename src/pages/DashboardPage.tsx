@@ -1,11 +1,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { SUBJECTS, NUM_TERMS, type Assessment, type Todo, type PomodoroSession } from '@/lib/types';
+import {
+  SUBJECTS,
+  NUM_TERMS,
+  type Assessment,
+  type Todo,
+  type PomodoroSession,
+  type Habit,
+  type HabitCompletion,
+  type FinanceSettings,
+  type FinanceTransaction,
+} from '@/lib/types';
 import { computeFinalGrade, computeGeneralAverage, computeTermGrade } from '@/lib/gradeUtils';
 import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import { usePomodoro } from '@/context/PomodoroContext';
-import { Calendar, BookOpen } from 'lucide-react';
+import { doneSet, isDone, lastNDays, todayIso } from '@/lib/habit-stats';
+import { Calendar, BookOpen, Flame, Wallet, CheckSquare, Clock } from 'lucide-react';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
 
@@ -40,11 +51,33 @@ function computeStreak(sessions: PomodoroSession[]): number {
   return streak;
 }
 
+function useMilitaryClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const dateLabel = now.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  return { time: `${hh}:${mm}:${ss}`, dateLabel };
+}
+
 export default function DashboardPage({ navigate }: { navigate: (p: PageId) => void }) {
   const pomodoro = usePomodoro();
+  const clock = useMilitaryClock();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [completions, setCompletions] = useState<HabitCompletion[]>([]);
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [sigil, setSigil] = useState(() => {
     try {
@@ -57,18 +90,36 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const [awake, setAwake] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [{ data: aData }, { data: tData }, { data: sData }] = await Promise.all([
+    const [
+      { data: aData },
+      { data: tData },
+      { data: sData },
+      { data: hData },
+      { data: cData },
+      { data: fData },
+      { data: txData },
+    ] = await Promise.all([
       supabase.from('assessments').select('*'),
       supabase.from('todos').select('*').order('created_at', { ascending: false }),
       supabase.from('pomodoro_sessions').select('*'),
+      supabase.from('habits').select('*').order('created_at', { ascending: true }),
+      supabase.from('habit_completions').select('*'),
+      supabase.from('finance_settings').select('*').maybeSingle(),
+      supabase.from('finance_transactions').select('*'),
     ]);
     if (aData) setAssessments(aData as Assessment[]);
     if (tData) setTodos(tData as Todo[]);
     if (sData) setSessions(sData as PomodoroSession[]);
+    if (hData) setHabits(hData as Habit[]);
+    if (cData) setCompletions(cData as HabitCompletion[]);
+    if (fData) setFinanceSettings(fData as FinanceSettings);
+    if (txData) setTransactions(txData as FinanceTransaction[]);
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const generalAverage = computeGeneralAverage(assessments);
   const activeTodos = todos.filter((t) => !t.completed);
@@ -81,7 +132,14 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const upcomingTodos = activeTodos
     .filter((t) => t.due_date)
     .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
-    .slice(0, 5);
+    .slice(0, 6);
+
+  const deadlineCount = activeTodos.filter((t) => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date + 'T00:00:00');
+    const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
+    return diff >= 0 && diff <= 7;
+  }).length;
 
   const currentTerm = (() => {
     const month = new Date().getMonth();
@@ -89,6 +147,43 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     if (month >= 10 || month <= 1) return 2;
     return 3;
   })();
+
+  const done = useMemo(() => doneSet(completions), [completions]);
+  const last7 = useMemo(() => lastNDays(7), []);
+  const habitRate = useMemo(() => {
+    if (!habits.length) return null;
+    let slots = 0;
+    let got = 0;
+    for (const d of last7) {
+      for (const h of habits) {
+        slots += 1;
+        if (isDone(done, h.id, d)) got += 1;
+      }
+    }
+    return slots ? got / slots : 0;
+  }, [habits, done, last7]);
+
+  const todayHabitRate = useMemo(() => {
+    if (!habits.length) return null;
+    const t = todayIso();
+    const got = habits.filter((h) => isDone(done, h.id, t)).length;
+    return got / habits.length;
+  }, [habits, done]);
+
+  const weakSubjects = useMemo(() => {
+    return SUBJECTS.map((s) => {
+      const fg = computeFinalGrade(s.key, assessments);
+      const tg = computeTermGrade(s.key, currentTerm, assessments);
+      return { subject: s, fg, tg };
+    })
+      .filter((x) => x.fg !== null)
+      .sort((a, b) => (a.fg ?? 100) - (b.fg ?? 100))
+      .slice(0, 4);
+  }, [assessments, currentTerm]);
+
+  const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const baonRemaining =
+    financeSettings != null ? Number(financeSettings.allowance_amount) - totalSpent : null;
 
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
@@ -112,6 +207,10 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
   const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
+  const habitPct =
+    habitRate !== null ? `${Math.round(habitRate * 100)}%` : '—';
+  const baonLabel =
+    baonRemaining !== null ? `₱${baonRemaining.toFixed(0)}` : '—';
 
   if (loading) {
     return (
@@ -123,7 +222,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
 
   return (
     <div>
-      <section className={`hud-hero mb-10 ${awake ? 'hud-awake' : ''}`}>
+      <section className={`hud-hero mb-8 ${awake ? 'hud-awake' : ''}`}>
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-14">
           <div className="min-w-0 flex-1">
             {editingSigil ? (
@@ -152,9 +251,14 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             )}
           </div>
 
-          <div className="font-mono text-[12px] leading-6 text-zinc-600 lg:min-w-[280px] lg:pt-2">
+          <div className="font-mono text-[12px] leading-6 text-zinc-600 lg:min-w-[300px] lg:pt-2">
+            <div className="mb-3 flex items-baseline gap-3">
+              <span className="text-3xl font-semibold tabular-nums tracking-tight text-zinc-900">{clock.time}</span>
+              <span className="text-[11px] uppercase tracking-wider text-zinc-500">{clock.dateLabel}</span>
+            </div>
             <p className="text-zinc-800">
-              user<span className="text-zinc-500">@</span>{host}
+              user<span className="text-zinc-500">@</span>
+              {host}
             </p>
             <p className="text-zinc-400">{'─'.repeat(22)}</p>
             <StatRow label="OS" value="epicure 10.2" />
@@ -162,81 +266,191 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
             <StatRow label="FOCUS" value={focusLabel} />
             <StatRow label="GPA" value={gpa} />
+            <StatRow label="HABITS" value={habitPct} />
             <StatRow label="TASKS" value={`${activeTodos.length} open`} />
-            <StatRow label="KERNEL" value={`${SUBJECTS.length} subjects`} />
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => navigate('grades')} className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900">
+              <button
+                type="button"
+                onClick={() => navigate('grades')}
+                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
+              >
                 → grades
               </button>
-              <button type="button" onClick={() => navigate('pomodoro')} className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900">
-                → focus
+              <button
+                type="button"
+                onClick={() => navigate('habits')}
+                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
+              >
+                → habits
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('finance')}
+                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
+              >
+                → baon
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mb-10 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
-        <QuietStat label="GPA" value={gpa} onOpen={() => navigate('grades')} />
-        <QuietStat label="PENDING" value={String(activeTodos.length)} onOpen={() => navigate('todos')} />
-        <QuietStat label="FOCUS" value={focusLabel} onOpen={() => navigate('pomodoro')} />
-        <QuietStat label="TERM" value={`T${currentTerm}`} onOpen={() => navigate('grades')} />
+      {/* Single insight strip — no duplicate GPA card */}
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <InsightTile
+          icon={BookOpen}
+          label="GPA"
+          value={gpa}
+          hint={`Term ${currentTerm}`}
+          onOpen={() => navigate('grades')}
+        />
+        <InsightTile
+          icon={Flame}
+          label="HABIT RATE"
+          value={habitPct}
+          hint={
+            todayHabitRate !== null
+              ? `Today ${Math.round(todayHabitRate * 100)}% · 7d avg`
+              : 'Last 7 days'
+          }
+          onOpen={() => navigate('habits')}
+        />
+        <InsightTile
+          icon={CheckSquare}
+          label="DEADLINES"
+          value={String(deadlineCount)}
+          hint="Next 7 days"
+          onOpen={() => navigate('todos')}
+        />
+        <InsightTile
+          icon={Wallet}
+          label="BAON LEFT"
+          value={baonLabel}
+          hint={
+            financeSettings
+              ? `${financeSettings.allowance_period} allowance`
+              : 'Set allowance'
+          }
+          onOpen={() => navigate('finance')}
+        />
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-2">
-        <Card className="p-0">
-          <div className="mb-5 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">SUBJECT GRADES</h3>
-            <button onClick={() => navigate('grades')} className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800">all →</button>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-0 lg:col-span-1">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">WEAK SUBJECTS</h3>
+            <button
+              type="button"
+              onClick={() => navigate('grades')}
+              className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800"
+            >
+              grades →
+            </button>
           </div>
-          {assessments.length === 0 ? (
-            <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add your assessment scores to see your grades here." />
+          {weakSubjects.length === 0 ? (
+            <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add assessments to surface weak spots." />
           ) : (
             <div className="space-y-1">
-              {SUBJECTS.map((s) => {
-                const fg = computeFinalGrade(s.key, assessments);
-                const tg = computeTermGrade(s.key, currentTerm, assessments);
-                return (
-                  <button key={s.key} onClick={() => navigate('grades')} className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/3">
-                    <SubjectBadge shortName={s.shortName} />
-                    <div className="flex items-center gap-4 font-mono">
-                      <span className="text-[11px] text-zinc-500">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
-                      <span className={`text-sm ${gradeColor(fg)}`}>{fg !== null ? fg.toFixed(2) : '—'}</span>
-                    </div>
-                  </button>
-                );
-              })}
+              {weakSubjects.map(({ subject, fg, tg }) => (
+                <button
+                  key={subject.key}
+                  type="button"
+                  onClick={() => navigate('grades')}
+                  className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/40"
+                >
+                  <SubjectBadge shortName={subject.shortName} />
+                  <div className="flex items-center gap-3 font-mono">
+                    <span className="text-[11px] text-zinc-500">
+                      T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}
+                    </span>
+                    <span className={`text-sm ${gradeColor(fg)}`}>
+                      {fg !== null ? fg.toFixed(2) : '—'}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </Card>
 
-        <Card className="p-0">
-          <div className="mb-5 flex items-baseline justify-between">
+        <Card className="p-0 lg:col-span-1">
+          <div className="mb-4 flex items-baseline justify-between">
             <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">UPCOMING</h3>
-            <button onClick={() => navigate('calendar')} className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800">calendar →</button>
+            <button
+              type="button"
+              onClick={() => navigate('calendar')}
+              className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800"
+            >
+              calendar →
+            </button>
           </div>
           {upcomingTodos.length === 0 ? (
-            <EmptyState icon={Calendar} title="No upcoming deadlines" subtitle="Add due dates to your tasks to see them here." />
+            <EmptyState
+              icon={Calendar}
+              title="No upcoming deadlines"
+              subtitle="Add due dates to your tasks to see them here."
+            />
           ) : (
             <div className="space-y-1">
               {upcomingTodos.map((todo) => {
                 const dDate = new Date(todo.due_date! + 'T00:00:00');
-                const daysAway = Math.ceil((dDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                const daysAway = Math.ceil((dDate.getTime() - Date.now()) / 86400000);
                 return (
                   <div key={todo.id} className="flex items-center gap-3 rounded-md px-1 py-2">
                     <div className="w-10 shrink-0 font-mono">
-                      <div className="text-[9px] uppercase tracking-wider text-zinc-500">{dDate.toLocaleDateString('en-US', { month: 'short' })}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-zinc-500">
+                        {dDate.toLocaleDateString('en-US', { month: 'short' })}
+                      </div>
                       <div className="text-sm text-zinc-800">{dDate.getDate()}</div>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-zinc-800">{todo.title}</p>
-                      <span className="font-mono text-[10px] text-zinc-500">{daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}</span>
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        {daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+        </Card>
+
+        <Card className="p-0 lg:col-span-1">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">TODAY</h3>
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-500">
+              <Clock className="h-3 w-3" />
+              {focusLabel} focus
+            </span>
+          </div>
+          <div className="space-y-3">
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Habits today</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">
+                {todayHabitRate !== null ? `${Math.round(todayHabitRate * 100)}%` : '—'}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                {habits.length
+                  ? `${habits.filter((h) => isDone(done, h.id, todayIso())).length}/${habits.length} done`
+                  : 'No habits yet'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Baon</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{baonLabel}</p>
+              <p className="text-[11px] text-zinc-500">
+                {financeSettings
+                  ? `₱${Number(financeSettings.allowance_amount).toFixed(0)} ${financeSettings.allowance_period} · spent ₱${totalSpent.toFixed(0)}`
+                  : 'Open Baon Tracker to set allowance'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Open tasks</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{activeTodos.length}</p>
+              <p className="text-[11px] text-zinc-500">{deadlineCount} due within 7 days</p>
+            </div>
+          </div>
         </Card>
       </div>
     </div>
@@ -252,11 +466,31 @@ function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function QuietStat({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
+function InsightTile({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  onOpen,
+}: {
+  icon: typeof BookOpen;
+  label: string;
+  value: string;
+  hint: string;
+  onOpen: () => void;
+}) {
   return (
-    <button type="button" onClick={onOpen} className="group text-left">
-      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-zinc-500">{label}</div>
-      <div className="font-mono text-2xl text-zinc-800">{value}</div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="glass group rounded-2xl p-4 text-left transition-colors hover:bg-white/50"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-zinc-500" />
+        <span className="font-mono text-[10px] tracking-[0.18em] text-zinc-500">{label}</span>
+      </div>
+      <div className="font-mono text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
+      <div className="mt-1 text-[11px] text-zinc-500">{hint}</div>
     </button>
   );
 }

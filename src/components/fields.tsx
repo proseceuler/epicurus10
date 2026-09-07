@@ -34,6 +34,8 @@ function Menu({
   triggerRef,
   menuRef,
   minWidth,
+  maxWidth = 360,
+  width: fixedWidth,
 }: {
   open: boolean;
   children: ReactNode;
@@ -41,6 +43,8 @@ function Menu({
   triggerRef: RefObject<HTMLDivElement | null>;
   menuRef: RefObject<HTMLDivElement | null>;
   minWidth?: number;
+  maxWidth?: number;
+  width?: number;
 }) {
   const reduce = useReducedMotion();
   const [pos, setPos] = useState({ top: 0, left: 0, width: 220 });
@@ -49,8 +53,8 @@ function Menu({
     if (!open || !triggerRef.current) return;
     const place = () => {
       const r = triggerRef.current!.getBoundingClientRect();
-      const width = Math.max(r.width, minWidth ?? r.width);
-      const estH = Math.min(320, window.innerHeight * 0.5);
+      const width = fixedWidth ?? Math.min(Math.max(r.width, minWidth ?? 200), maxWidth);
+      const estH = Math.min(360, window.innerHeight * 0.55);
       let top = r.bottom + 6;
       let left = r.left;
       if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 6);
@@ -65,7 +69,7 @@ function Menu({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, triggerRef, minWidth]);
+  }, [open, triggerRef, minWidth, maxWidth, fixedWidth]);
 
   if (typeof document === 'undefined') return null;
 
@@ -75,7 +79,7 @@ function Menu({
         <motion.div
           ref={menuRef}
           className={`epic-menu fixed z-[200] ${className}`}
-          style={{ top: pos.top, left: pos.left, width: minWidth ? undefined : pos.width, minWidth: minWidth ?? pos.width }}
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
           initial={reduce ? false : { opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={reduce ? { opacity: 1 } : { opacity: 0, y: -4, scale: 0.98 }}
@@ -95,12 +99,14 @@ function FieldButton({
   children,
   className = '',
   empty,
+  trailingIcon = true,
 }: {
   onClick: () => void;
   icon?: typeof CalendarDays;
   children: ReactNode;
   className?: string;
   empty?: boolean;
+  trailingIcon?: boolean;
 }) {
   return (
     <button
@@ -108,9 +114,9 @@ function FieldButton({
       onClick={onClick}
       className={`glass-input epic-press flex h-9 w-full items-center gap-2 rounded-xl px-3 text-left text-sm ${empty ? 'text-zinc-400' : 'text-zinc-800'} ${className}`}
     >
-      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : null}
+      {!trailingIcon && Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+      {trailingIcon && Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
     </button>
   );
 }
@@ -138,8 +144,8 @@ export function Select({
       <FieldButton onClick={() => setOpen((v) => !v)} empty={!value}>
         {current}
       </FieldButton>
-      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef}>
-        <div className="epic-menu-scroll py-1">
+      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} minWidth={200} maxWidth={420}>
+        <div className="epic-menu-scroll">
           {options.map((o) => (
             <button
               key={o.value || 'empty'}
@@ -149,12 +155,12 @@ export function Select({
                 onChange(o.value);
                 setOpen(false);
               }}
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
+              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm ${
                 o.value === value ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
               }`}
             >
-              <span className="truncate">{o.label}</span>
-              {o.value === value && <Check className="h-3.5 w-3.5" />}
+              <span className="min-w-0 flex-1 break-words">{o.label}</span>
+              {o.value === value && <Check className="h-3.5 w-3.5 shrink-0" />}
             </button>
           ))}
         </div>
@@ -201,16 +207,16 @@ export function DateField({
   const first = new Date(year, month, 1).getDay();
   const days = new Date(year, month + 1, 0).getDate();
   const label = selected
-    ? selected.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    ? selected.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
     : 'Pick a date';
   const todayIso = isoFrom(new Date());
 
   return (
     <div ref={triggerRef} className={`relative ${className}`}>
-      <FieldButton onClick={() => setOpen((v) => !v)} icon={CalendarDays} empty={!value}>
+      <FieldButton onClick={() => setOpen((v) => !v)} icon={CalendarDays} empty={!value} trailingIcon>
         {label}
       </FieldButton>
-      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} minWidth={280} className="w-[17.5rem] p-3">
+      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} width={280} className="p-3">
         <div className="mb-2 flex items-center justify-between">
           <button type="button" className="epic-press rounded-lg p-1 hover:bg-zinc-100" onClick={() => setCursor(new Date(year, month - 1, 1))}>
             <ChevronLeft className="h-4 w-4 text-zinc-500" />
@@ -277,7 +283,7 @@ function joinTime(hour12: number, minute: number, pm: boolean) {
 function prettyTime(value: string) {
   if (!value) return 'Pick a time';
   const { hour12, minute, pm } = splitTime(value);
-  return `${hour12}:${pad(minute)} ${pm ? 'PM' : 'AM'}`;
+  return `${pad(hour12)}:${pad(minute)} ${pm ? 'pm' : 'am'}`;
 }
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -302,76 +308,74 @@ export function TimeField({
     if (!open) return;
     hourRef.current?.scrollIntoView({ block: 'center' });
     minuteRef.current?.scrollIntoView({ block: 'center' });
-  }, [open, parsed.hour12, parsed.minute]);
+  }, [open]);
 
-  const commit = (next: { hour12?: number; minute?: number; pm?: boolean }, close = false) => {
+  const commit = (next: { hour12?: number; minute?: number; pm?: boolean }) => {
     const hour12 = next.hour12 ?? parsed.hour12;
     const minute = next.minute ?? parsed.minute;
     const pm = next.pm ?? parsed.pm;
     onChange(joinTime(hour12, minute, pm));
-    if (close) setOpen(false);
   };
 
   return (
     <div ref={triggerRef} className={`relative ${className}`}>
-      <FieldButton onClick={() => setOpen((v) => !v)} icon={Clock} empty={!value}>
+      <FieldButton onClick={() => setOpen((v) => !v)} icon={Clock} empty={!value} trailingIcon>
         {prettyTime(value)}
       </FieldButton>
-      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} minWidth={220} className="w-[13.5rem] p-2">
-        <div className="mb-2 flex items-center justify-between gap-2 px-1">
-          <p className="text-sm font-medium tabular-nums text-zinc-800">{prettyTime(value || '09:00')}</p>
-          <div className="flex rounded-lg bg-zinc-100 p-0.5">
-            {(['AM', 'PM'] as const).map((label) => {
-              const on = label === 'PM' ? parsed.pm : !parsed.pm;
+      <Menu open={open} triggerRef={triggerRef} menuRef={menuRef} width={228} className="p-2">
+        <div className="mb-1.5 flex items-center justify-between px-1 text-sm font-medium tabular-nums text-zinc-800">
+          <span>{prettyTime(value || '09:00')}</span>
+          <Clock className="h-3.5 w-3.5 text-zinc-400" />
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          <div className="epic-time-col">
+            {HOURS.map((h) => (
+              <button
+                key={h}
+                ref={h === parsed.hour12 ? hourRef : undefined}
+                type="button"
+                onClick={() => commit({ hour12: h })}
+                className={`mx-auto flex h-7 w-10 items-center justify-center rounded-md text-xs tabular-nums ${
+                  h === parsed.hour12
+                    ? 'bg-white font-semibold text-zinc-900 ring-2 ring-zinc-900'
+                    : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                {pad(h)}
+              </button>
+            ))}
+          </div>
+          <div className="epic-time-col">
+            {MINUTES.map((m) => (
+              <button
+                key={m}
+                ref={m === parsed.minute ? minuteRef : undefined}
+                type="button"
+                onClick={() => commit({ minute: m })}
+                className={`mx-auto flex h-7 w-10 items-center justify-center rounded-md text-xs tabular-nums ${
+                  m === parsed.minute ? 'bg-zinc-900 font-semibold text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                {pad(m)}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col items-center pt-0.5">
+            {(['am', 'pm'] as const).map((label) => {
+              const on = label === 'pm' ? parsed.pm : !parsed.pm;
               return (
                 <button
                   key={label}
                   type="button"
-                  onClick={() => commit({ pm: label === 'PM' })}
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${on ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
+                  onClick={() => commit({ pm: label === 'pm' })}
+                  className={`mb-1 flex h-7 w-10 items-center justify-center rounded-md text-xs font-medium ${
+                    on ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'
+                  }`}
                 >
                   {label}
                 </button>
               );
             })}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          <div>
-            <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Hour</p>
-            <div className="epic-time-col rounded-lg bg-zinc-50">
-              {HOURS.map((h) => (
-                <button
-                  key={h}
-                  ref={h === parsed.hour12 ? hourRef : undefined}
-                  type="button"
-                  onClick={() => commit({ hour12: h })}
-                  className={`flex h-8 w-full items-center justify-center text-sm tabular-nums ${
-                    h === parsed.hour12 ? 'bg-zinc-900 font-medium text-white' : 'text-zinc-700 hover:bg-zinc-100'
-                  }`}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Min</p>
-            <div className="epic-time-col rounded-lg bg-zinc-50">
-              {MINUTES.map((m) => (
-                <button
-                  key={m}
-                  ref={m === parsed.minute ? minuteRef : undefined}
-                  type="button"
-                  onClick={() => commit({ minute: m }, true)}
-                  className={`flex h-8 w-full items-center justify-center text-sm tabular-nums ${
-                    m === parsed.minute ? 'bg-zinc-900 font-medium text-white' : 'text-zinc-700 hover:bg-zinc-100'
-                  }`}
-                >
-                  {pad(m)}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </Menu>

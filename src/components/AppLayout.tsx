@@ -1,6 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
+import { fadeMotion, motionTransition } from '@/lib/motion';
 import { getXP, xpForNextLevel } from '@/lib/xp';
 import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
 import { supabase } from '@/lib/supabase';
@@ -81,6 +83,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [badgeKanban, setBadgeKanban] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
   const [xpProgress, setXpProgress] = useState(() => xpForNextLevel());
+  const reduceMotion = useReducedMotion();
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
 
   useEffect(() => {
@@ -96,7 +99,6 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
           (t) => !t.completed && ((t.due_date && t.due_date <= today) || t.priority === 'urgent_important' || t.priority === 'high'),
         ).length;
         setBadgeTodos(openHigh);
-        // Kanban: due today/overdue or due within 3 days (not done column)
         const kb = (kanban || []).filter((k) => {
           if (!k.due_date) return false;
           if (k.status === 'done' || k.status === 'completed') return false;
@@ -125,7 +127,6 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       shortcuts = getShortcuts();
     };
     const onKey = (e: KeyboardEvent) => {
-      // ignore when typing in inputs (except mod shortcuts still often desired — allow mod)
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
       if (typing && !e.metaKey && !e.ctrlKey) return;
@@ -185,9 +186,19 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         <div className="absolute -right-24 top-1/3 h-[20rem] w-[20rem] rounded-full bg-white/70 blur-[100px]" />
       </div>
 
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key="sidebar-overlay"
+            className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+            initial={reduceMotion ? false : fadeMotion.initial}
+            animate={fadeMotion.animate}
+            exit={fadeMotion.exit}
+            transition={motionTransition(reduceMotion, 0.18)}
+          />
+        )}
+      </AnimatePresence>
 
       <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
@@ -210,7 +221,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                           ? badgeCards
                           : 0;
                   return (
-                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                      {active && (
+                        <motion.span
+                          layoutId={reduceMotion ? undefined : 'rice-nav-active'}
+                          className="absolute inset-0 rounded-xl bg-white/15"
+                          transition={motionTransition(reduceMotion, 0.22)}
+                        />
+                      )}
                       <span className="relative shrink-0">
                         <Icon className="h-4 w-4" />
                         {badge > 0 && (
@@ -219,7 +237,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                           </span>
                         )}
                       </span>
-                      <span className="rice-nav-label truncate">{item.label}</span>
+                      <span className="rice-nav-label relative truncate">{item.label}</span>
                     </button>
                   );
                 })}
@@ -231,10 +249,17 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
               type="button"
               onClick={() => navigate('settings')}
               title="Settings"
-              className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${page === 'settings' ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+              className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${page === 'settings' ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
             >
-              <SettingsIcon className="h-4 w-4 shrink-0" />
-              <span className="rice-nav-label truncate">Settings</span>
+              {page === 'settings' && (
+                <motion.span
+                  layoutId={reduceMotion ? undefined : 'rice-nav-active'}
+                  className="absolute inset-0 rounded-xl bg-white/15"
+                  transition={motionTransition(reduceMotion, 0.22)}
+                />
+              )}
+              <SettingsIcon className="relative h-4 w-4 shrink-0" />
+              <span className="rice-nav-label relative truncate">Settings</span>
             </button>
           </div>
         </div>

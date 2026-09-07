@@ -90,7 +90,7 @@ export { Select, DateField, TimeField } from '@/components/fields';
 
 export function EmptyState({ icon: Icon, title, subtitle }: { icon: LucideIcon; title: string; subtitle?: string }) {
   return (
-    <div className="epic-fade-in flex flex-col items-center justify-center py-14 text-center">
+    <div className="epic-fade-in flex flex-col items-center justify-center py-8 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl glass">
         <Icon className="h-6 w-6 text-zinc-400" />
       </div>

@@ -7,7 +7,7 @@ export function MotionOverlay({
   onClose,
   children,
   zClass = 'z-50',
-  panelClassName = 'epic-sheet max-h-[88vh] w-full max-w-md overflow-visible p-5',
+  panelClassName = 'epic-glass-sheet max-h-[88vh] w-full max-w-md overflow-visible p-5',
 }: {
   open: boolean;
   onClose?: () => void;

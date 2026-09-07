@@ -1,8 +1,9 @@
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import AppLayout, { usePageState } from '@/components/AppLayout';
+import { motionTransition, pageMotion } from '@/lib/motion';
 import DashboardPage from '@/pages/DashboardPage';
 import GradesPage from '@/pages/GradesPage';
 import ClassHubPage from '@/pages/ClassHubPage';
@@ -29,6 +30,7 @@ registerPwa();
 
 function App() {
   const [page, navigate] = usePageState();
+  const reduceMotion = useReducedMotion();
 
   const pages: Record<string, ReactNode> = {
     dashboard: <DashboardPage navigate={navigate} />,
@@ -57,10 +59,10 @@ function App() {
           <motion.div
             key={page}
             className="min-h-full"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 1 }}
-            transition={{ duration: 0 }}
+            initial={reduceMotion ? false : pageMotion.initial}
+            animate={pageMotion.animate}
+            exit={reduceMotion ? pageMotion.animate : pageMotion.exit}
+            transition={motionTransition(reduceMotion, 0.2)}
           >
             {pages[page] ?? pages.dashboard}
           </motion.div>

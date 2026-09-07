@@ -239,7 +239,16 @@ function ClassInfoTab() {
               />
             </div>
             <div className="flex min-h-[28px] items-center justify-between gap-2">
-              <a href="#timetable" className="text-[11px] text-zinc-500 hover:text-zinc-800">→ Timetable</a>
+              <button
+                type="button"
+                className="text-[11px] text-zinc-500 hover:text-zinc-800"
+                onClick={() => {
+                  const el = document.getElementById('timetable');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              >
+                → Timetable
+              </button>
               <div className="flex items-center gap-2">
                 {dirty && (
                   <button
@@ -433,7 +442,7 @@ function TimetableTab() {
   }
 
   return (
-    <div id="timetable" >
+    <div id="timetable" className="scroll-mt-4">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="text-base font-semibold text-zinc-800">Timetable</h3><button type="button" onClick={() => void syncTimetableToCalendar(entries)} className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50">Push to Calendar</button></div>
         <div className="flex gap-2">

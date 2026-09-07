@@ -6,6 +6,15 @@
   --assistant-w: 340px;
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  /* Site-wide monochrome: every painted color collapses to grayscale */
+  filter: grayscale(1);
+}
+/* Nested fixed layers (dock, modals) inherit visual grayscale via parent;
+   re-apply on portals that escape .rice-shell if needed */
+.rice-shell img,
+.rice-shell video,
+.rice-shell canvas {
+  filter: grayscale(1);
 }
 
 .rice-shell .font-mono,

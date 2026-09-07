@@ -742,3 +742,11 @@
 .epicure-tldraw .tl-color-bg {
   opacity: 1 !important;
 }
+
+
+/* grayscale force — collapse remaining chromatic utilities */
+.bg-red-500, .bg-emerald-500, .bg-blue-500, .bg-amber-500, .bg-violet-500,
+.bg-green-500, .bg-orange-500, .text-red-500, .text-emerald-600, .text-blue-500,
+.text-amber-500, .text-violet-600, .text-green-600, .border-red-500 {
+  /* visual handled by .rice-shell filter; keep specificity hooks for docs */
+}

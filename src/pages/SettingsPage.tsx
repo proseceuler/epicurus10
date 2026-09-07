@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
-import { Key, Database, Download, Check, Cpu, Smartphone } from 'lucide-react';
+import { Key, Database, Download, Check, Cpu, Smartphone, Keyboard } from 'lucide-react';
 import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
+import {
+  getShortcuts, setShortcut, resetShortcuts, formatShortcut,
+  SHORTCUT_LABELS, type ShortcutId, type ShortcutMap,
+} from '@/lib/shortcuts';
 
 const AI_MODELS = [
   { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest (free)' },
@@ -18,11 +22,35 @@ export default function SettingsPage() {
   const [tavilyKey, setTavilyKey] = useState(() => getTavilyKey());
   const [defaultModel, setDefaultModel] = useState(() => getDefaultModel() || AI_MODELS[0].value);
   const [saved, setSaved] = useState(false);
+  const [shortcuts, setShortcuts] = useState<ShortcutMap>(() => getShortcuts());
+  const [listening, setListening] = useState<ShortcutId | null>(null);
   const [sigil, setSigil] = useState(() => {
     try { return localStorage.getItem('epicure-ascii-sigil') || ''; } catch { return ''; }
   });
 
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1500); };
+
+  useEffect(() => {
+    const sync = () => setShortcuts(getShortcuts());
+    window.addEventListener('epicure-shortcuts-changed', sync);
+    return () => window.removeEventListener('epicure-shortcuts-changed', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!listening) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) return;
+      setShortcut(listening, { mod: e.metaKey || e.ctrlKey, key: e.key.toLowerCase() });
+      setListening(null);
+      flash();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [listening]);
+
+
   const updateOpenRouter = (v: string) => { setOpenRouterKey(v); saveKey(OPENROUTER_KEY, v.trim()); };
   const updateMw = (v: string) => { setMwKey(v); saveKey(MW_KEY, v.trim()); };
   const updateTavily = (v: string) => { setTavilyKey(v); saveKey(TAVILY_KEY, v.trim()); };
@@ -89,6 +117,39 @@ export default function SettingsPage() {
             <Select value={defaultModel} onChange={updateModel} options={AI_MODELS} />
           </div>
         </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Keyboard className="h-5 w-5 text-zinc-400" />
+            <h3 className="font-semibold text-zinc-800">Keyboard shortcuts</h3>
+          </div>
+          <p className="mb-4 text-xs text-zinc-400">Click a row, then press the new key combo (e.g. Ctrl+K).</p>
+          <div className="space-y-2">
+            {(Object.keys(SHORTCUT_LABELS) as ShortcutId[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setListening(id)}
+                className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  listening === id ? 'border-zinc-900 bg-zinc-100' : 'border-zinc-200/80 bg-white/60 hover:bg-white'
+                }`}
+              >
+                <span className="text-sm text-zinc-700">{SHORTCUT_LABELS[id]}</span>
+                <kbd className="rounded-md bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-800">
+                  {listening === id ? 'Press keys…' : formatShortcut(shortcuts[id])}
+                </kbd>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => { resetShortcuts(); setShortcuts(getShortcuts()); flash(); }}
+            className="mt-3 text-xs text-zinc-500 underline hover:text-zinc-800"
+          >
+            Reset to defaults
+          </button>
+        </Card>
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Database className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">Data</h3></div>
           <div className="flex items-center justify-between p-3 rounded-xl glass">

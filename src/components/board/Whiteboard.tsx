@@ -46,8 +46,19 @@ export default function Whiteboard({
   onOpenNote?: (n: Note) => void;
   onCreateNote?: (title: string) => void;
 }) {
-  const [boards, setBoards] = useState(() => loadBoards());
-  const [activeId, setActiveId] = useState(() => loadBoards()[0]?.id || '');
+  const [boards, setBoards] = useState(() => {
+    let list = loadBoards();
+    if (!list.length) {
+      const b = emptyBoard('Board 1');
+      list = [b];
+      persistBoards(list);
+    }
+    return list;
+  });
+  const [activeId, setActiveId] = useState(() => {
+    const list = loadBoards();
+    return list[0]?.id || '';
+  });
   const [bg, setBg] = useState<BgMode>('dots');
   const [editor, setEditor] = useState<Editor | null>(null);
 
@@ -288,15 +299,19 @@ export default function Whiteboard({
         </div>
       </div>
 
-      <div className="relative z-0 min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>
-        <div className="epicure-tldraw absolute inset-0 h-full w-full">
-          <Tldraw
-            key={persistenceKey}
-            shapeUtils={shapeUtils}
-            onMount={onMount}
-            inferDarkMode={false}
-            autoFocus
-          />
+      <div className="relative z-0 min-h-[420px] w-full flex-1 overflow-hidden rounded-2xl border border-zinc-200/70 shadow-sm" style={bgCss(bg)}>
+        <div className="epicure-tldraw absolute inset-0 h-full min-h-[420px] w-full">
+          {active ? (
+            <Tldraw
+              key={persistenceKey}
+              shapeUtils={shapeUtils}
+              onMount={onMount}
+              inferDarkMode={false}
+              autoFocus
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-zinc-400">No board selected</div>
+          )}
         </div>
       </div>
     </div>

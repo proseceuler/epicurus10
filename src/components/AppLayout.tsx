@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
 import { getXP, xpForNextLevel } from '@/lib/xp';
+import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
@@ -119,18 +120,35 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [currentLabel]);
 
   useEffect(() => {
+    let shortcuts: ShortcutMap = getShortcuts();
+    const syncSc = () => {
+      shortcuts = getShortcuts();
+    };
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      // ignore when typing in inputs (except mod shortcuts still often desired — allow mod)
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+      if (typing && !e.metaKey && !e.ctrlKey) return;
+
+      if (matchShortcut(e, shortcuts.search)) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      if (matchShortcut(e, shortcuts.assistant)) {
         e.preventDefault();
         setAssistantOpen((v) => !v);
         setAssistantRail(false);
+        return;
+      }
+      if (matchShortcut(e, shortcuts.inbox)) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('epicure-toggle-inbox'));
+        return;
       }
     };
     window.addEventListener('keydown', onKey);
+    window.addEventListener('epicure-shortcuts-changed', syncSc);
     const onArrodes = () => {
       setAssistantOpen(true);
       setAssistantRail(false);
@@ -138,6 +156,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     window.addEventListener('epicure-open-arrodes', onArrodes);
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('epicure-shortcuts-changed', syncSc);
       window.removeEventListener('epicure-open-arrodes', onArrodes);
     };
   }, []);
@@ -222,7 +241,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                 />
               </div>
             </div>
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes (⌘J)" aria-label="Toggle Arrodes">
+            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>

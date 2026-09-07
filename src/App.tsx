@@ -17,6 +17,7 @@ import FlashcardsPage from '@/pages/FlashcardsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import DrivePage from '@/pages/DrivePage';
 import './rice.css';
+import './styles.css';
 
 function App() {
   const [page, navigate] = usePageState();

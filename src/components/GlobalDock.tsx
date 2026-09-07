@@ -47,7 +47,6 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
   useEffect(() => {
     const onSearch = () => {
       setOpen((was) => {
-        // toggle: if already on search and open, close
         if (was && activeTab === 'search') {
           setActiveTab('main');
           return false;
@@ -56,9 +55,24 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
         return true;
       });
     };
+    const onInbox = () => {
+      setOpen((was) => {
+        if (was && activeTab === 'inbox' && !inboxDetached) {
+          setActiveTab('main');
+          return false;
+        }
+        if (inboxDetached) return was;
+        setActiveTab('inbox');
+        return true;
+      });
+    };
     window.addEventListener('epicure-toggle-search', onSearch);
-    return () => window.removeEventListener('epicure-toggle-search', onSearch);
-  }, [activeTab]);
+    window.addEventListener('epicure-toggle-inbox', onInbox);
+    return () => {
+      window.removeEventListener('epicure-toggle-search', onSearch);
+      window.removeEventListener('epicure-toggle-inbox', onInbox);
+    };
+  }, [activeTab, inboxDetached]);
 
   const openTab = (tab: DockTab) => {
     setOpen(true);

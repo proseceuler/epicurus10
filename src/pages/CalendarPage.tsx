@@ -412,7 +412,6 @@ export default function CalendarPage() {
   };
 
   const TimedCell = ({ dayIso, label }: { dayIso: string; label: string }) => {
-    const timed = eventsForDay(dayIso).filter((e) => !e.all_day && (e.start_time || '00:00').slice(0, 5) === label);
     const rowH = density === 'compact' ? 'min-h-[22px]' : 'min-h-[32px]';
     const selected = inSlotRange(dayIso, label);
     return (
@@ -443,11 +442,7 @@ export default function CalendarPage() {
           setSlotDrag(null);
           openForm(dayIso, { start, end: addOneHour(end) });
         }}
-      >
-        {timed.map((e) => (
-          <button key={e.id} type="button" draggable onDragStart={(ev) => writeDrag(ev, { kind: 'event', id: e.id })} onClick={() => openEvent(e)} className={`mb-0.5 block w-full truncate rounded px-1 text-left text-[10px] ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}>{e.start_time?.slice(0, 5)} {e.title}</button>
-        ))}
-      </div>
+      />
     );
   };
 
@@ -557,6 +552,44 @@ export default function CalendarPage() {
                         {rangeDays.map((d) => <TimedCell key={`${iso(d)}-${slot.label}`} dayIso={iso(d)} label={slot.label} />)}
                       </div>
                     ))}
+                    {rangeDays.map((d, di) => {
+                      const dayIso = iso(d);
+                      const rowH = density === 'compact' ? 22 : 32;
+                      const gridStart = 6 * 60;
+                      const gridEnd = 22 * 60;
+                      const timed = eventsForDay(dayIso).filter((e) => !e.all_day);
+                      return (
+                        <div
+                          key={`overlay-${dayIso}`}
+                          className="pointer-events-none relative"
+                          style={{ gridColumn: di + 2, gridRow: `1 / span ${slots.length}` }}
+                        >
+                          {timed.map((e) => {
+                            const start = labelToMinutes((e.start_time || '06:00').slice(0, 5));
+                            const rawEnd = e.end_time ? labelToMinutes(e.end_time.slice(0, 5)) : start + 60;
+                            const s = Math.max(gridStart, Math.min(start, gridEnd - 15));
+                            const en = Math.max(s + 15, Math.min(rawEnd <= start ? start + 60 : rawEnd, gridEnd));
+                            const top = ((s - gridStart) / stepMin) * rowH;
+                            const height = Math.max(rowH - 2, ((en - s) / stepMin) * rowH - 2);
+                            return (
+                              <button
+                                key={e.id}
+                                type="button"
+                                draggable
+                                onDragStart={(ev) => writeDrag(ev, { kind: 'event', id: e.id })}
+                                onClick={() => openEvent(e)}
+                                className={`pointer-events-auto absolute left-0.5 right-0.5 z-10 overflow-hidden rounded px-1 py-0.5 text-left text-[10px] leading-tight ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}
+                                style={{ top, height }}
+                                title={`${(e.start_time || '').slice(0, 5)}${e.end_time ? `–${e.end_time.slice(0, 5)}` : ''} ${e.title}`}
+                              >
+                                <span className="font-medium">{e.title}</span>
+                                <span className="ml-1 opacity-70">{(e.start_time || '').slice(0, 5)}{e.end_time ? `–${e.end_time.slice(0, 5)}` : ''}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -62,11 +62,29 @@ export function dueTone(due: string | null): string {
   return 'bg-emerald-50 text-emerald-700';
 }
 
+export function splitDue(due: string | null): { date: string; time: string } {
+  if (!due) return { date: '', time: '' };
+  const date = due.slice(0, 10);
+  const timeMatch = due.match(/T(\d{2}:\d{2})/);
+  return { date, time: timeMatch ? timeMatch[1] : '' };
+}
+
+export function joinDue(date: string, time: string) {
+  if (!date) return null;
+  return time ? `${date}T${time}` : date;
+}
+
 export function formatDue(due: string) {
-  return new Date(due + (due.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-US', {
+  const { date, time } = splitDue(due);
+  const label = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
+  if (!time) return label;
+  const [hs, ms] = time.split(':').map(Number);
+  const h = hs % 12 || 12;
+  const ap = hs >= 12 ? 'PM' : 'AM';
+  return `${label}, ${h}:${String(ms).padStart(2, '0')} ${ap}`;
 }
 
 export function isImageUrl(url: string) {

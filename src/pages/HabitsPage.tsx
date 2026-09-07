@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MotionSwap } from '@/components/MotionUI';
+import { Select } from '@/components/kit';
 import { supabase } from '@/lib/supabase';
 import type { Habit, HabitCompletion } from '@/lib/types';
 import { HomeView, TrackView, DashView, InsightsView, type View } from '@/components/habits/views';
@@ -128,12 +129,8 @@ export default function HabitsPage() {
           {VIEWS.map((v) => (
             <button key={v.id} type="button" onClick={() => setView(v.id)} className={`epic-press rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
           ))}
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
-            {MONTHS.map((m, i) => <option key={m} value={i}>{m.slice(0, 3)}</option>)}
-          </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <Select className="w-[5.5rem]" value={String(month)} onChange={(v) => setMonth(Number(v))} options={MONTHS.map((m, i) => ({ value: String(i), label: m.slice(0, 3) }))} />
+          <Select className="w-[4.5rem]" value={String(year)} onChange={(v) => setYear(Number(v))} options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
       </div>
       <MotionSwap id={view}>

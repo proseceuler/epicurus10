@@ -7,6 +7,7 @@ import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
 import { upsertLinkedCalendarEvent, deleteCalendarEvent } from '@/lib/calendarStore';
 import { parseNaturalWhen } from '@/lib/parseWhen';
 import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
+import { MotionOverlay } from '@/components/MotionUI';
 import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag, Pencil } from 'lucide-react';
 
 const PRIORITY_CONFIG = {
@@ -111,28 +112,48 @@ export default function TodosPage() {
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => !t.completed).length}</div><div className="text-xs text-zinc-500">Pending</div></Card>
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => t.completed).length}</div><div className="text-xs text-zinc-500">Completed</div></Card>
       </div>
-      {showForm && (
-        <Card className="p-4 mb-6">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="sm:col-span-2"><label className="text-xs font-medium text-zinc-500 mb-1 block">Title</label><Input value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Chemistry Exam 2pm to 4pm on Sept 17" /></div>
-            <div><label className="text-xs font-medium text-zinc-500 mb-1 block">Subject</label><Select value={form.subject_key} onChange={(v) => setForm({ ...form, subject_key: v })} options={[{ value: '', label: 'None' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.shortName }))]} /></div>
-            <div><label className="text-xs font-medium text-zinc-500 mb-1 block">Due Date</label><Input value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} type="date" /></div>
-            <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-zinc-600"><input type="checkbox" checked={form.all_day} onChange={(e) => setForm({ ...form, all_day: e.target.checked })} /> All day</label>
-              {!form.all_day && (<><Input value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} type="time" /><Input value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} type="time" /></>)}
+      <MotionOverlay open={showForm} onClose={() => { setShowForm(false); setEditing(null); }}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-semibold text-zinc-800">{editing ? 'Edit task' : 'New task'}</h3>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Title</label>
+            <Input value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Chemistry Exam 2pm to 4pm on Sept 17" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Subject</label>
+              <Select value={form.subject_key} onChange={(v) => setForm({ ...form, subject_key: v })} options={[{ value: '', label: 'None' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.shortName }))]} />
             </div>
-            <div className="sm:col-span-2 lg:col-span-4">
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Priority</label>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                {(Object.keys(PRIORITY_CONFIG) as PriorityKey[]).map((key) => (
-                  <button key={key} onClick={() => setForm({ ...form, priority: key })} className={`px-3 py-2 rounded-xl text-xs font-medium border text-left ${form.priority === key ? 'bg-zinc-900 text-white border-zinc-900' : 'glass text-zinc-600 border-transparent'}`}><Flag className="w-3 h-3 inline mr-1" />{PRIORITY_CONFIG[key].short}</button>
-                ))}
-              </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Due date</label>
+              <Input value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} type="date" />
             </div>
           </div>
-          <div className="flex gap-2 mt-3"><Button onClick={saveTodo} size="sm">{editing ? 'Save changes' : 'Add Task'}</Button><Button onClick={() => { setShowForm(false); setEditing(null); }} variant="ghost" size="sm">Cancel</Button></div>
-        </Card>
-      )}
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
+            <input type="checkbox" checked={form.all_day} onChange={(e) => setForm({ ...form, all_day: e.target.checked })} /> All day
+          </label>
+          {!form.all_day && (
+            <div className="grid grid-cols-2 gap-3">
+              <Input value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} type="time" />
+              <Input value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} type="time" />
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Priority</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(PRIORITY_CONFIG) as PriorityKey[]).map((key) => (
+                <button key={key} type="button" onClick={() => setForm({ ...form, priority: key })} className={`rounded-xl border px-3 py-2 text-left text-xs font-medium ${form.priority === key ? 'border-zinc-900 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'}`}><Flag className="mr-1 inline h-3 w-3" />{PRIORITY_CONFIG[key].short}</button>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button onClick={() => { setShowForm(false); setEditing(null); }} variant="ghost" size="sm">Cancel</Button>
+            <Button onClick={saveTodo} size="sm">{editing ? 'Save changes' : 'Add Task'}</Button>
+          </div>
+        </div>
+      </MotionOverlay>
       <div className="flex flex-wrap gap-2 mb-4">
         {(['all', 'active', 'completed'] as Filter[]).map((f) => (
           <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-xl text-sm font-medium capitalize ${filter === f ? 'bg-zinc-900 text-white' : 'glass text-zinc-600'}`}>{f}</button>

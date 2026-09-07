@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
 import { Search, FileText, CheckSquare, BookOpen, X } from 'lucide-react';
 import { SUBJECTS } from '@/lib/types';
+import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
 
 type Hit = {
   id: string;
@@ -27,6 +29,7 @@ export default function GlobalSearch({
   const [notes, setNotes] = useState<{ id: string; title: string; content: string; folder: string }[]>([]);
   const [todos, setTodos] = useState<{ id: string; title: string; completed: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,8 +71,6 @@ export default function GlobalSearch({
     return out.slice(0, 40);
   }, [q, notes, todos]);
 
-  if (!open) return null;
-
   const icon = (k: Hit['kind']) => (k === 'note' ? FileText : k === 'todo' ? CheckSquare : BookOpen);
 
   const list = (
@@ -87,7 +88,7 @@ export default function GlobalSearch({
           <button
             key={`${h.kind}-${h.id}`}
             type="button"
-            className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-zinc-100/80"
+            className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 hover:bg-zinc-100/80"
             onClick={() => {
               navigate(h.page);
               onClose();
@@ -106,6 +107,7 @@ export default function GlobalSearch({
   );
 
   if (mode === 'dock') {
+    if (!open) return null;
     return (
       <div className="w-[min(92vw,22rem)] overflow-hidden rounded-xl bg-white/95">
         <div className="flex items-center gap-2 border-b border-zinc-200/70 px-2 py-2">
@@ -124,7 +126,7 @@ export default function GlobalSearch({
               }
             }}
           />
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+          <button type="button" onClick={onClose} className="epic-press rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -134,30 +136,49 @@ export default function GlobalSearch({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-zinc-900/30 px-4 pt-[12vh] backdrop-blur-sm" onClick={onClose}>
-      <div className="glass w-full max-w-lg overflow-hidden rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2 border-b border-zinc-200/70 px-3 py-2.5">
-          <Search className="h-4 w-4 text-zinc-400" />
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search notes, tasks, classes…"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose();
-              if (e.key === 'Enter' && hits[0]) {
-                navigate(hits[0].page);
-                onClose();
-              }
-            }}
-          />
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {list}
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="search-overlay"
+          className="fixed inset-0 z-[80] flex items-start justify-center bg-zinc-900/30 px-4 pt-[12vh] backdrop-blur-sm"
+          onClick={onClose}
+          initial={reduceMotion ? false : fadeMotion.initial}
+          animate={fadeMotion.animate}
+          exit={fadeMotion.exit}
+          transition={motionTransition(reduceMotion, 0.18)}
+        >
+          <motion.div
+            className="glass w-full max-w-lg overflow-hidden rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            initial={reduceMotion ? false : sheetMotion.initial}
+            animate={sheetMotion.animate}
+            exit={sheetMotion.exit}
+            transition={motionTransition(reduceMotion, 0.2)}
+          >
+            <div className="flex items-center gap-2 border-b border-zinc-200/70 px-3 py-2.5">
+              <Search className="h-4 w-4 text-zinc-400" />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search notes, tasks, classes…"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') onClose();
+                  if (e.key === 'Enter' && hits[0]) {
+                    navigate(hits[0].page);
+                    onClose();
+                  }
+                }}
+              />
+              <button type="button" onClick={onClose} className="epic-press rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {list}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

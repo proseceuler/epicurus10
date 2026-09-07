@@ -26,6 +26,12 @@ export const fadeMotion = {
   exit: { opacity: 0 },
 };
 
+export const listItemMotion = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -4 },
+};
+
 export function motionTransition(reduce: boolean | null | undefined, seconds = dur.ui): Transition {
   if (reduce) return { duration: 0 };
   return { duration: seconds, ease: easeSoft };

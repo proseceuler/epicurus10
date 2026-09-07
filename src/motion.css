@@ -33,6 +33,10 @@
   100% { background-position: 0 0; }
 }
 
+.epic-flip-wrap {
+  perspective: 900px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

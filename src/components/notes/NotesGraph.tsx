@@ -42,9 +42,9 @@ function classifyNote(n: Note): NodeKind {
 
 const KIND_COLOR: Record<NodeKind, string> = {
   index: '#18181b',
-  daily: '#52525b',
+  daily: '#2563eb',
   topic: '#3f3f46',
-  board: '#71717a',
+  board: '#c2410c',
 };
 
 const KIND_LABEL: Record<NodeKind, string> = {
@@ -254,7 +254,7 @@ export default function NotesGraph({
   void degree;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200/70 bg-zinc-50/80 film-grain">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap gap-2">
         {(Object.keys(KIND_COLOR) as NodeKind[]).map((k) => (
           <span
@@ -277,7 +277,7 @@ export default function NotesGraph({
       >
         <defs>
           <filter id="hubGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#18181b" floodOpacity="0.25" />
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.35" />
           </filter>
         </defs>
 
@@ -297,16 +297,16 @@ export default function NotesGraph({
               key={i}
               d={`M ${s.x} ${s.y} Q ${midX} ${midY} ${t.x} ${t.y}`}
               fill="none"
-              stroke={dim ? 'rgba(24,24,27,0.04)' : 'rgba(24,24,27,0.22)'}
-              strokeWidth={dim ? 0.8 : 1.4 + Math.min(2, l.strength)}
-              strokeOpacity={dim ? 0.35 : 1}
+              stroke={dim ? 'rgba(24,24,27,0.06)' : 'rgba(24,24,27,0.45)'}
+              strokeWidth={dim ? 1 : 1.8 + Math.min(2.5, l.strength)}
+              strokeOpacity={dim ? 0.4 : 1}
             />
           );
         })}
 
         {nodesRef.current.map((n) => {
           if (n.x == null || n.y == null) return null;
-          const r = 8 + Math.sqrt(n.degree + 1) * 3.2;
+          const r = 11 + Math.sqrt(n.degree + 1) * 4.2;
           const isFocus = focusId === n.id;
           const isNeighbor = focusId ? neighbors.get(focusId)?.has(n.id) : false;
           const dim = focusId && !isFocus && !isNeighbor;
@@ -316,7 +316,7 @@ export default function NotesGraph({
               key={n.id}
               transform={`translate(${n.x},${n.y})`}
               className="cursor-pointer"
-              opacity={dim ? 0.22 : 1}
+              opacity={dim ? 0.28 : 1}
               filter={n.degree >= 3 ? 'url(#hubGlow)' : undefined}
               onPointerEnter={() => setHoverId(n.id)}
               onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))}
@@ -347,7 +347,7 @@ export default function NotesGraph({
                 y={r + 12}
                 textAnchor="middle"
                 fontSize={11}
-                fill={dim ? '#a1a1aa' : '#3f3f46'}
+                fill={dim ? '#a1a1aa' : '#18181b'}
                 style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}
               >
                 {n.label.length > 18 ? `${n.label.slice(0, 16)}…` : n.label}

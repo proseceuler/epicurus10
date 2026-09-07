@@ -719,9 +719,17 @@
   box-shadow: 0 8px 28px rgba(24, 24, 27, 0.1) !important;
   backdrop-filter: blur(10px);
 }
-.epicure-tldraw .tlui-button {
-  color: #18181b !important;
+.epicure-tldraw .tlui-button:not([data-testid*="color"]) {
+  color: #18181b;
 }
 .epicure-tldraw .tlui-button__icon {
-  color: #18181b !important;
+  color: inherit;
+}
+/* keep style-panel color swatches showing real fills */
+.epicure-tldraw .tlui-style-panel button[style*="background"],
+.epicure-tldraw .tlui-button[style*="background"] {
+  background-color: inherit !important;
+}
+.epicure-tldraw .tl-color-bg {
+  opacity: 1 !important;
 }

@@ -48,7 +48,7 @@ export type ChartShape = TLBaseShape<
   }
 >;
 
-const COLORS = ['#18181b', '#3f3f46', '#52525b', '#71717a', '#a1a1aa', '#d4d4d8', '#27272a', '#09090b'];
+const COLORS = ['#1971c2', '#e03131', '#2f9e44', '#f59f00', '#7048e8', '#f76707', '#0ca678', '#d6336c'];
 
 const KINDS: { id: ChartKind; label: string }[] = [
   { id: 'area', label: 'Area' },
@@ -139,7 +139,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="value" stroke="#1971c2" strokeWidth={2.5} dot={{ r: 3, fill: '#1971c2' }} />
           </LineChart>
         );
       }
@@ -150,7 +150,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <Tooltip />
-            <Area type="monotone" dataKey="value" stroke="#18181b" fill="rgba(24,24,27,0.18)" strokeWidth={2} />
+            <Area type="monotone" dataKey="value" stroke="#1971c2" fill="rgba(25,113,194,0.25)" strokeWidth={2.5} />
           </AreaChart>
         );
       }
@@ -161,7 +161,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} width={40} />
             <Tooltip />
-            <Bar dataKey="value" fill="#18181b" radius={[0, 3, 3, 0]} />
+            <Bar dataKey="value" fill="#1971c2" radius={[0, 3, 3, 0]} />
           </BarChart>
         );
       }
@@ -172,7 +172,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <Tooltip />
-            <Bar dataKey="value" fill="#18181b" radius={k === 'histogram' ? 0 : [3, 3, 0, 0]} barSize={k === 'histogram' ? 28 : undefined} />
+            <Bar dataKey="value" fill={k === 'histogram' ? '#7048e8' : '#1971c2'} radius={k === 'histogram' ? 0 : [3, 3, 0, 0]} barSize={k === 'histogram' ? 28 : undefined} />
           </BarChart>
         );
       }
@@ -184,7 +184,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <YAxis type="number" dataKey="y" name="y" tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <ZAxis range={[60, 60]} />
             <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-            <Scatter data={rows} fill="#18181b" />
+            <Scatter data={rows} fill="#e03131" />
           </ScatterChart>
         );
       }

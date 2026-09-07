@@ -179,7 +179,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [navigate]);
 
   return (
-    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''} ${page === 'notes' ? 'rice-shell--color' : 'rice-shell--mono'}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
+    <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''} ${page === 'notes' ? 'rice-shell--notes' : 'rice-shell--mono'}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
       <div className="film-grain" aria-hidden />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />
@@ -287,11 +287,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">
-          <div className={page === 'dashboard' ? 'mx-auto w-full max-w-6xl' : 'contents'}>
-            {children}
-          </div>
-        </main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
       </div>
 
       <GlobalAssistant

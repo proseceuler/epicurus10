@@ -232,7 +232,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                       <span className="relative shrink-0">
                         <Icon className="h-4 w-4" />
                         {badge > 0 && (
-                          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                          <span className="chrome-badge absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-600 px-0.5 text-[9px] font-bold text-white">
                             {badge > 9 ? '9+' : badge}
                           </span>
                         )}

@@ -391,14 +391,6 @@ export default function GlobalDock({ navigate, page }: { navigate: (p: PageId) =
                 <Plus className="h-6 w-6 transition-transform duration-200" />
               )}
             </motion.button>
-                className={
-                    ? 'relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-transform active:scale-95'
-                    : 'relative flex h-14 w-14 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800 transition-transform active:scale-95') +
-                }
-              >
-                <Bot className="h-5 w-5" />
-              </motion.button>
-            )}
           </div>
         </div>
       </div>

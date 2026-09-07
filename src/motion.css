@@ -37,12 +37,32 @@
   perspective: 900px;
 }
 
-.epic-popover {
-  isolation: isolate;
-  overflow: hidden;
+/* Solid sheets — no glass border / blur stack (that hairline). */
+.epic-popover,
+.epic-menu,
+.epic-sheet {
   background: #fff;
-  border: 1px solid rgba(24, 24, 27, 0.08);
-  box-shadow: 0 12px 40px rgba(24, 24, 27, 0.1), 0 2px 8px rgba(24, 24, 27, 0.04);
+  background-clip: padding-box;
+  border: 0 !important;
+  outline: none;
+  isolation: auto;
+  overflow: visible;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.12);
+}
+
+.epic-popover {
+  border-radius: 1.25rem;
+}
+
+.epic-menu {
+  border-radius: 0.9rem;
+}
+
+.epic-sheet {
+  border-radius: 1.25rem;
+  box-shadow: 0 24px 64px rgba(24, 24, 27, 0.18);
 }
 
 select.glass-input,

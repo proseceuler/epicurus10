@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSession } from '@/lib/types';
 import { Card, PageHeader, EmptyState } from '@/components/kit';
+import { MotionSwap } from '@/components/MotionUI';
 import { BarChart3, Clock, Flame, Target } from 'lucide-react';
 
 export default function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
@@ -94,6 +95,7 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
         </div>
       </div>
 
+      <MotionSwap id={range}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -183,6 +185,7 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
           )}
         </Card>
       </div>
+      </MotionSwap>
     </div>
   );
 }

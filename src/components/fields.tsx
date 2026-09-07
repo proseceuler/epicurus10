@@ -170,6 +170,7 @@ export function Select({
 }
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const WEEKDAYS_LONG = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function isoFrom(d: Date) {
   const y = d.getFullYear();
@@ -183,6 +184,83 @@ function parseIso(value: string) {
   const [y, m, d] = value.split('-').map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d);
+}
+
+export function DateGrid({
+  value,
+  onChange,
+  cursor,
+  onCursor,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  cursor?: Date;
+  onCursor?: (d: Date) => void;
+}) {
+  const selected = parseIso(value);
+  const [localCursor, setLocalCursor] = useState(() => selected ?? new Date());
+  const view = cursor ?? localCursor;
+  const setView = (d: Date) => {
+    setLocalCursor(d);
+    onCursor?.(d);
+  };
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const first = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const todayIso = isoFrom(new Date());
+  const prevDays = new Date(year, month, 0).getDate();
+  const cells: { iso: string; day: number; muted: boolean }[] = [];
+  for (let i = first - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1, prevDays - i);
+    cells.push({ iso: isoFrom(d), day: d.getDate(), muted: true });
+  }
+  for (let day = 1; day <= days; day++) {
+    cells.push({ iso: isoFrom(new Date(year, month, day)), day, muted: false });
+  }
+  let nextDay = 1;
+  while (cells.length % 7 !== 0) {
+    const d = new Date(year, month + 1, nextDay++);
+    cells.push({ iso: isoFrom(d), day: d.getDate(), muted: true });
+  }
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-0.5">
+          <button type="button" className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100" onClick={() => setView(new Date(year - 1, month, 1))}>«</button>
+          <button type="button" className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100" onClick={() => setView(new Date(year, month - 1, 1))}><ChevronLeft className="h-4 w-4" /></button>
+        </div>
+        <p className="text-sm font-semibold text-zinc-800">
+          {view.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </p>
+        <div className="flex items-center gap-0.5">
+          <button type="button" className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100" onClick={() => setView(new Date(year, month + 1, 1))}><ChevronRight className="h-4 w-4" /></button>
+          <button type="button" className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100" onClick={() => setView(new Date(year + 1, month, 1))}>»</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-y-1">
+        {WEEKDAYS_LONG.map((d) => (
+          <div key={d} className="py-1 text-center text-[10px] font-medium text-zinc-400">{d}</div>
+        ))}
+        {cells.map((c) => {
+          const active = c.iso === value;
+          const isToday = c.iso === todayIso;
+          return (
+            <button
+              key={c.iso + (c.muted ? '-m' : '')}
+              type="button"
+              onClick={() => onChange(c.iso)}
+              className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs ${
+                active ? 'bg-zinc-900 text-white' : isToday ? 'bg-zinc-200 font-medium text-zinc-900' : c.muted ? 'text-zinc-300 hover:bg-zinc-50' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              {c.day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function DateField({

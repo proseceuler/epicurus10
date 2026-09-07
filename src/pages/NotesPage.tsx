@@ -203,7 +203,7 @@ function NotesVault({
   const [search, setSearch] = useState('');
   const [activeFolder, setActiveFolder] = useState('All');
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState<Note | null>(null);
   const [linkPicker, setLinkPicker] = useState(false);
   const [showNew, setShowNew] = useState(false);

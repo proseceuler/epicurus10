@@ -10,8 +10,9 @@ import {
 } from 'd3-force';
 import { loadBoards, BOARDS_CHANGED } from '@/lib/board-store';
 import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle } from '@/lib/wiki';
+import { findBoardByName } from '@/lib/board-store';
 import type { Note } from '@/lib/types';
-import { findBoardByName as findBoard } from '@/lib/board-store';
+import { Palette } from 'lucide-react';
 
 type NodeKind = 'index' | 'daily' | 'topic' | 'board';
 
@@ -28,6 +29,35 @@ type GLink = SimulationLinkDatum<GNode> & {
   strength: number;
 };
 
+type GraphColors = Record<NodeKind, string>;
+
+const DEFAULT_COLORS: GraphColors = {
+  index: '#18181b',
+  daily: '#2563eb',
+  topic: '#3f3f46',
+  board: '#c2410c',
+};
+
+const COLOR_KEY = 'epicure:graph-colors';
+
+function loadColors(): GraphColors {
+  try {
+    const raw = localStorage.getItem(COLOR_KEY);
+    if (raw) return { ...DEFAULT_COLORS, ...JSON.parse(raw) };
+  } catch {
+    /* ignore */
+  }
+  return { ...DEFAULT_COLORS };
+}
+
+function saveColors(c: GraphColors) {
+  try {
+    localStorage.setItem(COLOR_KEY, JSON.stringify(c));
+  } catch {
+    /* ignore */
+  }
+}
+
 function classifyNote(n: Note): NodeKind {
   const title = (n.title || '').trim();
   const folder = (n.folder || '').toLowerCase();
@@ -39,13 +69,6 @@ function classifyNote(n: Note): NodeKind {
   }
   return 'topic';
 }
-
-const KIND_COLOR: Record<NodeKind, string> = {
-  index: '#18181b',
-  daily: '#2563eb',
-  topic: '#3f3f46',
-  board: '#c2410c',
-};
 
 const KIND_LABEL: Record<NodeKind, string> = {
   index: 'Index',
@@ -72,12 +95,17 @@ export default function NotesGraph({
   const [boards, setBoards] = useState(() => (typeof window === 'undefined' ? [] : loadBoards()));
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
+  const [colors, setColors] = useState<GraphColors>(() =>
+    typeof window === 'undefined' ? DEFAULT_COLORS : loadColors(),
+  );
+  const [colorOpen, setColorOpen] = useState(false);
+  const [, setTick] = useState(0);
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<ReturnType<typeof forceSimulation<GNode>> | null>(null);
   const nodesRef = useRef<GNode[]>([]);
   const linksRef = useRef<GLink[]>([]);
   const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
+  const sizeRef = useRef({ w: 900, h: 560 });
   const [size, setSize] = useState({ w: 900, h: 560 });
 
   useEffect(() => {
@@ -86,18 +114,37 @@ export default function NotesGraph({
     return () => window.removeEventListener(BOARDS_CHANGED, on);
   }, []);
 
+  // Debounced size — ignore assistant/sidebar micro-resizes that used to restart the sim
   useEffect(() => {
     const el = svgRef.current?.parentElement;
     if (!el) return;
+    let t: number | null = null;
     const ro = new ResizeObserver((entries) => {
       const r = entries[0]?.contentRect;
-      if (r) setSize({ w: Math.max(320, r.width), h: Math.max(360, r.height) });
+      if (!r) return;
+      if (t) window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const next = { w: Math.max(320, Math.round(r.width)), h: Math.max(360, Math.round(r.height)) };
+        const prev = sizeRef.current;
+        if (Math.abs(prev.w - next.w) < 40 && Math.abs(prev.h - next.h) < 40) return;
+        sizeRef.current = next;
+        setSize(next);
+      }, 180);
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      if (t) window.clearTimeout(t);
+      ro.disconnect();
+    };
   }, []);
 
-  const { nodes, links, degree } = useMemo(() => {
+  const topologyKey = useMemo(() => {
+    const noteIds = notes.map((n) => n.id).join(',');
+    const boardIds = boards.map((b) => b.id).join(',');
+    return `${noteIds}|${boardIds}|${notes.map((n) => (n.content || '').length).join(',')}`;
+  }, [notes, boards]);
+
+  const { nodes, links } = useMemo(() => {
     const ns: GNode[] = [
       ...notes.map((n) => ({
         id: n.id,
@@ -115,22 +162,20 @@ export default function NotesGraph({
     const idSet = new Set(ns.map((n) => n.id));
     const ls: GLink[] = [];
     const deg = new Map<string, number>();
-
     const bump = (a: string, b: string) => {
       deg.set(a, (deg.get(a) || 0) + 1);
       deg.set(b, (deg.get(b) || 0) + 1);
     };
-
     for (const n of notes) {
-      for (const t of wikiLinkTitles(n.content || '')) {
-        const dest = findNoteByTitle(notes, t);
+      for (const title of wikiLinkTitles(n.content || '')) {
+        const dest = findNoteByTitle(notes, title);
         if (dest && idSet.has(dest.id)) {
           ls.push({ source: n.id, target: dest.id, strength: 1 });
           bump(n.id, dest.id);
         }
       }
-      for (const t of wikiBoardTitles(n.content || '')) {
-        const b = findBoard(boards, t);
+      for (const title of wikiBoardTitles(n.content || '')) {
+        const b = findBoardByName(boards, title);
         if (b) {
           const bid = `board:${b.id}`;
           if (idSet.has(bid)) {
@@ -140,42 +185,56 @@ export default function NotesGraph({
         }
       }
     }
-
     for (const n of ns) n.degree = deg.get(n.id) || 0;
-    return { nodes: ns, links: ls, degree: deg };
-  }, [notes, boards]);
+    return { nodes: ns, links: ls };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topologyKey]);
 
+  // Build simulation only when topology changes (not on every sidebar resize)
   useEffect(() => {
-    nodesRef.current = nodes.map((n) => ({ ...n }));
+    const prevPos = new Map(nodesRef.current.map((n) => [n.id, { x: n.x, y: n.y }]));
+    nodesRef.current = nodes.map((n) => {
+      const p = prevPos.get(n.id);
+      return p?.x != null ? { ...n, x: p.x, y: p.y } : { ...n };
+    });
     linksRef.current = links.map((l) => ({ ...l }));
     simRef.current?.stop();
+    const { w, h } = sizeRef.current;
     const sim = forceSimulation<GNode>(nodesRef.current)
       .force(
         'link',
         forceLink<GNode, GLink>(linksRef.current)
           .id((d) => d.id)
-          .distance((l) => 80 + 40 / Math.max(1, l.strength))
-          .strength(0.35),
+          .distance(90)
+          .strength(0.4),
       )
-      .force('charge', forceManyBody().strength(-180))
-      .force('center', forceCenter(size.w / 2, size.h / 2))
+      .force('charge', forceManyBody().strength(-220))
+      .force('center', forceCenter(w / 2, h / 2))
       .force(
         'collide',
-        forceCollide<GNode>().radius((d) => 12 + Math.sqrt(d.degree + 1) * 6),
+        forceCollide<GNode>().radius((d) => 14 + Math.sqrt(d.degree + 1) * 5),
       )
-      .alpha(0.9)
-      .on('tick', () => setTick((t) => t + 1));
+      .alpha(0.85)
+      .on('tick', () => setTick((x) => x + 1));
     simRef.current = sim;
     return () => {
       sim.stop();
     };
-  }, [nodes, links, size.w, size.h]);
+  }, [nodes, links]);
+
+  // Gentle re-center when size changes a lot — do not rebuild nodes
+  useEffect(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    sim.force('center', forceCenter(size.w / 2, size.h / 2));
+    sim.alpha(0.2).restart();
+  }, [size.w, size.h]);
 
   const neighbors = useMemo(() => {
     const m = new Map<string, Set<string>>();
     for (const l of links) {
-      const s = typeof l.source === 'string' ? l.source : l.source.id;
-      const t = typeof l.target === 'string' ? l.target : l.target.id;
+      const s = typeof l.source === 'string' ? l.source : (l.source as GNode).id;
+      const t = typeof l.target === 'string' ? l.target : (l.target as GNode).id;
       if (!m.has(s)) m.set(s, new Set());
       if (!m.has(t)) m.set(t, new Set());
       m.get(s)!.add(t);
@@ -189,13 +248,11 @@ export default function NotesGraph({
   const onPointerDown = (e: React.PointerEvent, id: string) => {
     e.stopPropagation();
     const node = nodesRef.current.find((n) => n.id === id);
-    if (!node) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const pt = svg.createSVGPoint();
+    if (!node || !svgRef.current) return;
+    const pt = svgRef.current.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
-    const ctm = svg.getScreenCTM();
+    const ctm = svgRef.current.getScreenCTM();
     if (!ctm) return;
     const local = pt.matrixTransform(ctm.inverse());
     dragRef.current = { id, dx: local.x - (node.x || 0), dy: local.y - (node.y || 0) };
@@ -205,20 +262,18 @@ export default function NotesGraph({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const pt = svg.createSVGPoint();
+    if (!dragRef.current || !svgRef.current) return;
+    const pt = svgRef.current.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
-    const ctm = svg.getScreenCTM();
+    const ctm = svgRef.current.getScreenCTM();
     if (!ctm) return;
     const local = pt.matrixTransform(ctm.inverse());
     const node = nodesRef.current.find((n) => n.id === dragRef.current!.id);
     if (!node) return;
     node.fx = local.x - dragRef.current.dx;
     node.fy = local.y - dragRef.current.dy;
-    simRef.current?.alpha(0.3).restart();
+    simRef.current?.alpha(0.25).restart();
   };
 
   const onPointerUp = () => {
@@ -233,7 +288,6 @@ export default function NotesGraph({
 
   const openNode = useCallback(
     (id: string) => {
-      setSelectedId(id);
       if (id.startsWith('board:')) {
         const node = nodesRef.current.find((n) => n.id === id);
         const name = safeLabel(node?.label, '');
@@ -246,26 +300,69 @@ export default function NotesGraph({
     [notes, onOpenBoard, onOpenNote],
   );
 
+  const setKindColor = (kind: NodeKind, hex: string) => {
+    setColors((prev) => {
+      const next = { ...prev, [kind]: hex };
+      saveColors(next);
+      return next;
+    });
+  };
+
   const selectedNode = selectedId ? nodesRef.current.find((n) => n.id === selectedId) : null;
   const selectedNote = selectedId && !selectedId.startsWith('board:') ? notes.find((n) => n.id === selectedId) : null;
 
-  // silence unused tick (drives re-render)
-  void tick;
-  void degree;
-
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-      <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap gap-2">
-        {(Object.keys(KIND_COLOR) as NodeKind[]).map((k) => (
+      <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
+        {(Object.keys(KIND_LABEL) as NodeKind[]).map((k) => (
           <span
             key={k}
-            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm"
           >
-            <span className="h-2 w-2 rounded-full" style={{ background: KIND_COLOR[k] }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[k] }} />
             {KIND_LABEL[k]}
           </span>
         ))}
+        <button
+          type="button"
+          onClick={() => setColorOpen((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50"
+          title="Customize colors"
+        >
+          <Palette className="h-3 w-3" /> Colors
+        </button>
       </div>
+
+      {colorOpen && (
+        <div className="absolute left-3 top-12 z-20 w-56 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
+          <p className="mb-2 text-[11px] font-semibold text-zinc-700">Node colors</p>
+          {(Object.keys(KIND_LABEL) as NodeKind[]).map((k) => (
+            <label key={k} className="mb-2 flex items-center justify-between gap-2 text-xs text-zinc-600">
+              <span>{KIND_LABEL[k]}</span>
+              <input
+                type="color"
+                value={colors[k]}
+                onChange={(e) => setKindColor(k, e.target.value)}
+                className="h-7 w-10 cursor-pointer rounded border border-zinc-200 bg-transparent p-0"
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            className="mt-1 w-full rounded-lg bg-zinc-100 py-1 text-[11px] text-zinc-600 hover:bg-zinc-200"
+            onClick={() => {
+              setColors(DEFAULT_COLORS);
+              saveColors(DEFAULT_COLORS);
+            }}
+          >
+            Reset defaults
+          </button>
+        </div>
+      )}
+
+      <p className="pointer-events-none absolute right-3 top-3 z-10 text-[10px] text-zinc-400">
+        Drag to move · double-click to open
+      </p>
 
       <svg
         ref={svgRef}
@@ -274,10 +371,14 @@ export default function NotesGraph({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onClick={() => {
+          setSelectedId(null);
+          setColorOpen(false);
+        }}
       >
         <defs>
           <filter id="hubGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.35" />
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.3" />
           </filter>
         </defs>
 
@@ -287,19 +388,20 @@ export default function NotesGraph({
           if (!s || !t || s.x == null || t.x == null) return null;
           const midX = (s.x! + t.x!) / 2;
           const midY = (s.y! + t.y!) / 2 - 18;
-          const sId = s.id;
-          const tId = t.id;
           const active =
-            !focusId || focusId === sId || focusId === tId || neighbors.get(focusId)?.has(sId) || neighbors.get(focusId)?.has(tId);
-          const dim = focusId && !active;
+            !focusId ||
+            focusId === s.id ||
+            focusId === t.id ||
+            neighbors.get(focusId)?.has(s.id) ||
+            neighbors.get(focusId)?.has(t.id);
+          const dim = Boolean(focusId && !active);
           return (
             <path
               key={i}
               d={`M ${s.x} ${s.y} Q ${midX} ${midY} ${t.x} ${t.y}`}
               fill="none"
-              stroke={dim ? 'rgba(24,24,27,0.06)' : 'rgba(24,24,27,0.45)'}
-              strokeWidth={dim ? 1 : 1.8 + Math.min(2.5, l.strength)}
-              strokeOpacity={dim ? 0.4 : 1}
+              stroke={dim ? 'rgba(24,24,27,0.08)' : 'rgba(24,24,27,0.42)'}
+              strokeWidth={dim ? 1 : 1.8}
             />
           );
         })}
@@ -309,8 +411,8 @@ export default function NotesGraph({
           const r = 11 + Math.sqrt(n.degree + 1) * 4.2;
           const isFocus = focusId === n.id;
           const isNeighbor = focusId ? neighbors.get(focusId)?.has(n.id) : false;
-          const dim = focusId && !isFocus && !isNeighbor;
-          const fill = KIND_COLOR[n.kind];
+          const dim = Boolean(focusId && !isFocus && !isNeighbor);
+          const fill = colors[n.kind] || DEFAULT_COLORS[n.kind];
           return (
             <g
               key={n.id}
@@ -321,7 +423,14 @@ export default function NotesGraph({
               onPointerEnter={() => setHoverId(n.id)}
               onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))}
               onPointerDown={(e) => onPointerDown(e, n.id)}
-              onClick={() => openNode(n.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedId(n.id);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                openNode(n.id);
+              }}
             >
               {n.kind === 'board' ? (
                 <rect
@@ -332,19 +441,19 @@ export default function NotesGraph({
                   rx={3}
                   transform="rotate(45)"
                   fill={fill}
-                  stroke={isFocus ? '#fff' : 'rgba(255,255,255,0.5)'}
-                  strokeWidth={isFocus ? 2 : 1}
+                  stroke={isFocus ? '#fff' : 'rgba(255,255,255,0.55)'}
+                  strokeWidth={isFocus ? 2.5 : 1.2}
                 />
               ) : (
                 <circle
                   r={r}
                   fill={fill}
-                  stroke={isFocus ? '#fff' : 'rgba(255,255,255,0.45)'}
-                  strokeWidth={isFocus ? 2.5 : 1}
+                  stroke={isFocus ? '#fff' : 'rgba(255,255,255,0.5)'}
+                  strokeWidth={isFocus ? 2.5 : 1.2}
                 />
               )}
               <text
-                y={r + 12}
+                y={r + 13}
                 textAnchor="middle"
                 fontSize={11}
                 fill={dim ? '#a1a1aa' : '#18181b'}
@@ -358,19 +467,15 @@ export default function NotesGraph({
       </svg>
 
       {selectedNode && (
-        <div className="absolute bottom-3 left-3 right-3 z-10 mx-auto max-w-sm rounded-2xl border border-zinc-200/80 bg-white/95 p-3 shadow-lg backdrop-blur-sm sm:left-auto sm:right-3 sm:mx-0">
+        <div className="absolute bottom-3 left-3 right-3 z-10 mx-auto max-w-sm rounded-2xl border border-zinc-200 bg-white p-3 shadow-lg sm:left-auto sm:right-3 sm:mx-0">
           <div className="mb-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[selectedNode.kind] }} />
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[selectedNode.kind] }} />
               <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                 {KIND_LABEL[selectedNode.kind]}
               </span>
             </div>
-            <button
-              type="button"
-              className="text-xs text-zinc-400 hover:text-zinc-700"
-              onClick={() => setSelectedId(null)}
-            >
+            <button type="button" className="text-xs text-zinc-400 hover:text-zinc-700" onClick={() => setSelectedId(null)}>
               Close
             </button>
           </div>

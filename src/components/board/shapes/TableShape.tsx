@@ -9,6 +9,18 @@ import {
 } from 'tldraw';
 import type { CSSProperties } from 'react';
 
+declare module 'tldraw' {
+  interface TLGlobalShapePropsMap {
+    table: {
+      w: number;
+      h: number;
+      rows: number;
+      cols: number;
+      cells: string;
+    };
+  }
+}
+
 export type TableShape = TLBaseShape<
   'table',
   {

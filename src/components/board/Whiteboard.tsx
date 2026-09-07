@@ -161,8 +161,8 @@ export default function Whiteboard({
     const b = editor.getViewportPageBounds();
     editor.createShape({
       type: 'table',
-      x: b.center.x - 160,
-      y: b.center.y - 80,
+      x: b.center.x - 180,
+      y: b.center.y - 90,
     });
   };
 
@@ -181,34 +181,39 @@ export default function Whiteboard({
       pie: 'Pie',
       scatter: 'Scatter',
     };
-    editor.createShape({
-      type: 'chart',
-      x: b.center.x - 190,
-      y: b.center.y - 130,
-      props: {
-        w: 380,
-        h: 260,
-        kind,
-        title: titles[kind] || 'Chart',
-        data: JSON.stringify(
-          kind === 'scatter'
-            ? [
-                { label: 'A', x: 1, y: 4 },
-                { label: 'B', x: 2, y: 7 },
-                { label: 'C', x: 3, y: 3 },
-                { label: 'D', x: 4, y: 9 },
-                { label: 'E', x: 5, y: 6 },
-              ]
-            : [
-                { label: 'Mon', value: 4 },
-                { label: 'Tue', value: 7 },
-                { label: 'Wed', value: 3 },
-                { label: 'Thu', value: 9 },
-                { label: 'Fri', value: 6 },
-              ],
-        ),
-      },
-    });
+    try {
+      editor.createShape({
+        type: 'chart',
+        x: b.center.x - 200,
+        y: b.center.y - 140,
+        props: {
+          w: 400,
+          h: 280,
+          kind,
+          title: titles[kind] || 'Chart',
+          data: JSON.stringify(
+            kind === 'scatter'
+              ? [
+                  { label: 'A', x: 1, y: 4 },
+                  { label: 'B', x: 2, y: 7 },
+                  { label: 'C', x: 3, y: 3 },
+                  { label: 'D', x: 4, y: 9 },
+                  { label: 'E', x: 5, y: 6 },
+                ]
+              : [
+                  { label: 'Mon', value: 4 },
+                  { label: 'Tue', value: 7 },
+                  { label: 'Wed', value: 3 },
+                  { label: 'Thu', value: 9 },
+                  { label: 'Fri', value: 6 },
+                ],
+          ),
+        },
+      });
+      editor.setCurrentTool('select');
+    } catch (err) {
+      console.error('insertChart failed', err);
+    }
     setChartMenu(false);
   };
 

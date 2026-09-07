@@ -1,11 +1,11 @@
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
-  T,
-  TLBaseShape,
   Rectangle2d,
+  T,
   resizeBox,
   type TLResizeInfo,
+  type TLShape,
 } from 'tldraw';
 import {
   ResponsiveContainer,
@@ -37,20 +37,23 @@ export type ChartKind =
   | 'pie'
   | 'scatter';
 
-export type ChartShape = TLBaseShape<
-  'chart',
-  {
-    w: number;
-    h: number;
-    kind: string;
-    title: string;
-    data: string;
+declare module 'tldraw' {
+  interface TLGlobalShapePropsMap {
+    chart: {
+      w: number;
+      h: number;
+      kind: string;
+      title: string;
+      data: string;
+    };
   }
->;
+}
+
+export type ChartShape = TLShape<'chart'>;
 
 const COLORS = ['#1971c2', '#e03131', '#2f9e44', '#f59f00', '#7048e8', '#f76707', '#0ca678', '#d6336c'];
 
-const KINDS: { id: ChartKind; label: string }[] = [
+export const CHART_KINDS: { id: ChartKind; label: string }[] = [
   { id: 'area', label: 'Area' },
   { id: 'bar', label: 'Bar' },
   { id: 'column', label: 'Column' },
@@ -61,7 +64,7 @@ const KINDS: { id: ChartKind; label: string }[] = [
   { id: 'scatter', label: 'Scatter' },
 ];
 
-export function parseChartData(raw: string): { label: string; value: number; x?: number; y?: number }[] {
+export function parseChartData(raw: string): { label: string; value: number; x: number; y: number }[] {
   try {
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
@@ -104,8 +107,8 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
 
   getDefaultProps(): ChartShape['props'] {
     return {
-      w: 380,
-      h: 260,
+      w: 400,
+      h: 280,
       kind: 'column',
       title: 'Chart',
       data: DEFAULT_DATA,
@@ -130,6 +133,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
     const isEditing = this.editor.getEditingShapeId() === shape.id;
     const editor = this.editor;
     const k = (kind || 'column') as ChartKind;
+    const chartH = Math.max(160, h - (isEditing ? 8 : 36));
 
     const chartBody = (() => {
       if (k === 'line') {
@@ -150,7 +154,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <Tooltip />
-            <Area type="monotone" dataKey="value" stroke="#1971c2" fill="rgba(25,113,194,0.25)" strokeWidth={2.5} />
+            <Area type="monotone" dataKey="value" stroke="#1971c2" fill="rgba(25,113,194,0.28)" strokeWidth={2.5} />
           </AreaChart>
         );
       }
@@ -172,7 +176,12 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} />
             <YAxis tick={{ fontSize: 10, fill: '#71717a' }} width={28} />
             <Tooltip />
-            <Bar dataKey="value" fill={k === 'histogram' ? '#7048e8' : '#1971c2'} radius={k === 'histogram' ? 0 : [3, 3, 0, 0]} barSize={k === 'histogram' ? 28 : undefined} />
+            <Bar
+              dataKey="value"
+              fill={k === 'histogram' ? '#7048e8' : '#1971c2'}
+              radius={k === 'histogram' ? 0 : [3, 3, 0, 0]}
+              barSize={k === 'histogram' ? 28 : undefined}
+            />
           </BarChart>
         );
       }
@@ -188,7 +197,6 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
           </ScatterChart>
         );
       }
-      // pie / donut
       const inner = k === 'donut' ? '42%' : 0;
       return (
         <PieChart>
@@ -207,25 +215,23 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
         style={{
           width: w,
           height: h,
-          background: 'rgba(255,255,255,0.96)',
-          border: '1px solid rgba(24,24,27,0.18)',
+          background: '#ffffff',
+          border: '1px solid rgba(24,24,27,0.2)',
           borderRadius: 12,
-          padding: isEditing ? 8 : 10,
+          padding: 10,
           overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           pointerEvents: isEditing ? 'all' : 'none',
           display: 'flex',
           flexDirection: 'column',
-          gap: 4,
+          gap: 6,
         }}
       >
         {isEditing ? (
           <div onPointerDown={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%' }}>
             <input
               value={title}
-              onChange={(e) =>
-                editor.updateShape({ id: shape.id, type: 'chart', props: { title: e.target.value } })
-              }
+              onChange={(e) => editor.updateShape({ id: shape.id, type: 'chart', props: { title: e.target.value } })}
               style={{
                 fontSize: 12,
                 fontWeight: 600,
@@ -237,7 +243,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
               placeholder="Chart title"
             />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {KINDS.map((opt) => (
+              {CHART_KINDS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
@@ -264,14 +270,7 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
                   return data;
                 }
               })()}
-              onChange={(e) => {
-                try {
-                  JSON.parse(e.target.value);
-                  editor.updateShape({ id: shape.id, type: 'chart', props: { data: e.target.value } });
-                } catch {
-                  editor.updateShape({ id: shape.id, type: 'chart', props: { data: e.target.value } });
-                }
-              }}
+              onChange={(e) => editor.updateShape({ id: shape.id, type: 'chart', props: { data: e.target.value } })}
               style={{
                 flex: 1,
                 minHeight: 80,
@@ -283,22 +282,18 @@ export class ChartShapeUtil extends BaseBoxShapeUtil<ChartShape> {
                 resize: 'none',
                 outline: 'none',
               }}
-              placeholder='[{"label":"A","value":3}]'
             />
-            <div style={{ fontSize: 10, color: '#71717a' }}>
-              Edit JSON rows. Scatter uses x/y; others use label + value.
-            </div>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#18181b' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#18181b', flexShrink: 0 }}>
               {title || 'Chart'}
               <span style={{ marginLeft: 8, fontWeight: 500, color: '#a1a1aa', fontSize: 10 }}>
-                {KINDS.find((x) => x.id === k)?.label || k}
+                {CHART_KINDS.find((x) => x.id === k)?.label || k}
               </span>
             </div>
-            <div style={{ width: '100%', flex: 1, minHeight: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', height: chartH, minHeight: 160, flexShrink: 0 }}>
+              <ResponsiveContainer width="100%" height={chartH}>
                 {chartBody}
               </ResponsiveContainer>
             </div>

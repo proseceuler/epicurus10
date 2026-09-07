@@ -14,7 +14,6 @@ import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { doneSet, isDone, monthDays, todayIso } from '@/lib/habit-stats';
-import { Ring } from '@/components/habits/widgets';
 import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
@@ -48,6 +47,72 @@ function computeStreak(sessions: PomodoroSession[]): number {
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+/** Consecutive days where every habit was completed. */
+function computeHabitStreak(
+  habits: { id: string }[],
+  done: Set<string>,
+): { current: number; best: number } {
+  if (!habits.length) return { current: 0, best: 0 };
+  const dayComplete = (dateStr: string) => habits.every((h) => done.has(`${h.id}|${dateStr}`));
+  const iso = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  let best = 0;
+  let run = 0;
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);
+  // scan last 365 days for best + current
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() - i);
+    if (dayComplete(iso(d))) {
+      run += 1;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  }
+  // current: from today (or yesterday if today incomplete)
+  let current = 0;
+  const cursor = new Date(start);
+  if (!dayComplete(iso(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dayComplete(iso(cursor))) return { current: 0, best };
+  }
+  while (dayComplete(iso(cursor))) {
+    current += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return { current, best: Math.max(best, current) };
+}
+
+function termWeekProgress(term: number): { week: number; total: number; pct: number; label: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  // Approximate term windows matching currentTerm()
+  let start: Date;
+  let end: Date;
+  if (term === 1) {
+    start = new Date(y, 5, 1);
+    end = new Date(y, 9, 30);
+  } else if (term === 2) {
+    start = now.getMonth() <= 1 ? new Date(y - 1, 9, 1) : new Date(y, 9, 1);
+    end = now.getMonth() <= 1 ? new Date(y, 1, 28) : new Date(y + 1, 1, 28);
+  } else {
+    start = new Date(y, 1, 1);
+    end = new Date(y, 4, 31);
+  }
+  const totalMs = Math.max(1, end.getTime() - start.getTime());
+  const elapsed = Math.min(totalMs, Math.max(0, now.getTime() - start.getTime()));
+  const totalWeeks = Math.max(1, Math.round(totalMs / (7 * 86400000)));
+  const week = Math.min(totalWeeks, Math.max(1, Math.floor(elapsed / (7 * 86400000)) + 1));
+  const pct = Math.round((elapsed / totalMs) * 100);
+  return { week, total: totalWeeks, pct, label: `Week ${week}/${totalWeeks}` };
 }
 
 function useMilitaryClock() {
@@ -151,6 +216,8 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const monthSlots = Math.max(1, habits.length * monthCells.length);
   const monthPct = habits.length ? (monthDone / monthSlots) * 100 : 0;
   const todayHabitDone = habits.filter((h) => isDone(done, h.id, todayIso())).length;
+  const habitStreak = useMemo(() => computeHabitStreak(habits, done), [habits, done]);
+  const termProg = useMemo(() => termWeekProgress(currentTerm), [currentTerm]);
 
   const weakSubjects = useMemo(() => {
     return SUBJECTS.map((s) => {
@@ -285,14 +352,13 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
 
             {/* Insight strip — no GPA/Baon duplicates */}
       <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <button
-          type="button"
-          onClick={() => navigate('habits')}
-          className="glass flex flex-col items-center justify-center rounded-2xl p-4 text-center transition-colors hover:bg-white/50"
-        >
-          <p className="mb-1 text-xs font-medium text-zinc-500">Month habits</p>
-          <Ring value={monthPct} caption={`${monthDone}/${monthSlots}`} />
-        </button>
+        <InsightTile
+          icon={Flame}
+          label="Streak"
+          value={`${habitStreak.current}d`}
+          hint={`Best: ${habitStreak.best}d`}
+          onOpen={() => navigate('habits')}
+        />
         <InsightTile
           icon={CheckSquare}
           label="Deadlines"
@@ -309,9 +375,9 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
         />
         <InsightTile
           icon={Target}
-          label="Graded"
-          value={`${gradedCount}/${SUBJECTS.length}`}
-          hint={weakSubjects[0] ? `Weakest: ${weakSubjects[0].subject.shortName}` : 'No grades yet'}
+          label="Term progress"
+          value={termProg.label}
+          hint={`${termProg.pct}% through T${currentTerm}`}
           onOpen={() => navigate('grades')}
         />
       </div>

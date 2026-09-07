@@ -3,13 +3,12 @@ import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import BlackHole from '@/components/habits/BlackHole';
 import {
-  AlertRow, AreaChart, MultiArea, BarRow, Ring, Spark,
+  AlertRow, AreaChart, BarRow, Ring, Spark,
   chunkWeekly, habitWeekSeries, rateOn,
 } from '@/components/habits/widgets';
 import {
   MONTHS, WEEKDAYS, isDone, lastNDays, monthDays, type DayCell,
 } from '@/lib/habit-stats';
-import { getWellnessMap, setWellnessDay } from '@/lib/wellness';
 
 export type View = 'home' | 'track' | 'dash' | 'insights';
 
@@ -185,22 +184,7 @@ export function TrackView({
   onRemove: (id: string) => void;
   life: number;
 }) {
-  const [wellnessMap, setWellnessMap] = useState(() => getWellnessMap());
-  useEffect(() => {
-    const sync = () => setWellnessMap(getWellnessMap());
-    window.addEventListener('epicure-wellness-changed', sync);
-    return () => window.removeEventListener('epicure-wellness-changed', sync);
-  }, []);
   const monthWave = days.map((d) => rateOn(habits, d.dateStr, done));
-  const sleepSeries = days.map((d) => {
-    const v = wellnessMap.get(d.dateStr)?.sleep;
-    return v == null ? 0 : Math.min(1, v / 10); // normalize ~0-10h to 0-1 for chart
-  });
-  const moodSeries = days.map((d) => {
-    const v = wellnessMap.get(d.dateStr)?.mood;
-    return v == null ? 0 : (v - 1) / 4; // 1-5 → 0-1
-  });
-  const hasWellness = sleepSeries.some((v) => v > 0) || moodSeries.some((v) => v > 0);
   const n = Math.max(weeks.length, 1);
   const grid = {
     display: 'grid',
@@ -231,20 +215,8 @@ export function TrackView({
           <div className="flex items-end px-2 pb-1">
             <span className="text-[13px] font-semibold text-zinc-700">Habits</span>
           </div>
-          <div style={{ gridColumn: '2 / -1' }} className="px-1 pb-1">
-            <div className="mb-1 flex flex-wrap items-center gap-3 text-[9px] text-zinc-500">
-              <span className="inline-flex items-center gap-1"><span className="h-0.5 w-3 bg-zinc-900" /> Completion</span>
-              <span className="inline-flex items-center gap-1"><span className="h-0.5 w-3 bg-blue-500" /> Sleep</span>
-              <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t border-dashed border-emerald-500" /> Mood</span>
-            </div>
-            <MultiArea
-              height={96}
-              series={[
-                { values: monthWave, color: '#18181b' },
-                { values: hasWellness ? sleepSeries : monthWave.map(() => 0), color: '#3b82f6' },
-                { values: hasWellness ? moodSeries : monthWave.map(() => 0), color: '#10b981' },
-              ]}
-            />
+          <div style={{ gridColumn: '2 / -1' }}>
+            <AreaChart values={monthWave} height={96} />
           </div>
 
           <div className="border-b border-zinc-200" />
@@ -311,69 +283,6 @@ export function TrackView({
       </div>
 
 
-          {/* Sleep / Mood rows aligned to day columns */}
-          <div className="flex items-center gap-2 border-t border-zinc-100 px-2 py-1">
-            <span className="text-[11px] text-zinc-600">😴 Sleep</span>
-          </div>
-          {weeks.map((week, wi) => (
-            <div key={`sleep-${wi}`} className="grid grid-cols-7 border-t border-zinc-100">
-              {Array.from({ length: 7 }, (_, wd) => {
-                const cell = week.find((d) => d.weekdayIdx === wd);
-                if (!cell) return <div key={wd} />;
-                const val = wellnessMap.get(cell.dateStr)?.sleep;
-                return (
-                  <div key={wd} className="flex items-center justify-center py-0.5">
-                    <input
-                      type="number"
-                      min={0}
-                      max={14}
-                      step={0.5}
-                      title="Sleep hours"
-                      placeholder="—"
-                      value={val ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const n = raw === '' ? null : Math.min(14, Math.max(0, Number(raw)));
-                        setWellnessDay(cell.dateStr, { sleep: n != null && !Number.isNaN(n) ? n : null });
-                      }}
-                      className="h-5 w-7 rounded border border-zinc-200 bg-white px-0.5 text-center text-[9px] tabular-nums text-zinc-700"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-          <div className="flex items-center gap-2 px-2 py-1">
-            <span className="text-[11px] text-zinc-600">🙂 Mood</span>
-          </div>
-          {weeks.map((week, wi) => (
-            <div key={`mood-${wi}`} className="grid grid-cols-7">
-              {Array.from({ length: 7 }, (_, wd) => {
-                const cell = week.find((d) => d.weekdayIdx === wd);
-                if (!cell) return <div key={wd} />;
-                const val = wellnessMap.get(cell.dateStr)?.mood;
-                return (
-                  <div key={wd} className="flex items-center justify-center py-0.5">
-                    <select
-                      title="Mood 1–5"
-                      value={val ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const n = raw === '' ? null : Math.min(5, Math.max(1, Number(raw)));
-                        setWellnessDay(cell.dateStr, { mood: n });
-                      }}
-                      className="h-5 w-7 appearance-none rounded border border-zinc-200 bg-white text-center text-[9px] text-zinc-700"
-                    >
-                      <option value="">·</option>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
 
       <div className="overflow-x-auto">
         <div style={grid} className="items-start">

@@ -19,6 +19,7 @@ export default function KanbanPage() {
   const [quickTitle, setQuickTitle] = useState('');
   const [draggingList, setDraggingList] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
+  const [addingList, setAddingList] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [links, setLinks] = useState<{ todos: Todo[]; notes: Note[]; habits: Habit[] }>({ todos: [], notes: [], habits: [] });
 
@@ -97,8 +98,8 @@ export default function KanbanPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Project Kanban Board" action={<div className="flex items-center gap-2"><Input value={newListName} onChange={setNewListName} placeholder="New list name" /><Button size="sm" onClick={() => { const label = newListName.trim(); if (!label) return; persistLists([...lists, { id: slugList(label), label, tint: nextTint(lists.length) }]); setNewListName(''); }}><Plus className="h-4 w-4" /> Add list</Button></div>} />
-      <div className="-mx-1 flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4 pt-1">
+      <PageHeader title="Project Kanban Board" />
+      <div className="-mx-1 flex min-h-0 flex-1 items-start gap-3 overflow-x-auto pb-4 pt-1">
         {lists.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.id);
           return (
@@ -112,7 +113,7 @@ export default function KanbanPage() {
                 if (from >= 0 && to >= 0) { const [moved] = next.splice(from, 1); next.splice(to, 0, moved); persistLists(next); }
               }
               setDraggingId(null); setDraggingList(null); setDragOverCol(null);
-            }} className={`flex w-[272px] shrink-0 flex-col rounded-2xl ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: 'calc(100vh - 12rem)' }}>
+            }} className={`flex w-[272px] shrink-0 flex-col self-start rounded-2xl ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: colTasks.length ? 'calc(100vh - 12rem)' : undefined }}>
               <div
                 className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing"
                 draggable
@@ -125,7 +126,7 @@ export default function KanbanPage() {
                 <span className="rounded-full bg-zinc-200/70 px-1.5 text-[10px]">{colTasks.length}</span>
                 {lists.length > 1 && <button type="button" className="ml-auto text-zinc-300" onClick={() => void deleteList(col.id)}><X className="h-3.5 w-3.5" /></button>}
               </div>
-              <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+              <div className="space-y-2 overflow-y-auto px-2 pb-2" style={{ maxHeight: colTasks.length > 4 ? 'calc(100vh - 16rem)' : undefined }}>
                 {colTasks.map((task) => (
                   <KanbanCardPreview key={task.id} task={task} dragging={draggingId === task.id} onDragStart={(e) => { setDraggingId(task.id); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }} onOpen={() => setSelectedId(task.id)} onDelete={() => deleteTask(task.id)} />
                 ))}
@@ -141,6 +142,54 @@ export default function KanbanPage() {
             </div>
           );
         })}
+        <div className="w-[272px] shrink-0 self-start">
+          {addingList ? (
+            <div className="space-y-2 rounded-2xl bg-white/70 p-2 ring-1 ring-zinc-200/80">
+              <input
+                autoFocus
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const label = newListName.trim();
+                    if (!label) return;
+                    persistLists([...lists, { id: slugList(label), label, tint: nextTint(lists.length) }]);
+                    setNewListName('');
+                    setAddingList(false);
+                  }
+                  if (e.key === 'Escape') setAddingList(false);
+                }}
+                placeholder="Enter list name..."
+                className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const label = newListName.trim();
+                    if (!label) return;
+                    persistLists([...lists, { id: slugList(label), label, tint: nextTint(lists.length) }]);
+                    setNewListName('');
+                    setAddingList(false);
+                  }}
+                >
+                  Add list
+                </Button>
+                <button type="button" onClick={() => { setAddingList(false); setNewListName(''); }} className="text-zinc-400 hover:text-zinc-700">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingList(true)}
+              className="flex w-full items-center gap-1.5 rounded-2xl bg-zinc-900/80 px-3 py-2.5 text-sm font-medium text-white hover:bg-zinc-900"
+            >
+              <Plus className="h-4 w-4" /> Add list
+            </button>
+          )}
+        </div>
       </div>
       {selected && <CardDetailModal task={selected} lists={lists} links={links} onClose={() => setSelectedId(null)} onDelete={() => deleteTask(selected.id)} onStatus={(status) => updateStatus(selected.id, status)} onSave={(patch) => persist(selected.id, patch)} />}
     </div>

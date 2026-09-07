@@ -77,6 +77,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [assistantRail, setAssistantRail] = useState(false);
   const [assistantWidth, setAssistantWidth] = useState(340);
   const [badgeTodos, setBadgeTodos] = useState(0);
+  const [badgeKanban, setBadgeKanban] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
   const [xpProgress, setXpProgress] = useState(() => xpForNextLevel());
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
@@ -85,14 +86,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     const loadBadges = async () => {
       try {
         const today = new Date().toLocaleDateString('en-CA');
-        const [{ data: todos }, { data: cards }] = await Promise.all([
+        const [{ data: todos }, { data: cards }, { data: kanban }] = await Promise.all([
           supabase.from('todos').select('id,due_date,completed,priority'),
           supabase.from('flashcards').select('id,due_date'),
+          supabase.from('kanban_tasks').select('id,due_date,status'),
         ]);
         const openHigh = (todos || []).filter(
-          (t) => !t.completed && (t.due_date && t.due_date <= today || t.priority === 'urgent_important' || t.priority === 'high'),
+          (t) => !t.completed && ((t.due_date && t.due_date <= today) || t.priority === 'urgent_important' || t.priority === 'high'),
         ).length;
         setBadgeTodos(openHigh);
+        // Kanban: due today/overdue or due within 3 days (not done column)
+        const kb = (kanban || []).filter((k) => {
+          if (!k.due_date) return false;
+          if (k.status === 'done' || k.status === 'completed') return false;
+          return k.due_date <= today || k.due_date <= new Date(Date.now() + 3 * 86400000).toLocaleDateString('en-CA');
+        }).length;
+        setBadgeKanban(kb);
         setBadgeCards((cards || []).filter((c) => !c.due_date || c.due_date <= today).length);
       } catch {
         /* ignore */
@@ -158,11 +167,13 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                   const Icon = item.icon;
                   const active = page === item.id;
                   const badge =
-                    item.id === 'todos' || item.id === 'kanban'
+                    item.id === 'todos'
                       ? badgeTodos
-                      : item.id === 'flashcards'
-                        ? badgeCards
-                        : 0;
+                      : item.id === 'kanban'
+                        ? badgeKanban
+                        : item.id === 'flashcards'
+                          ? badgeCards
+                          : 0;
                   return (
                     <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
                       <span className="relative shrink-0">

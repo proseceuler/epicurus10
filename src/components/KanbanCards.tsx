@@ -43,7 +43,7 @@ export function KanbanCardPreview({ task, dragging, onDragStart, onDragEnd, onOp
   const snippet = (task.description || '').trim();
   return (
     <div draggable onDragStart={(e) => { e.stopPropagation(); onDragStart(e); }} onDragEnd={onDragEnd} onClick={onOpen} className={`group cursor-pointer overflow-hidden rounded-xl border border-white/50 bg-white/85 shadow-sm ${dragging ? 'opacity-50' : ''}`}>
-      {cover ? <CoverFrame url={cover} className="block w-full overflow-hidden border-b border-zinc-200/60" imgClass="block h-36 w-full object-cover" /> : null}
+      {cover ? <CoverFrame url={cover} className="block w-full overflow-hidden border-b border-zinc-200/60" imgClass="block h-auto max-h-72 w-full object-contain object-top bg-zinc-50" /> : null}
       <div className="p-3">
         {subj && <div className="mb-1.5"><span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-zinc-800 text-white">{subj.shortName}</span></div>}
         <div className="flex items-start gap-1.5">

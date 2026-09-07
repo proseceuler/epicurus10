@@ -471,11 +471,11 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
                 const daysAway = Math.ceil((dDate.getTime() - Date.now()) / 86400000);
                 return (
                   <div key={todo.id} className="flex items-center gap-3 rounded-md px-1 py-2">
-                    <div className="w-10 shrink-0 font-mono">
-                      <div className="text-[9px] uppercase tracking-wider text-zinc-500">
+                    <div className="flex w-11 shrink-0 flex-col items-center justify-center font-mono leading-tight">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
                         {dDate.toLocaleDateString('en-US', { month: 'short' })}
-                      </div>
-                      <div className="text-sm text-zinc-800">{dDate.getDate()}</div>
+                      </span>
+                      <span className="text-base font-semibold tabular-nums text-zinc-900">{dDate.getDate()}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-zinc-800">{todo.title}</p>

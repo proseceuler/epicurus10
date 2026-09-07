@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { addCalendarEvent, getCalendarEvents, deleteCalendarEvent } from '@/lib/calendarStore';
 import { SUBJECTS, type ClassHub, type ClassHubLink, type TimetableEntry, type ClassAttendance, type SubjectKey } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
 import { FolderTree, Plus, Trash2, Link2, Clock, MapPin, User, Save, ExternalLink, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
@@ -16,14 +17,47 @@ export default function ClassHubPage() {
   );
 }
 
+
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const OFFICE_DAY_OPTS = [1, 2, 3, 4, 5];
+
+function parseOfficeHours(raw: string): { days: number[]; start: string; end: string } {
+  const days: number[] = [];
+  const map: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  for (const [k, v] of Object.entries(map)) {
+    if (new RegExp('\\b' + k, 'i').test(raw)) days.push(v);
+  }
+  const tm = raw.match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
+  const pad = (s: string) => {
+    const [h, m] = s.split(':');
+    return String(h).padStart(2, '0') + ':' + String(m || '00').padStart(2, '0');
+  };
+  return {
+    days: days.length ? days : [],
+    start: tm ? pad(tm[1]) : '14:00',
+    end: tm ? pad(tm[2]) : '15:00',
+  };
+}
+
+function formatOfficeHours(days: number[], start: string, end: string) {
+  if (!days.length) return '';
+  const labels = days.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]);
+  return labels.join(', ') + ' ' + start + '\u2013' + end;
+}
+
 function ClassInfoTab() {
   const [hubs, setHubs] = useState<Record<string, ClassHub>>({});
   const [links, setLinks] = useState<ClassHubLink[]>([]);
   const [selected, setSelected] = useState<SubjectKey>('math');
   const [loading, setLoading] = useState(true);
   const [editForm, setEditForm] = useState({ teacher_name: '', office_hours: '', room: '', notes: '' });
+  const [officeDays, setOfficeDays] = useState<number[]>([]);
+  const [officeStart, setOfficeStart] = useState('14:00');
+  const [officeEnd, setOfficeEnd] = useState('15:00');
   const [newLink, setNewLink] = useState({ title: '', url: '' });
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const loadData = useCallback(async () => {
     const [{ data: hubData }, { data: linkData }] = await Promise.all([
@@ -49,18 +83,23 @@ function ClassInfoTab() {
       room: hub?.room ?? '',
       notes: hub?.notes ?? '',
     });
+    const parsed = parseOfficeHours(hub?.office_hours ?? '');
+    setOfficeDays(parsed.days);
+    setOfficeStart(parsed.start);
+    setOfficeEnd(parsed.end);
+    setDirty(false);
   }, [selected, hubs]);
 
   const subject = SUBJECTS.find((s) => s.key === selected)!;
   const subjectLinks = links.filter((l) => l.subject_key === selected);
 
-  const saveHub = async () => {
+  const saveHub = async (form = editForm) => {
     setSaving(true);
     const existing = hubs[selected];
     if (existing) {
       const { data } = await supabase
         .from('class_hub')
-        .update({ ...editForm, updated_at: new Date().toISOString() })
+        .update({ ...form, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
         .select()
         .single();
@@ -68,13 +107,32 @@ function ClassInfoTab() {
     } else {
       const { data } = await supabase
         .from('class_hub')
-        .insert({ subject_key: selected, ...editForm })
+        .insert({ subject_key: selected, ...form })
         .select()
         .single();
       if (data) setHubs({ ...hubs, [selected]: data as ClassHub });
     }
     setSaving(false);
+    setDirty(false);
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 1200);
   };
+
+  const markField = (patch: Partial<typeof editForm>) => {
+    setEditForm((f) => ({ ...f, ...patch }));
+    setDirty(true);
+  };
+
+  useEffect(() => {
+    if (!dirty) return;
+    const t = window.setTimeout(() => {
+      void saveHub({
+        ...editForm,
+        office_hours: formatOfficeHours(officeDays, officeStart, officeEnd) || editForm.office_hours,
+      });
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [dirty, editForm, officeDays, officeStart, officeEnd]);
 
   const addLink = async () => {
     if (!newLink.title.trim() || !newLink.url.trim()) return;
@@ -128,33 +186,79 @@ function ClassInfoTab() {
               <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-1">
                 <User className="w-3.5 h-3.5" /> Teacher Name
               </label>
-              <Input value={editForm.teacher_name} onChange={(v) => setEditForm({ ...editForm, teacher_name: v })} placeholder="e.g. Mrs. Reyes" />
+              <Input value={editForm.teacher_name} onChange={(v) => markField({ teacher_name: v })} placeholder="e.g. Mrs. Reyes" />
             </div>
             <div>
               <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-1">
                 <Clock className="w-3.5 h-3.5" /> Office Hours
               </label>
-              <Input value={editForm.office_hours} onChange={(v) => setEditForm({ ...editForm, office_hours: v })} placeholder="e.g. Mon-Fri 2-3pm" />
+              <div className="mb-2 flex flex-wrap gap-1">
+                {OFFICE_DAY_OPTS.map((d) => {
+                  const on = officeDays.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        setOfficeDays((prev) => {
+                          const next = on ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b);
+                          setDirty(true);
+                          return next;
+                        });
+                      }}
+                      className={`rounded-lg px-2 py-1 text-[11px] font-medium ${on ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                    >
+                      {DAY_SHORT[d]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="time" value={officeStart} onChange={(e) => { setOfficeStart(e.target.value); setDirty(true); }} className="glass-input rounded-xl px-2 py-1.5 text-sm" />
+                <span className="text-xs text-zinc-400">to</span>
+                <input type="time" value={officeEnd} onChange={(e) => { setOfficeEnd(e.target.value); setDirty(true); }} className="glass-input rounded-xl px-2 py-1.5 text-sm" />
+              </div>
+              {officeDays.length > 0 && (
+                <p className="mt-1 text-[10px] text-zinc-400">{formatOfficeHours(officeDays, officeStart, officeEnd)}</p>
+              )}
             </div>
             <div>
               <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-1">
                 <MapPin className="w-3.5 h-3.5" /> Room
               </label>
-              <Input value={editForm.room} onChange={(v) => setEditForm({ ...editForm, room: v })} placeholder="e.g. Room 204" />
+              <Input value={editForm.room} onChange={(v) => markField({ room: v })} placeholder="e.g. Room 204" />
             </div>
             <div>
               <label className="text-xs font-medium text-zinc-500 mb-1 block">Notes</label>
               <textarea
                 value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                onChange={(e) => markField({ notes: e.target.value })}
                 rows={3}
                 placeholder="Any extra notes about this class..."
                 className="w-full px-3 py-2 glass-input rounded-xl text-sm text-zinc-800 placeholder-zinc-400 resize-none"
               />
             </div>
-            <Button onClick={saveHub} disabled={saving} className="w-full">
-              <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Class Info'}
-            </Button>
+            <div className="flex min-h-[28px] items-center justify-between gap-2">
+              <a href="#timetable" className="text-[11px] text-zinc-500 hover:text-zinc-800">→ Timetable</a>
+              <div className="flex items-center gap-2">
+                {dirty && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveHub({
+                        ...editForm,
+                        office_hours: formatOfficeHours(officeDays, officeStart, officeEnd) || editForm.office_hours,
+                      })
+                    }
+                    disabled={saving}
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white"
+                  >
+                    <Save className="h-3.5 w-3.5" /> {saving ? '…' : 'Save'}
+                  </button>
+                )}
+                {savedFlash && !dirty && <span className="text-[11px] text-emerald-600">Saved</span>}
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -198,6 +302,41 @@ function ClassInfoTab() {
       </div>
     </div>
   );
+}
+
+
+async function syncTimetableToCalendar(entries: TimetableEntry[]) {
+  const subjects = Object.fromEntries(SUBJECTS.map((s) => [s.key, s]));
+  const existing = getCalendarEvents().filter((e) => (e.description || '').includes('epicure:timetable'));
+  for (const e of existing) deleteCalendarEvent(e.id);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let w = 0; w < 4; w++) {
+    for (const entry of entries) {
+      const d = new Date(today);
+      const day = d.getDay();
+      const delta = (entry.day_of_week - day + 7) % 7;
+      d.setDate(d.getDate() + delta + w * 7);
+      if (d < today) continue;
+      const iso = d.toLocaleDateString('en-CA');
+      const sub = subjects[entry.subject_key];
+      addCalendarEvent({
+        title: sub ? sub.shortName + ' class' : 'Class',
+        description: 'epicure:timetable · ' + (entry.room || 'Room TBA'),
+        start_date: iso,
+        end_date: iso,
+        all_day: false,
+        start_time: (entry.start_time || '08:00').slice(0, 5),
+        end_time: (entry.end_time || '09:00').slice(0, 5),
+        kind: 'event',
+        subject_key: (entry.subject_key as SubjectKey) || null,
+        linked_todo_id: null,
+        linked_note_id: null,
+        linked_habit_id: null,
+        linked_kanban_id: null,
+      });
+    }
+  }
 }
 
 function TimetableTab() {
@@ -294,9 +433,9 @@ function TimetableTab() {
   }
 
   return (
-    <div>
+    <div id="timetable" >
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h3 className="text-base font-semibold text-zinc-800">Timetable</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="text-base font-semibold text-zinc-800">Timetable</h3><button type="button" onClick={() => void syncTimetableToCalendar(entries)} className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50">Push to Calendar</button></div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setWeekOffset(weekOffset - 1)}>
             <ChevronLeft className="w-4 h-4" />

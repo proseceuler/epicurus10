@@ -113,7 +113,7 @@ export default function KanbanPage() {
                 if (from >= 0 && to >= 0) { const [moved] = next.splice(from, 1); next.splice(to, 0, moved); persistLists(next); }
               }
               setDraggingId(null); setDraggingList(null); setDragOverCol(null);
-            }} className={`flex w-[272px] shrink-0 flex-col self-start rounded-2xl ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: colTasks.length ? 'calc(100vh - 12rem)' : undefined }}>
+            }} className={`flex w-[272px] shrink-0 flex-col self-start rounded-2xl transition-[background-color,box-shadow] duration-200 ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: colTasks.length ? 'calc(100vh - 12rem)' : undefined }}>
               <div
                 className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing"
                 draggable

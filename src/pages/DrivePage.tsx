@@ -37,6 +37,11 @@ declare global {
         read: (path: string) => Promise<Blob>;
         stat: (path: string) => Promise<FSItem>;
       };
+      auth?: {
+        isSignedIn: () => boolean;
+        signIn: () => Promise<unknown>;
+        getUser: () => Promise<{ username?: string } | null>;
+      };
     };
   }
 }
@@ -140,6 +145,8 @@ export default function DrivePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [items, setItems] = useState<FSItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [puterReady, setPuterReady] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: FSItem } | null>(null);
@@ -162,7 +169,9 @@ export default function DrivePage() {
       return;
     }
     setLoading(true);
+    setLoadError(null);
     try {
+      // soft auth check — sign-in is prompted by Puter on first FS call if needed
       await ensureTrash();
       let next: FSItem[] = [];
       if (sideView === 'recent') {
@@ -179,10 +188,12 @@ export default function DrivePage() {
           next = next.filter((i) => i.name !== '.trash' && i.path !== TRASH_PATH);
         }
       }
-      setItems(next);
+      setItems(Array.isArray(next) ? next : []);
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : 'Could not load files');
+      const msg = err instanceof Error ? err.message : 'Could not load files';
+      setLoadError(msg);
+      toast.error(msg);
       setItems([]);
     } finally {
       setLoading(false);
@@ -191,16 +202,23 @@ export default function DrivePage() {
 
   useEffect(() => {
     let tries = 0;
+    let cancelled = false;
     const tick = () => {
+      if (cancelled) return;
       if (window.puter) {
-        load();
+        setPuterReady(true);
+        void load();
         return;
       }
       tries += 1;
-      if (tries < 40) setTimeout(tick, 150);
-      else setLoading(false);
+      if (tries < 80) setTimeout(tick, 200); // ~16s
+      else {
+        setLoading(false);
+        setLoadError('Puter.js did not load. Check your network or ad-blocker, then refresh.');
+      }
     };
     tick();
+    return () => { cancelled = true; };
   }, [load]);
 
   const ctxRef = useRef<HTMLDivElement>(null);
@@ -553,11 +571,20 @@ export default function DrivePage() {
           )}
 
           <div className="h-full overflow-auto p-3">
-            {!window.puter && !loading && (
-              <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-zinc-500">
+            {!puterReady && !loading && (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-sm text-zinc-500">
                 <Cloud className="h-10 w-10 text-zinc-300" />
-                <p>Loading Puter.js…</p>
-                <p className="text-xs">If this persists, refresh the page.</p>
+                <p>{loadError || 'Puter.js is not available'}</p>
+                <p className="max-w-xs text-center text-xs text-zinc-400">
+                  Cloud Drive needs Puter.js. Disable blockers for this site, then refresh.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white"
+                >
+                  Refresh
+                </button>
               </div>
             )}
 
@@ -568,7 +595,40 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && window.puter && filtered.length === 0 && (
+            {!loading && puterReady && loadError && (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-sm text-zinc-500">
+                <Cloud className="h-10 w-10 text-zinc-300" />
+                <p className="max-w-sm text-center">{loadError}</p>
+                <p className="max-w-xs text-center text-xs text-zinc-400">
+                  First use may require signing in with Puter. Allow the popup if your browser blocks it.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void load()}
+                    className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await window.puter?.auth?.signIn?.();
+                        await load();
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Sign-in failed');
+                      }
+                    }}
+                    className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800"
+                  >
+                    Sign in with Puter
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!loading && puterReady && !loadError && filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-zinc-500">
                 <Folder className="h-10 w-10 text-zinc-300" />
                 <p>{search ? 'No matches' : sideView === 'trash' ? 'Trash is empty' : 'This folder is empty'}</p>
@@ -578,7 +638,7 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && filtered.length > 0 && viewMode === 'grid' && (
+            {!loading && puterReady && !loadError && filtered.length > 0 && viewMode === 'grid' && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((item) => {
                   const Icon = iconFor(item);
@@ -618,7 +678,7 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && filtered.length > 0 && viewMode === 'list' && (
+            {!loading && puterReady && !loadError && filtered.length > 0 && viewMode === 'list' && (
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200/70 text-[11px] uppercase tracking-wide text-zinc-400">

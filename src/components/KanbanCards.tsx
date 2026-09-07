@@ -43,7 +43,7 @@ export function KanbanCardPreview({ task, dragging, onDragStart, onDragEnd, onOp
   const snippet = (task.description || '').trim();
   return (
     <div draggable onDragStart={(e) => { e.stopPropagation(); onDragStart(e); }} onDragEnd={onDragEnd} onClick={onOpen} className={`group cursor-pointer overflow-hidden rounded-xl border border-white/50 bg-white/85 shadow-sm ${dragging ? 'opacity-50' : ''}`}>
-      {cover ? <div className="border-b border-zinc-200/80 bg-zinc-50 p-2"><CoverFrame url={cover} className="mx-auto max-h-28 w-full overflow-hidden rounded-lg border border-zinc-200/70 bg-white" imgClass="mx-auto block max-h-28 w-auto max-w-full object-contain" /></div> : null}
+      {cover ? <CoverFrame url={cover} className="block w-full overflow-hidden border-b border-zinc-200/60" imgClass="block h-36 w-full object-cover" /> : null}
       <div className="p-3">
         {subj && <div className="mb-1.5"><span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-zinc-800 text-white">{subj.shortName}</span></div>}
         <div className="flex items-start gap-1.5">
@@ -89,7 +89,7 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4" onClick={onClose}>
       <div className="glass glass-shadow-lg relative my-6 w-[min(96vw,72rem)] overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        {cover ? <CoverFrame url={cover} name={coverFile?.name} className="w-full" imgClass="block h-auto w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
+        {cover ? <CoverFrame url={cover} name={coverFile?.name} className="mx-auto max-h-52 w-full overflow-hidden bg-zinc-100" imgClass="mx-auto block max-h-52 w-auto max-w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/50 px-5 py-3">
           <select value={task.status} onChange={(e) => onStatus(e.target.value as Status)} className="rounded-lg border border-zinc-200/80 bg-white/70 px-2 py-1.5 text-xs">{columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
           <div className="flex-1" />

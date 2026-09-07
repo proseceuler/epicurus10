@@ -8,15 +8,14 @@ import {
   type PomodoroSession,
   type Habit,
   type HabitCompletion,
-  type FinanceSettings,
-  type FinanceTransaction,
 } from '@/lib/types';
 import { computeFinalGrade, computeGeneralAverage, computeTermGrade } from '@/lib/gradeUtils';
 import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import { usePomodoro } from '@/context/PomodoroContext';
-import { doneSet, isDone, lastNDays, todayIso } from '@/lib/habit-stats';
-import { Calendar, BookOpen, Flame, Wallet, CheckSquare, Clock } from 'lucide-react';
+import { doneSet, isDone, monthDays, todayIso } from '@/lib/habit-stats';
+import { Ring } from '@/components/habits/widgets';
+import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
 
@@ -76,8 +75,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
-  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null);
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [sigil, setSigil] = useState(() => {
     try {
@@ -96,24 +93,18 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
       { data: sData },
       { data: hData },
       { data: cData },
-      { data: fData },
-      { data: txData },
     ] = await Promise.all([
       supabase.from('assessments').select('*'),
       supabase.from('todos').select('*').order('created_at', { ascending: false }),
       supabase.from('pomodoro_sessions').select('*'),
       supabase.from('habits').select('*').order('created_at', { ascending: true }),
       supabase.from('habit_completions').select('*'),
-      supabase.from('finance_settings').select('*').maybeSingle(),
-      supabase.from('finance_transactions').select('*'),
     ]);
     if (aData) setAssessments(aData as Assessment[]);
     if (tData) setTodos(tData as Todo[]);
     if (sData) setSessions(sData as PomodoroSession[]);
     if (hData) setHabits(hData as Habit[]);
     if (cData) setCompletions(cData as HabitCompletion[]);
-    if (fData) setFinanceSettings(fData as FinanceSettings);
-    if (txData) setTransactions(txData as FinanceTransaction[]);
     setLoading(false);
   }, []);
 
@@ -149,26 +140,17 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   })();
 
   const done = useMemo(() => doneSet(completions), [completions]);
-  const last7 = useMemo(() => lastNDays(7), []);
-  const habitRate = useMemo(() => {
-    if (!habits.length) return null;
-    let slots = 0;
-    let got = 0;
-    for (const d of last7) {
-      for (const h of habits) {
-        slots += 1;
-        if (isDone(done, h.id, d)) got += 1;
-      }
-    }
-    return slots ? got / slots : 0;
-  }, [habits, done, last7]);
-
-  const todayHabitRate = useMemo(() => {
-    if (!habits.length) return null;
-    const t = todayIso();
-    const got = habits.filter((h) => isDone(done, h.id, t)).length;
-    return got / habits.length;
-  }, [habits, done]);
+  const monthCells = useMemo(() => {
+    const n = new Date();
+    return monthDays(n.getFullYear(), n.getMonth());
+  }, []);
+  const monthDone = useMemo(
+    () => habits.reduce((s, h) => s + monthCells.filter((d) => isDone(done, h.id, d.dateStr)).length, 0),
+    [habits, monthCells, done],
+  );
+  const monthSlots = Math.max(1, habits.length * monthCells.length);
+  const monthPct = habits.length ? (monthDone / monthSlots) * 100 : 0;
+  const todayHabitDone = habits.filter((h) => isDone(done, h.id, todayIso())).length;
 
   const weakSubjects = useMemo(() => {
     return SUBJECTS.map((s) => {
@@ -181,9 +163,19 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
       .slice(0, 4);
   }, [assessments, currentTerm]);
 
-  const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const baonRemaining =
-    financeSettings != null ? Number(financeSettings.allowance_amount) - totalSpent : null;
+  const gradedCount = useMemo(
+    () => SUBJECTS.filter((s) => computeFinalGrade(s.key, assessments) !== null).length,
+    [assessments],
+  );
+
+  const weekFocus = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return sessions
+      .filter((s) => s.session_type === 'focus' && new Date(s.completed_at) >= start)
+      .reduce((sum, s) => sum + s.duration_minutes, 0);
+  }, [sessions]);
 
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
@@ -207,10 +199,7 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
   const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
-  const habitPct =
-    habitRate !== null ? `${Math.round(habitRate * 100)}%` : '—';
-  const baonLabel =
-    baonRemaining !== null ? `₱${baonRemaining.toFixed(0)}` : '—';
+  const weekFocusLabel = `${Math.floor(weekFocus / 60)}h ${weekFocus % 60}m`;
 
   if (loading) {
     return (
@@ -266,7 +255,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
             <StatRow label="FOCUS" value={focusLabel} />
             <StatRow label="GPA" value={gpa} />
-            <StatRow label="HABITS" value={habitPct} />
             <StatRow label="TASKS" value={`${activeTodos.length} open`} />
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -285,66 +273,55 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
               </button>
               <button
                 type="button"
-                onClick={() => navigate('finance')}
+                onClick={() => navigate('todos')}
                 className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
               >
-                → baon
+                → tasks
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Single insight strip — no duplicate GPA card */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <InsightTile
-          icon={BookOpen}
-          label="GPA"
-          value={gpa}
-          hint={`Term ${currentTerm}`}
-          onOpen={() => navigate('grades')}
-        />
-        <InsightTile
-          icon={Flame}
-          label="HABIT RATE"
-          value={habitPct}
-          hint={
-            todayHabitRate !== null
-              ? `Today ${Math.round(todayHabitRate * 100)}% · 7d avg`
-              : 'Last 7 days'
-          }
-          onOpen={() => navigate('habits')}
-        />
+            {/* Insight strip — no GPA/Baon duplicates */}
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => navigate('habits')}
+          className="glass flex flex-col items-center justify-center rounded-2xl p-4 text-center transition-colors hover:bg-white/50"
+        >
+          <p className="mb-1 text-xs font-medium text-zinc-500">Month habits</p>
+          <Ring value={monthPct} caption={`${monthDone}/${monthSlots}`} />
+        </button>
         <InsightTile
           icon={CheckSquare}
-          label="DEADLINES"
+          label="Deadlines"
           value={String(deadlineCount)}
-          hint="Next 7 days"
+          hint="Due in the next 7 days"
           onOpen={() => navigate('todos')}
         />
         <InsightTile
-          icon={Wallet}
-          label="BAON LEFT"
-          value={baonLabel}
-          hint={
-            financeSettings
-              ? `${financeSettings.allowance_period} allowance`
-              : 'Set allowance'
-          }
-          onOpen={() => navigate('finance')}
+          icon={Clock}
+          label="Focus (7d)"
+          value={weekFocusLabel}
+          hint={`Today ${focusLabel}`}
+          onOpen={() => navigate('pomodoro')}
+        />
+        <InsightTile
+          icon={Target}
+          label="Graded"
+          value={`${gradedCount}/${SUBJECTS.length}`}
+          hint={weakSubjects[0] ? `Weakest: ${weakSubjects[0].subject.shortName}` : 'No grades yet'}
+          onOpen={() => navigate('grades')}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-0 lg:col-span-1">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">WEAK SUBJECTS</h3>
-            <button
-              type="button"
-              onClick={() => navigate('grades')}
-              className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800"
-            >
-              grades →
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Weak subjects</h3>
+            <button type="button" onClick={() => navigate('grades')} className="text-xs text-zinc-500 hover:text-zinc-800">
+              Grades →
             </button>
           </div>
           {weakSubjects.length === 0 ? (
@@ -373,23 +350,15 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
           )}
         </Card>
 
-        <Card className="p-0 lg:col-span-1">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">UPCOMING</h3>
-            <button
-              type="button"
-              onClick={() => navigate('calendar')}
-              className="font-mono text-[10px] text-zinc-500 hover:text-zinc-800"
-            >
-              calendar →
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Upcoming</h3>
+            <button type="button" onClick={() => navigate('calendar')} className="text-xs text-zinc-500 hover:text-zinc-800">
+              Calendar →
             </button>
           </div>
           {upcomingTodos.length === 0 ? (
-            <EmptyState
-              icon={Calendar}
-              title="No upcoming deadlines"
-              subtitle="Add due dates to your tasks to see them here."
-            />
+            <EmptyState icon={Calendar} title="No upcoming deadlines" subtitle="Add due dates to your tasks to see them here." />
           ) : (
             <div className="space-y-1">
               {upcomingTodos.map((todo) => {
@@ -416,37 +385,33 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
           )}
         </Card>
 
-        <Card className="p-0 lg:col-span-1">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">TODAY</h3>
-            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-500">
-              <Clock className="h-3 w-3" />
-              {focusLabel} focus
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Today</h3>
+            <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+              <Flame className="h-3 w-3" />
+              {streak}d streak
             </span>
           </div>
           <div className="space-y-3">
-            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Habits today</p>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Habits today</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">
-                {todayHabitRate !== null ? `${Math.round(todayHabitRate * 100)}%` : '—'}
+                {habits.length ? `${todayHabitDone}/${habits.length}` : '—'}
               </p>
               <p className="text-[11px] text-zinc-500">
                 {habits.length
-                  ? `${habits.filter((h) => isDone(done, h.id, todayIso())).length}/${habits.length} done`
-                  : 'No habits yet'}
+                  ? `${Math.round((todayHabitDone / Math.max(habits.length, 1)) * 100)}% complete`
+                  : 'Add habits to track'}
               </p>
             </div>
-            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Baon</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{baonLabel}</p>
-              <p className="text-[11px] text-zinc-500">
-                {financeSettings
-                  ? `₱${Number(financeSettings.allowance_amount).toFixed(0)} ${financeSettings.allowance_period} · spent ₱${totalSpent.toFixed(0)}`
-                  : 'Open Baon Tracker to set allowance'}
-              </p>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Focus today</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{focusLabel}</p>
+              <p className="text-[11px] text-zinc-500">{weekFocusLabel} this week</p>
             </div>
-            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-2.5">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Open tasks</p>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Open tasks</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{activeTodos.length}</p>
               <p className="text-[11px] text-zinc-500">{deadlineCount} due within 7 days</p>
             </div>
@@ -487,9 +452,9 @@ function InsightTile({
     >
       <div className="mb-2 flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-zinc-500" />
-        <span className="font-mono text-[10px] tracking-[0.18em] text-zinc-500">{label}</span>
+        <span className="text-xs font-medium text-zinc-500">{label}</span>
       </div>
-      <div className="font-mono text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
+      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
       <div className="mt-1 text-[11px] text-zinc-500">{hint}</div>
     </button>
   );

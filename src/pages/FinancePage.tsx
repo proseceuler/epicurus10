@@ -119,19 +119,27 @@ export default function FinancePage() {
   };
 
   const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const remaining = settings ? Number(settings.allowance_amount) - totalSpent : 0;
+  const allowanceAmt = settings ? Number(settings.allowance_amount) || 0 : 0;
+  const remaining = settings ? allowanceAmt - totalSpent : 0;
 
   const today = new Date();
-  const periodStart = settings ? new Date(settings.period_start_date) : today;
+  today.setHours(0, 0, 0, 0);
+  let periodStart = today;
+  if (settings?.period_start_date) {
+    const parsed = new Date(settings.period_start_date);
+    if (!Number.isNaN(parsed.getTime())) periodStart = parsed;
+  }
+  periodStart.setHours(0, 0, 0, 0);
   const periodEnd = settings?.allowance_period === 'weekly'
     ? new Date(periodStart.getTime() + 7 * 24 * 60 * 60 * 1000)
     : new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, periodStart.getDate());
 
-  const remainingDays = Math.max(1, Math.ceil((periodEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-  const schoolDaysLeft = settings
-    ? Math.max(1, Math.ceil(remainingDays * settings.school_days_per_week / 7))
-    : 1;
-  const dailySafeSpend = remaining > 0 ? remaining / schoolDaysLeft : 0;
+  const rawDays = Math.ceil((periodEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingDays = Number.isFinite(rawDays) ? Math.max(1, rawDays) : 1;
+  const schoolPerWeek = Number(settings?.school_days_per_week);
+  const schoolDaysPerWeek = Number.isFinite(schoolPerWeek) && schoolPerWeek > 0 ? schoolPerWeek : 5;
+  const schoolDaysLeft = Math.max(1, Math.ceil(remainingDays * schoolDaysPerWeek / 7));
+  const dailySafeSpend = remaining > 0 && schoolDaysLeft > 0 ? remaining / schoolDaysLeft : 0;
 
   const categoryTotals = EXPENSE_CATEGORIES.map((cat) => ({
     ...cat,
@@ -175,10 +183,10 @@ export default function FinancePage() {
             <span className="font-semibold text-zinc-800">Allowance (Baon)</span>
           </div>
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount</label>
-              <div className="flex gap-2 items-stretch">
-                <div className="relative min-w-0 flex-1">
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount</label>
+                <div className="relative">
                   <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-base font-semibold text-zinc-500">₱</span>
                   <Input
                     value={allowanceInput}
@@ -186,14 +194,17 @@ export default function FinancePage() {
                     type="number"
                     placeholder="0.00"
                     size="lg"
-                    className="pl-10 pr-3"
+                    className="pl-9 pr-3"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Period</label>
                 <Select
                   value={periodInput}
                   onChange={(v) => setPeriodInput(v as 'weekly' | 'monthly')}
                   options={[{ value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]}
-                  className="h-14 min-h-14 w-[7.5rem] shrink-0"
+                  className="h-11 w-full"
                 />
               </div>
             </div>
@@ -203,10 +214,10 @@ export default function FinancePage() {
           <div className="mt-6 pt-6 border-t border-zinc-200/40">
             <p className="text-xs font-medium text-zinc-500 mb-1">Daily Safe-to-Spend</p>
             <div className="text-4xl font-bold text-zinc-900">
-              ₱{dailySafeSpend.toFixed(2)}
+              ₱{(Number.isFinite(dailySafeSpend) ? dailySafeSpend : 0).toFixed(2)}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
-              ₱{remaining.toFixed(2)} left · {schoolDaysLeft} school days remaining
+              ₱{(Number.isFinite(remaining) ? remaining : 0).toFixed(2)} left · {Number.isFinite(schoolDaysLeft) ? schoolDaysLeft : 0} school days remaining
             </p>
           </div>
         </Card>

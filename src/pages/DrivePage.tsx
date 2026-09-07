@@ -29,8 +29,8 @@ declare global {
   interface Window {
     puter?: {
       fs: {
-        readdir: (path: string) => Promise<FSItem[]>;
-        mkdir: (path: string, options?: { createMissingParents?: boolean }) => Promise<FSItem>;
+        readdir: (path: string, options?: Record<string, unknown>) => Promise<FSItem[]>;
+        mkdir: (path: string, options?: { createMissingParents?: boolean; overwrite?: boolean; dedupeName?: boolean }) => Promise<FSItem>;
         write: (path: string, data: string | File | Blob) => Promise<FSItem>;
         rename: (oldPath: string, newPath: string) => Promise<FSItem>;
         delete: (path: string | string[]) => Promise<void>;
@@ -40,7 +40,8 @@ declare global {
       auth?: {
         isSignedIn: () => boolean;
         signIn: () => Promise<unknown>;
-        getUser: () => Promise<{ username?: string } | null>;
+        signOut: () => void;
+        getUser: () => Promise<{ username?: string; uuid?: string } | null>;
       };
     };
   }
@@ -55,21 +56,32 @@ export type FSItem = {
   modified?: number;
 };
 
-const TRASH_PATH = '/.trash';
+const APP_ROOT = '.';
+const TRASH_PATH = '.trash';
 
 type ViewMode = 'grid' | 'list';
 type SideView = 'myfiles' | 'recent' | 'trash';
 
+/** Join app-relative Puter paths (root is "." = app AppData sandbox). */
 function joinPath(...parts: string[]) {
-  const cleaned = parts.map((p) => String(p).replace(/^\/+|\/+$/g, '')).filter(Boolean);
-  return '/' + cleaned.join('/');
+  const cleaned = parts
+    .flatMap((p) => String(p).split('/'))
+    .map((p) => p.trim())
+    .filter((p) => p && p !== '.');
+  if (!cleaned.length) return APP_ROOT;
+  return cleaned.join('/');
 }
 
 function parentPath(p: string) {
-  if (p === '/' || !p) return '/';
-  const parts = p.replace(/\/+$/, '').split('/').filter(Boolean);
+  if (!p || p === APP_ROOT || p === './' || p === '/') return APP_ROOT;
+  const parts = String(p).split('/').filter((x) => x && x !== '.');
   parts.pop();
-  return parts.length ? '/' + parts.join('/') : '/';
+  return parts.length ? parts.join('/') : APP_ROOT;
+}
+
+function isTrashPath(p: string) {
+  const n = String(p || '').replace(/^\.\//, '');
+  return n === TRASH_PATH || n.startsWith(TRASH_PATH + '/');
 }
 
 function formatSize(bytes?: number) {
@@ -120,7 +132,7 @@ async function ensureTrash() {
   }
 }
 
-async function collectRecent(path: string, depth = 0): Promise<FSItem[]> {
+async function collectRecent(path: string = APP_ROOT, depth = 0): Promise<FSItem[]> {
   if (depth > 2 || !window.puter) return [];
   let list: FSItem[] = [];
   try {
@@ -141,12 +153,14 @@ async function collectRecent(path: string, depth = 0): Promise<FSItem[]> {
 
 export default function DrivePage() {
   const [sideView, setSideView] = useState<SideView>('myfiles');
-  const [currentPath, setCurrentPath] = useState('/');
+  const [currentPath, setCurrentPath] = useState(APP_ROOT);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [items, setItems] = useState<FSItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [puterReady, setPuterReady] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: FSItem } | null>(null);
@@ -162,8 +176,37 @@ export default function DrivePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLDivElement>(null);
 
+  const refreshAuth = useCallback(async () => {
+    const puter = window.puter;
+    if (!puter?.auth) {
+      setSignedIn(false);
+      setUsername(null);
+      return false;
+    }
+    try {
+      const ok = Boolean(puter.auth.isSignedIn?.());
+      setSignedIn(ok);
+      if (ok) {
+        try {
+          const user = await puter.auth.getUser?.();
+          setUsername(user?.username || null);
+        } catch {
+          setUsername(null);
+        }
+      } else {
+        setUsername(null);
+      }
+      return ok;
+    } catch {
+      setSignedIn(false);
+      setUsername(null);
+      return false;
+    }
+  }, []);
+
   const load = useCallback(async () => {
-    if (!window.puter) {
+    const puter = window.puter;
+    if (!puter?.fs) {
       setLoading(false);
       setItems([]);
       return;
@@ -171,55 +214,101 @@ export default function DrivePage() {
     setLoading(true);
     setLoadError(null);
     try {
-      // soft auth check — sign-in is prompted by Puter on first FS call if needed
+      const ok = await refreshAuth();
+      if (!ok) {
+        // Do not call FS without a signed-in session — popup auth must be user-initiated
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+
       await ensureTrash();
       let next: FSItem[] = [];
       if (sideView === 'recent') {
-        const all = await collectRecent('/');
+        const all = await collectRecent(APP_ROOT);
         next = all
-          .filter((i) => !i.is_dir && !i.path.startsWith(TRASH_PATH))
+          .filter((i) => !i.is_dir && !isTrashPath(i.path || i.name))
           .sort((a, b) => (b.modified || b.created || 0) - (a.modified || a.created || 0))
           .slice(0, 50);
       } else if (sideView === 'trash') {
-        next = await window.puter.fs.readdir(TRASH_PATH);
+        try {
+          next = await puter.fs.readdir(TRASH_PATH);
+        } catch {
+          next = [];
+        }
       } else {
-        next = await window.puter.fs.readdir(currentPath);
-        if (currentPath === '/') {
-          next = next.filter((i) => i.name !== '.trash' && i.path !== TRASH_PATH);
+        const path = currentPath || APP_ROOT;
+        next = await puter.fs.readdir(path);
+        // hide internal trash folder from My Files root
+        if (path === APP_ROOT || path === './' || path === '.') {
+          next = next.filter((i) => (i.name || '') !== '.trash' && !isTrashPath(i.path || ''));
         }
       }
       setItems(Array.isArray(next) ? next : []);
     } catch (err) {
       console.error(err);
       const msg = err instanceof Error ? err.message : 'Could not load files';
-      setLoadError(msg);
+      // Common when not signed in / popup blocked
+      if (/auth|sign.?in|permission|denied|unauthorized|login/i.test(msg)) {
+        setSignedIn(false);
+        setLoadError('Sign in with Puter to open your personal cloud drive.');
+      } else {
+        setLoadError(msg);
+      }
       toast.error(msg);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [sideView, currentPath]);
+  }, [sideView, currentPath, refreshAuth]);
+
+  const signIn = useCallback(async () => {
+    const puter = window.puter;
+    if (!puter?.auth?.signIn) {
+      toast.error('Puter auth is unavailable');
+      return;
+    }
+    try {
+      setLoading(true);
+      setLoadError(null);
+      await puter.auth.signIn();
+      await refreshAuth();
+      await load();
+      toast.success('Signed in to Puter');
+    } catch (err) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : 'Sign-in failed';
+      setLoadError(msg);
+      toast.error(msg);
+      setLoading(false);
+    }
+  }, [load, refreshAuth]);
 
   useEffect(() => {
     let tries = 0;
     let cancelled = false;
-    const tick = () => {
+    const tick = async () => {
       if (cancelled) return;
       if (window.puter) {
         setPuterReady(true);
-        void load();
+        const ok = await refreshAuth();
+        if (ok) void load();
+        else {
+          setLoading(false);
+          setItems([]);
+        }
         return;
       }
       tries += 1;
-      if (tries < 80) setTimeout(tick, 200); // ~16s
+      if (tries < 80) setTimeout(tick, 200);
       else {
         setLoading(false);
         setLoadError('Puter.js did not load. Check your network or ad-blocker, then refresh.');
       }
     };
-    tick();
+    void tick();
     return () => { cancelled = true; };
-  }, [load]);
+  }, [load, refreshAuth]);
 
   const ctxRef = useRef<HTMLDivElement>(null);
 
@@ -254,11 +343,12 @@ export default function DrivePage() {
   const breadcrumbs = useMemo(() => {
     if (sideView === 'recent') return [{ label: 'Recent', path: null as string | null }];
     if (sideView === 'trash') return [{ label: 'Trash', path: null }];
-    const parts = currentPath === '/' ? [] : currentPath.replace(/^\//, '').split('/');
-    const crumbs: { label: string; path: string | null }[] = [{ label: 'My Files', path: '/' }];
+    const raw = (currentPath || APP_ROOT).replace(/^\.\//, '').replace(/^\./, '');
+    const parts = !raw || raw === APP_ROOT ? [] : raw.split('/').filter(Boolean);
+    const crumbs: { label: string; path: string | null }[] = [{ label: 'My Files', path: APP_ROOT }];
     let acc = '';
     parts.forEach((p) => {
-      acc += '/' + p;
+      acc = acc ? `${acc}/${p}` : p;
       crumbs.push({ label: p, path: acc });
     });
     return crumbs;
@@ -272,7 +362,7 @@ export default function DrivePage() {
 
   const uploadFiles = async (files: File[]) => {
     if (!window.puter || !files.length) return;
-    const base = sideView === 'trash' ? '/' : currentPath;
+    const base = sideView === 'trash' ? APP_ROOT : currentPath;
     let ok = 0;
     for (const file of files) {
       try {
@@ -304,10 +394,10 @@ export default function DrivePage() {
 
   const restore = async (item: FSItem) => {
     if (!window.puter) return;
-    let dest = joinPath('/', item.name);
+    let dest = joinPath(APP_ROOT, item.name);
     try {
       await window.puter.fs.stat(dest);
-      dest = joinPath('/', `${Date.now()}_${item.name}`);
+      dest = joinPath(APP_ROOT, `${Date.now()}_${item.name}`);
     } catch {
       /* free */
     }
@@ -372,7 +462,7 @@ export default function DrivePage() {
   const createFolder = async () => {
     const name = folderName.trim();
     if (!name || !window.puter) return;
-    const path = joinPath(sideView === 'trash' ? '/' : currentPath, name);
+    const path = joinPath(sideView === 'trash' ? APP_ROOT : currentPath, name);
     try {
       await window.puter.fs.mkdir(path);
       toast.success(`Folder "${name}" created`);
@@ -404,7 +494,7 @@ export default function DrivePage() {
   };
 
   const inTrash =
-    sideView === 'trash' || (ctx?.item.path.startsWith(TRASH_PATH) ?? false);
+    sideView === 'trash' || isTrashPath(ctx?.item.path || '');
 
   return (
     <div className="flex h-[calc(100vh-7rem)] min-h-[420px] flex-col gap-3">
@@ -531,7 +621,7 @@ export default function DrivePage() {
                 type="button"
                 onClick={() => {
                   setSideView(s.id);
-                  if (s.id === 'myfiles') setCurrentPath('/');
+                  if (s.id === 'myfiles') setCurrentPath(APP_ROOT);
                   setSelectedPath(null);
                 }}
                 className={`flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm transition-colors ${
@@ -543,9 +633,35 @@ export default function DrivePage() {
               </button>
             );
           })}
-          <p className="mt-2 px-2 text-[10px] leading-relaxed text-zinc-400">
-            Powered by Puter.js. Sign-in appears on first use.
-          </p>
+          <div className="mt-3 space-y-1.5 border-t border-zinc-200/50 px-2 pt-3">
+            {signedIn ? (
+              <>
+                <p className="truncate text-[11px] font-medium text-zinc-700">
+                  {username ? `@${username}` : 'Signed in'}
+                </p>
+                <p className="text-[10px] leading-relaxed text-zinc-400">
+                  Personal Puter drive · app sandbox · your account storage
+                </p>
+                <button
+                  type="button"
+                  className="text-[10px] font-medium text-zinc-500 hover:text-zinc-800"
+                  onClick={() => {
+                    window.puter?.auth?.signOut?.();
+                    setSignedIn(false);
+                    setUsername(null);
+                    setItems([]);
+                    setLoadError(null);
+                  }}
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <p className="text-[10px] leading-relaxed text-zinc-400">
+                Sign in with your Puter account to use unlimited personal cloud storage (User-Pays model).
+              </p>
+            )}
+          </div>
         </aside>
 
         <div
@@ -595,13 +711,28 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && puterReady && loadError && (
+            {!loading && puterReady && !signedIn && (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-sm text-zinc-600">
+                <Cloud className="h-12 w-12 text-zinc-300" />
+                <p className="text-base font-semibold text-zinc-800">Connect your Puter drive</p>
+                <p className="max-w-sm text-center text-xs text-zinc-500">
+                  Sign in with your Puter account to load files. Storage is on your account (User-Pays) — you are the owner, not the app host.
+                </p>
+                {loadError && <p className="max-w-sm text-center text-xs text-amber-700">{loadError}</p>}
+                <button
+                  type="button"
+                  onClick={() => void signIn()}
+                  className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                >
+                  Sign in with Puter
+                </button>
+              </div>
+            )}
+
+            {!loading && puterReady && signedIn && loadError && (
               <div className="flex flex-col items-center justify-center gap-3 py-20 text-sm text-zinc-500">
                 <Cloud className="h-10 w-10 text-zinc-300" />
                 <p className="max-w-sm text-center">{loadError}</p>
-                <p className="max-w-xs text-center text-xs text-zinc-400">
-                  First use may require signing in with Puter. Allow the popup if your browser blocks it.
-                </p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
@@ -612,23 +743,16 @@ export default function DrivePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await window.puter?.auth?.signIn?.();
-                        await load();
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Sign-in failed');
-                      }
-                    }}
+                    onClick={() => void signIn()}
                     className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800"
                   >
-                    Sign in with Puter
+                    Re-authenticate
                   </button>
                 </div>
               </div>
             )}
 
-            {!loading && puterReady && !loadError && filtered.length === 0 && (
+            {!loading && puterReady && signedIn && !loadError && filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-zinc-500">
                 <Folder className="h-10 w-10 text-zinc-300" />
                 <p>{search ? 'No matches' : sideView === 'trash' ? 'Trash is empty' : 'This folder is empty'}</p>
@@ -638,7 +762,7 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && puterReady && !loadError && filtered.length > 0 && viewMode === 'grid' && (
+            {!loading && puterReady && signedIn && !loadError && filtered.length > 0 && viewMode === 'grid' && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((item) => {
                   const Icon = iconFor(item);
@@ -678,7 +802,7 @@ export default function DrivePage() {
               </div>
             )}
 
-            {!loading && puterReady && !loadError && filtered.length > 0 && viewMode === 'list' && (
+            {!loading && puterReady && signedIn && !loadError && filtered.length > 0 && viewMode === 'list' && (
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200/70 text-[11px] uppercase tracking-wide text-zinc-400">

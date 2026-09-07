@@ -37,6 +37,21 @@
   perspective: 900px;
 }
 
+.epic-popover {
+  isolation: isolate;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  box-shadow: 0 12px 40px rgba(24, 24, 27, 0.1), 0 2px 8px rgba(24, 24, 27, 0.04);
+}
+
+select.glass-input,
+.glass-input[type='date'],
+.glass-input[type='time'] {
+  appearance: none;
+  background-clip: padding-box;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -25,7 +25,7 @@ type Props = {
 };
 
 export function WeekGrid(p: Props) {
-  const stepMin = 30;
+  const stepMin = p.slots.length >= 2 ? Math.max(15, labelToMinutes(p.slots[1].label) - labelToMinutes(p.slots[0].label)) : 30;
   const rowH = p.density === 'compact' ? 36 : 48;
   const inSlotRange = (dayIso: string, label: string) => {
     if (!p.slotDrag || p.slotDrag.dayIso !== dayIso) return false;

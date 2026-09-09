@@ -74,6 +74,26 @@ export function joinDue(date: string, time: string) {
   return time ? `${date}T${time}` : date;
 }
 
+const START_KEY = (id: string) => `epicure:kanban-start:${id}`;
+
+export function loadStartDate(id: string): string {
+  if (typeof window === 'undefined') return '';
+  try { return window.localStorage.getItem(START_KEY(id)) || ''; } catch { return ''; }
+}
+
+export function saveStartDate(id: string, date: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (date) window.localStorage.setItem(START_KEY(id), date);
+    else window.localStorage.removeItem(START_KEY(id));
+  } catch { /* ignore */ }
+}
+
+export function formatStart(date: string) {
+  if (!date) return '';
+  return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function formatDue(due: string) {
   const { date, time } = splitDue(due);
   const label = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {

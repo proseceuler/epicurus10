@@ -34,7 +34,7 @@ function parseOfficeHours(raw: string): { days: number[]; start: string; end: st
 function formatOfficeHours(days: number[], start: string, end: string) {
   if (!days.length) return '';
   const labels = days.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]);
-  return labels.join(', ') + ' ' + start + '\u2013' + end;
+  return labels.join(', ') + ' ' + start + '-' + end;
 }
 
 function ClassInfoTab() {
@@ -138,7 +138,7 @@ function ClassInfoTab() {
         <Card className="p-6">
           <div className="mb-4 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900"><User className="h-4 w-4 text-white" /></div>
-            <h3 className="font-semibold text-zinc-800">{subject.name} \u00b7 Class Info</h3>
+            <h3 className="font-semibold text-zinc-800">{subject.name} - Class Info</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -171,9 +171,9 @@ function ClassInfoTab() {
               <textarea value={editForm.notes} onChange={(e) => markField({ notes: e.target.value })} rows={3} placeholder="Any extra notes about this class..." className="glass-input w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400" />
             </div>
             <div className="flex min-h-[28px] items-center justify-between gap-2">
-              <button type="button" className="text-[11px] text-zinc-500 hover:text-zinc-800" onClick={() => { const el = document.getElementById('timetable'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>→ Timetable</button>
+              <button type="button" className="text-[11px] text-zinc-500 hover:text-zinc-800" onClick={() => { const el = document.getElementById('timetable'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Go to Timetable</button>
               <div className="flex items-center gap-2">
-                {dirty && <button type="button" onClick={() => void saveHub({ ...editForm, office_hours: formatOfficeHours(officeDays, officeStart, officeEnd) || editForm.office_hours })} disabled={saving} className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white"><Save className="h-3.5 w-3.5" /> {saving ? '\u2026' : 'Save'}</button>}
+                {dirty && <button type="button" onClick={() => void saveHub({ ...editForm, office_hours: formatOfficeHours(officeDays, officeStart, officeEnd) || editForm.office_hours })} disabled={saving} className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white"><Save className="h-3.5 w-3.5" /> {saving ? '...' : 'Save'}</button>}
                 {savedFlash && !dirty && <span className="text-[11px] text-emerald-600">Saved</span>}
               </div>
             </div>

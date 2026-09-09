@@ -13,6 +13,36 @@ export interface BoardList {
   id: string;
   label: string;
   tint: string;
+  color?: string | null;
+}
+
+export type ListAutomationTrigger = 'card_added' | 'every_day' | 'every_monday';
+export type ListAutomationAction = 'sort_by_due' | 'sort_by_title' | 'sort_by_created';
+
+export interface ListAutomation {
+  id: string;
+  listId: string;
+  trigger: ListAutomationTrigger;
+  action: ListAutomationAction;
+  enabled: boolean;
+}
+
+const AUTOMATION_KEY = 'epicure:kanban-automations';
+
+export function loadAutomations(): ListAutomation[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(AUTOMATION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as ListAutomation[]) : [];
+    return Array.isArray(parsed) ? parsed.filter((r) => r?.id && r?.listId) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveAutomations(rules: ListAutomation[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(AUTOMATION_KEY, JSON.stringify(rules));
 }
 
 const LISTS_KEY = 'epicure:kanban-lists';
@@ -86,7 +116,8 @@ export function saveStartDate(id: string, date: string) {
   try {
     if (date) window.localStorage.setItem(START_KEY(id), date);
     else window.localStorage.removeItem(START_KEY(id));
-  } catch { /* ignore */ }
+  } catch { /* ignore */
+  }
 }
 
 export function formatStart(date: string) {

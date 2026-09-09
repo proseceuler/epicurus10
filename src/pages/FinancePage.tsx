@@ -25,6 +25,9 @@ function faviconFor(url?: string | null): string | null {
   }
 }
 
+const PHP = String.fromCharCode(0x20B1);
+const MID = String.fromCharCode(0x00B7);
+
 export default function FinancePage() {
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
@@ -171,7 +174,7 @@ export default function FinancePage() {
     <div>
       <PageHeader
         title="Baon Tracker"
-        subtitle="Student allowance manager \u00b7 Track spending \u00b7 Save for goals"
+        subtitle={`Student allowance manager ${MID} Track spending ${MID} Save for goals`}
         action={<Button onClick={() => setShowAddExpense(true)}><Plus className="w-4 h-4" /> Add Expense</Button>}
       />
 
@@ -188,7 +191,7 @@ export default function FinancePage() {
               <div>
                 <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-base font-semibold text-zinc-500">\u20b1</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-base font-semibold text-zinc-500">{PHP}</span>
                   <Input
                     value={allowanceInput}
                     onChange={setAllowanceInput}
@@ -215,10 +218,10 @@ export default function FinancePage() {
           <div className="mt-6 pt-6 border-t border-zinc-200/40">
             <p className="text-xs font-medium text-zinc-500 mb-1">Daily Safe-to-Spend</p>
             <div className="text-4xl font-bold text-zinc-900">
-              \u20b1{(Number.isFinite(dailySafeSpend) ? dailySafeSpend : 0).toFixed(2)}
+              {PHP}{(Number.isFinite(dailySafeSpend) ? dailySafeSpend : 0).toFixed(2)}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
-              \u20b1{(Number.isFinite(remaining) ? remaining : 0).toFixed(2)} left \u00b7 {Number.isFinite(schoolDaysLeft) ? schoolDaysLeft : 0} school days remaining
+              {PHP}{(Number.isFinite(remaining) ? remaining : 0).toFixed(2)} left {MID} {Number.isFinite(schoolDaysLeft) ? schoolDaysLeft : 0} school days remaining
             </p>
           </div>
         </Card>
@@ -237,7 +240,7 @@ export default function FinancePage() {
                 <div key={cat.key}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm text-zinc-600">{cat.emoji} {cat.label}</span>
-                    <span className="text-sm font-semibold text-zinc-800">\u20b1{cat.total.toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-zinc-800">{PHP}{cat.total.toFixed(2)}</span>
                   </div>
                   <div className="h-2 bg-zinc-200/50 rounded-full overflow-hidden">
                     <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -248,7 +251,7 @@ export default function FinancePage() {
           </div>
           <div className="mt-4 pt-4 border-t border-zinc-200/40 flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-700">Total Spent</span>
-            <span className="text-lg font-bold text-zinc-900">\u20b1{totalSpent.toFixed(2)}</span>
+            <span className="text-lg font-bold text-zinc-900">{PHP}{totalSpent.toFixed(2)}</span>
           </div>
         </Card>
 
@@ -269,7 +272,7 @@ export default function FinancePage() {
             <div className="space-y-2 mb-3 pb-3 border-b border-zinc-200/40">
               <Input value={goalForm.name} onChange={(v) => setGoalForm({ ...goalForm, name: v })} placeholder="Goal name (e.g. Keyboard)" />
               <Input value={goalForm.target} onChange={(v) => setGoalForm({ ...goalForm, target: v })} type="number" placeholder="Target amount" />
-              <Input value={goalForm.url} onChange={(v) => setGoalForm({ ...goalForm, url: v })} placeholder="Link (optional) — store, listing, wishlist" />
+              <Input value={goalForm.url} onChange={(v) => setGoalForm({ ...goalForm, url: v })} placeholder="Link (optional) - store, listing, wishlist" />
               <Button onClick={addGoal} size="sm" className="w-full">Add Goal</Button>
             </div>
           )}
@@ -310,8 +313,8 @@ export default function FinancePage() {
                       </button>
                     </div>
                     <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
-                      <span>\u20b1{goal.saved_amount.toFixed(2)}</span>
-                      <span>\u20b1{goal.target_amount.toFixed(2)}</span>
+                      <span>{PHP}{goal.saved_amount.toFixed(2)}</span>
+                      <span>{PHP}{goal.target_amount.toFixed(2)}</span>
                     </div>
                     <div className="h-2 bg-zinc-200/50 rounded-full overflow-hidden mb-2">
                       <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -321,7 +324,7 @@ export default function FinancePage() {
                         onClick={() => transferLeftover(goal.id)}
                         className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900 font-medium"
                       >
-                        <ArrowRight className="w-3 h-3" /> Transfer leftover (\u20b1{remaining.toFixed(2)})
+                        <ArrowRight className="w-3 h-3" /> Transfer leftover ({PHP}{remaining.toFixed(2)})
                       </button>
                     )}
                   </div>
@@ -343,7 +346,7 @@ export default function FinancePage() {
             return (
               <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
                 <span className="text-[9px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                  \u20b1{d.total.toFixed(0)}
+                  {PHP}{d.total.toFixed(0)}
                 </span>
                 <div
                   className={`w-full rounded-t transition-all ${d.total > 0 ? 'bg-zinc-700' : 'bg-zinc-200/50'}`}
@@ -376,9 +379,9 @@ export default function FinancePage() {
                   <span className="text-xl">{cat?.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-700">{t.description || cat?.label}</p>
-                    <p className="text-xs text-zinc-400">{cat?.label} \u00b7 {new Date(t.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    <p className="text-xs text-zinc-400">{cat?.label} {MID} {new Date(t.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                   </div>
-                  <span className="text-sm font-bold text-zinc-900">\u20b1{Number(t.amount).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-zinc-900">{PHP}{Number(t.amount).toFixed(2)}</span>
                   <button onClick={() => deleteExpense(t.id)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="w-4 h-4" />
                   </button>

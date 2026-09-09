@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendarStore';
 import type { Todo, KanbanTask, Note, Habit } from '@/lib/types';
-import { iso, addOneHour, labelToMinutes, type Density, type DragPayload } from '@/pages/calendar/model';
+import { iso, addOneHour, labelToMinutes, packTimed, eventFill, EVENT_COLORS, type Density, type DragPayload } from '@/pages/calendar/model';
 
 const KIND_STYLE: Record<string, string> = {
   event: 'bg-zinc-800 text-white',
@@ -36,11 +37,14 @@ type Props = {
   writeDrag: (e: React.DragEvent, payload: DragPayload) => void;
   setSelectedDay: (iso: string) => void;
   todayStr: string;
+  onColor?: (id: string, color: string | null) => void;
+  onDelete?: (id: string) => void;
 };
 
 export function WeekGrid(p: Props) {
   const stepMin = p.density === 'comfortable' ? 15 : 60;
-  const rowH = p.density === 'compact' ? 22 : 32;
+  const rowH = p.density === 'compact' ? 28 : 48;
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number; colorOpen?: boolean } | null>(null);
   const inSlotRange = (dayIso: string, label: string) => {
     if (!p.slotDrag || p.slotDrag.dayIso !== dayIso) return false;
     const a = labelToMinutes(p.slotDrag.start);
@@ -96,14 +100,15 @@ export function WeekGrid(p: Props) {
         <div className="min-w-[560px]" style={{ display: 'grid', gridTemplateColumns: `3.25rem repeat(${p.rangeDays.length}, minmax(0, 1fr))` }}>
           {p.slots.map((slot) => (
             <div key={slot.label} className="contents">
-              <div className={`border-t border-zinc-100 pr-1 text-right text-[10px] text-zinc-400 ${p.density === 'compact' ? 'h-[22px] leading-[22px]' : 'h-8 leading-8'}`}>{slot.m === 0 ? slot.label : ''}</div>
+              <div className="border-t border-zinc-100 pr-1 text-right text-[10px] text-zinc-400" style={{ height: rowH, lineHeight: `${rowH}px` }}>{slot.m === 0 ? slot.label : ''}</div>
               {p.rangeDays.map((d) => {
                 const dayIso = iso(d);
                 const selected = inSlotRange(dayIso, slot.label);
                 return (
                   <div
                     key={`${dayIso}-${slot.label}`}
-                    className={`${p.density === 'compact' ? 'min-h-[22px]' : 'min-h-[32px]'} border-l border-t border-zinc-100 p-0.5 select-none ${selected ? 'bg-zinc-900/10' : ''}`}
+                    className={`border-l border-t border-zinc-100 p-0.5 select-none ${selected ? 'bg-zinc-900/10' : ''}`}
+                    style={{ minHeight: rowH }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso, slot.label); }}
                     onDoubleClick={() => p.openForm(dayIso, { start: slot.label })}
@@ -139,28 +144,51 @@ export function WeekGrid(p: Props) {
             const gridStart = 6 * 60;
             const gridEnd = 22 * 60;
             const timed = p.eventsForDay(dayIso).filter((e) => !e.all_day);
+            const packed = packTimed(timed);
+            const isToday = d.toDateString() === p.todayStr;
+            const now = new Date();
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            const showNow = isToday && nowMin >= gridStart && nowMin <= gridEnd;
             return (
               <div key={`overlay-${dayIso}`} className="pointer-events-none relative" style={{ gridColumn: di + 2, gridRow: `1 / span ${p.slots.length}` }}>
-                {timed.map((e) => {
-                  const start = labelToMinutes((e.start_time || '06:00').slice(0, 5));
-                  const rawEnd = e.end_time ? labelToMinutes(e.end_time.slice(0, 5)) : start + 60;
-                  const s = Math.max(gridStart, Math.min(start, gridEnd - 15));
-                  const en = Math.max(s + 15, Math.min(rawEnd <= start ? start + 60 : rawEnd, gridEnd));
+                {showNow && (
+                  <div className="pointer-events-none absolute left-0 right-0 z-20" style={{ top: ((nowMin - gridStart) / stepMin) * rowH }}>
+                    <span className="absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full bg-rose-500" />
+                    <div className="h-px bg-rose-500" />
+                  </div>
+                )}
+                {packed.map((block) => {
+                  const ev = timed.find((e) => e.id === block.id);
+                  if (!ev) return null;
+                  const s = Math.max(gridStart, Math.min(block.startMin, gridEnd - 15));
+                  const en = Math.max(s + 15, Math.min(block.endMin, gridEnd));
                   const top = ((s - gridStart) / stepMin) * rowH;
-                  const height = Math.max(rowH - 2, ((en - s) / stepMin) * rowH - 2);
+                  const height = Math.max(22, ((en - s) / stepMin) * rowH - 3);
+                  const widthPct = 100 / block.cols;
+                  const leftPct = (block.col / block.cols) * 100;
+                  const fill = eventFill(ev.kind, ev.color);
                   return (
                     <button
-                      key={e.id}
+                      key={ev.id}
                       type="button"
                       draggable
-                      onDragStart={(ev) => p.writeDrag(ev, { kind: 'event', id: e.id })}
-                      onClick={() => p.openEvent(e)}
-                      className={`pointer-events-auto absolute left-0.5 right-0.5 z-10 overflow-hidden rounded px-1 py-0.5 text-left text-[10px] leading-tight ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}
-                      style={{ top, height }}
-                      title={`${(e.start_time || '').slice(0, 5)}${e.end_time ? `-${e.end_time.slice(0, 5)}` : ''} ${e.title}`}
+                      onDragStart={(drag) => p.writeDrag(drag, { kind: 'event', id: ev.id })}
+                      onClick={() => p.openEvent(ev)}
+                      onContextMenu={(ctx) => {
+                        ctx.preventDefault();
+                        setMenu({ id: ev.id, x: ctx.clientX, y: ctx.clientY });
+                      }}
+                      className="pointer-events-auto absolute z-10 overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[11px] leading-tight text-white shadow-sm"
+                      style={{ top, height, left: `calc(${leftPct}% + 2px)`, width: `calc(${widthPct}% - 4px)`, background: fill }}
+                      title={`${(ev.start_time || '').slice(0, 5)}${ev.end_time ? `-${ev.end_time.slice(0, 5)}` : ''} ${ev.title}`}
                     >
-                      <span className="font-medium">{e.title}</span>
-                      <span className="ml-1 opacity-70">{(e.start_time || '').slice(0, 5)}{e.end_time ? `-${e.end_time.slice(0, 5)}` : ''}</span>
+                      <div className="font-semibold">{ev.title || '(No title)'}</div>
+                      {height > 28 && (
+                        <div className="opacity-80">
+                          {(ev.start_time || '').slice(0, 5)}
+                          {ev.end_time ? ` – ${ev.end_time.slice(0, 5)}` : ''}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -169,6 +197,31 @@ export function WeekGrid(p: Props) {
           })}
         </div>
       </div>
+      {menu && (
+        <div className="fixed inset-0 z-50" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}>
+          <div
+            className="absolute w-56 overflow-hidden rounded-xl bg-white p-1.5 shadow-[0_16px_40px_rgba(24,24,27,0.18)]"
+            style={{ left: Math.min(menu.x, window.innerWidth - 240), top: Math.min(menu.y, window.innerHeight - 220) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" className="flex w-full rounded-lg px-3 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-100" onClick={() => {
+              const ev = p.rangeDays.flatMap((d) => p.eventsForDay(iso(d))).find((e) => e.id === menu.id);
+              if (ev) p.openEvent(ev);
+              setMenu(null);
+            }}>Edit event</button>
+            <button type="button" className="flex w-full rounded-lg px-3 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-100" onClick={() => setMenu({ ...menu, colorOpen: !menu.colorOpen })}>Change color</button>
+            {menu.colorOpen && (
+              <div className="grid grid-cols-7 gap-1.5 px-2 py-2">
+                {EVENT_COLORS.map((hex) => (
+                  <button key={hex} type="button" className="h-5 w-5 rounded-full border border-black/10" style={{ background: hex }} onClick={() => { p.onColor?.(menu.id, hex); setMenu(null); }} />
+                ))}
+                <button type="button" className="col-span-7 rounded-md bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600" onClick={() => { p.onColor?.(menu.id, null); setMenu(null); }}>Default</button>
+              </div>
+            )}
+            <button type="button" className="flex w-full rounded-lg px-3 py-1.5 text-left text-sm text-rose-600 hover:bg-rose-50" onClick={() => { void p.onDelete?.(menu.id); setMenu(null); }}>Delete</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

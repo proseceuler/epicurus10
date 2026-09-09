@@ -8,6 +8,7 @@ import {
 import { Button, Input, Select } from '@/components/kit';
 import { DateGrid, TimeField } from '@/components/fields';
 import { MotionPopover } from '@/components/MotionUI';
+import { CardComments } from '@/components/kanban/CardComments';
 import { Trash2, X, Calendar as CalIcon, CheckSquare, Paperclip, MessageSquare, Tag, AlignLeft, GripVertical, Link2 } from 'lucide-react';
 
 function MiniSheet({ title, open, onClose, children }: { title: string; open: boolean; onClose: () => void; children: React.ReactNode }) {
@@ -201,6 +202,7 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
                 </div>
               </MiniSheet>
             )}
+            <CardComments comments={uniqueById(task.comments)} onSave={(comments) => onSave({ comments })} />
           </aside>
         </div>
       </div>

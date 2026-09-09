@@ -15,6 +15,7 @@ export interface CalendarEvent {
   linked_note_id: string | null;
   linked_habit_id: string | null;
   linked_kanban_id: string | null;
+  color?: string | null;
   created_at: string;
 }
 
@@ -122,7 +123,6 @@ type SeedSpec = {
 
 /** DepEd Order No. 009, s. 2026 — School Year 2026–2027 three-term calendar */
 const DEPED_SY2026: SeedSpec[] = [
-  // Term 1
   { title: 'Brigada Eskwela / Enrollment Period', start_date: '2026-06-01', end_date: '2026-06-05', kind: 'event' },
   { title: 'Opening Block / Start of Term 1', start_date: '2026-06-08', end_date: '2026-06-11', kind: 'event' },
   { title: 'Term 1 begins', start_date: '2026-06-08', end_date: '2026-06-08', kind: 'event', description: 'Start: June 8, 2026 · End: Sept 15, 2026' },
@@ -140,7 +140,6 @@ const DEPED_SY2026: SeedSpec[] = [
   { title: 'Wellness Break of Learners (T1)', start_date: '2026-09-10', end_date: '2026-09-15', kind: 'holiday', description: 'Guided asynchronous learning experiences' },
   { title: 'Wellness Break of Teachers (T1)', start_date: '2026-09-14', end_date: '2026-09-15', kind: 'holiday' },
   { title: 'End of Term 1', start_date: '2026-09-15', end_date: '2026-09-15', kind: 'deadline' },
-  // Term 2
   { title: 'Start of Term 2', start_date: '2026-09-16', end_date: '2026-09-16', kind: 'event', description: 'Start: Sept 16, 2026 · End: Dec 18, 2026' },
   { title: 'First Teacher-made Summative Test (T2)', start_date: '2026-10-07', end_date: '2026-10-07', kind: 'exam' },
   { title: 'Second Teacher-made Summative Test (T2)', start_date: '2026-10-29', end_date: '2026-10-29', kind: 'exam' },
@@ -155,7 +154,6 @@ const DEPED_SY2026: SeedSpec[] = [
   { title: 'INSET / Wellness Break of Learners (T2)', start_date: '2026-12-16', end_date: '2026-12-16', kind: 'event' },
   { title: 'End of Term 2', start_date: '2026-12-17', end_date: '2026-12-18', kind: 'deadline' },
   { title: 'Year-End Break / Vacation', start_date: '2026-12-19', end_date: '2026-12-31', kind: 'holiday', description: 'Wellness Break of Learners & Teachers' },
-  // Term 3
   { title: 'Start of Term 3', start_date: '2027-01-04', end_date: '2027-01-04', kind: 'event', description: 'Start: Jan 4, 2027 · End: April 8, 2027' },
   { title: 'First Teacher-made Summative Test (T3)', start_date: '2027-01-25', end_date: '2027-01-25', kind: 'exam' },
   { title: 'Chinese New Year', start_date: '2027-02-06', end_date: '2027-02-06', kind: 'holiday', description: 'Additional Special Non-Working Holiday' },
@@ -218,4 +216,3 @@ export function seedDepEdCalendarIfNeeded(): number {
   }
   return toAdd.length;
 }
-

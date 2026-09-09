@@ -16,12 +16,12 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'insights', label: 'Insights' },
 ];
 const DEFAULT_HABITS = [
-  { name: 'Journal', emoji: '📔', goal_target: 30 },
-  { name: 'Push Up', emoji: '💪', goal_target: 25 },
-  { name: 'Healthy Diet', emoji: '🥗', goal_target: 30 },
-  { name: 'Read 3 pages', emoji: '📚', goal_target: 30 },
-  { name: 'Active Learning', emoji: '🧠', goal_target: 25 },
-  { name: 'Run', emoji: '🏃', goal_target: 20 },
+  { name: 'Journal', emoji: '\ud83d\udcd4', goal_target: 30 },
+  { name: 'Push Up', emoji: '\ud83d\udcaa', goal_target: 25 },
+  { name: 'Healthy Diet', emoji: '\ud83e\udd57', goal_target: 30 },
+  { name: 'Read 3 pages', emoji: '\ud83d\udcda', goal_target: 30 },
+  { name: 'Active Learning', emoji: '\ud83e\udde0', goal_target: 25 },
+  { name: 'Run', emoji: '\ud83c\udfc3', goal_target: 20 },
 ];
 
 function dedupeHabits(list: Habit[]) {
@@ -44,7 +44,7 @@ export default function HabitsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth());
   const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState({ name: '', emoji: '✅', goal: '30' });
+  const [draft, setDraft] = useState({ name: '', emoji: '\u2705', goal: '30' });
   const seeded = useRef(false);
   const today = todayIso();
   const done = useMemo(() => doneSet(completions), [completions]);
@@ -94,10 +94,10 @@ export default function HabitsPage() {
 
   const addHabit = async () => {
     if (!draft.name.trim()) return;
-    const { data } = await supabase.from('habits').insert({ name: draft.name.trim(), emoji: draft.emoji || '✅', goal_target: parseInt(draft.goal) || 30, color: 'zinc' }).select().single();
+    const { data } = await supabase.from('habits').insert({ name: draft.name.trim(), emoji: draft.emoji || '\u2705', goal_target: parseInt(draft.goal) || 30, color: 'zinc' }).select().single();
     if (data) {
       setHabits((cur) => dedupeHabits([...cur, data as Habit]));
-      setDraft({ name: '', emoji: '✅', goal: '30' });
+      setDraft({ name: '', emoji: '\u2705', goal: '30' });
       setShowAdd(false);
     }
   };
@@ -118,11 +118,11 @@ export default function HabitsPage() {
   }));
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20 text-xs text-zinc-500">Loading tracker…</div>;
+    return <div className="flex items-center justify-center py-20 text-xs text-zinc-500">Loading tracker\u2026</div>;
   }
 
   return (
-    <div className={`ht-shell ${view === 'home' ? 'flex min-h-[calc(100vh-5.5rem)] flex-col' : 'min-h-[calc(100vh-5.5rem)] pb-16'}`}>
+    <div className={`ht-shell ${view === 'home' ? 'flex h-[calc(100vh-8.25rem)] max-h-[calc(100vh-8.25rem)] flex-col overflow-hidden' : 'min-h-[calc(100vh-5.5rem)] pb-16'}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
@@ -133,7 +133,7 @@ export default function HabitsPage() {
           <Select className="w-[4.5rem]" value={String(year)} onChange={(v) => setYear(Number(v))} options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
       </div>
-      <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center' : ''}>
+      <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden' : ''}>
       <MotionSwap id={view}>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}

@@ -42,7 +42,6 @@ export function ListActions({
     if (!r) return;
     const width = 256;
     const height = menuRef.current?.offsetHeight || 340;
-    // Sit to the right of the list so the column stays readable, like Trello.
     let left = r.right + 8;
     if (left + width > window.innerWidth - 8) left = Math.max(8, r.left - width - 8);
     let top = r.top;
@@ -58,15 +57,19 @@ export function ListActions({
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const follow = () => placeMenu();
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    // Position once after paint. Do not follow the button — sidebar hover
-    // shifts the board, and Trello keeps the menu parked where it opened.
-    const id = window.requestAnimationFrame(placeMenu);
+    window.addEventListener('resize', follow);
+    window.addEventListener('scroll', follow, true);
+    const id = window.setInterval(follow, 50);
+    follow();
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
-      window.cancelAnimationFrame(id);
+      window.removeEventListener('resize', follow);
+      window.removeEventListener('scroll', follow, true);
+      window.clearInterval(id);
     };
   }, [open, section]);
 
@@ -82,11 +85,15 @@ export function ListActions({
 
   return (
     <div className="relative ml-auto flex items-center gap-1">
-      <span className="rounded-full bg-zinc-200/80 px-1.5 text-[10px] font-medium text-zinc-600">{count}</span>
+      <span
+        className={`rounded-full px-1.5 text-[10px] font-medium ${list.color ? '' : 'bg-zinc-200/80 text-zinc-600'}`}
+        style={list.color ? { background: `${list.color}33`, color: list.color } : undefined}
+      >{count}</span>
       <button
         ref={btnRef}
         type="button"
-        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-200/70 hover:text-zinc-700"
+        className={`rounded-md p-1 hover:bg-zinc-200/70 ${list.color ? '' : 'text-zinc-400 hover:text-zinc-700'}`}
+        style={list.color ? { color: list.color } : undefined}
         onClick={(e) => {
           e.stopPropagation();
           setSection('root');
@@ -101,7 +108,7 @@ export function ListActions({
         <div
           ref={menuRef}
           className="fixed z-[90] w-64 overflow-hidden rounded-xl bg-white shadow-[0_16px_40px_rgba(24,24,27,0.16)]"
-          style={{ top: pos.top, left: pos.left }}
+          style={{ top: pos.top, left: pos.left, borderTop: list.color ? `3px solid ${list.color}` : undefined }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="relative flex items-center justify-center border-b border-zinc-100 px-8 py-2">

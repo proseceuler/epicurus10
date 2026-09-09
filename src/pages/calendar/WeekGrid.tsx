@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendarStore';
 import type { Todo, KanbanTask, Note, Habit } from '@/lib/types';
 import { iso, addOneHour, hm, packTimed, eventFill, EVENT_COLORS, type Density, type DragPayload } from '@/pages/calendar/model';
@@ -18,9 +18,9 @@ const SOURCE_STYLE = {
   habit: 'border border-emerald-400/70 bg-emerald-50 text-emerald-800',
 };
 
-const GRID_START = 6 * 60;
-const GRID_END = 22 * 60;
-const HOURS = Array.from({ length: (GRID_END - GRID_START) / 60 }, (_, i) => 6 + i);
+const GRID_START = 0;
+const GRID_END = 24 * 60;
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function hourLabel(h: number) {
   if (h === 0) return '12 AM';
@@ -69,6 +69,15 @@ export function WeekGrid(p: Props) {
   const hourH = p.density === 'compact' ? 40 : 52;
   const gridH = HOURS.length * hourH;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; colorOpen?: boolean } | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const now = new Date();
+    const hour = Math.max(0, now.getHours() - 1);
+    el.scrollTop = hour * hourH;
+  }, [hourH]);
 
   const minutesFromY = (el: HTMLElement, clientY: number) => {
     const rect = el.getBoundingClientRect();
@@ -128,7 +137,7 @@ export function WeekGrid(p: Props) {
         })}
       </div>
 
-      <div className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto">
+      <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto">
         <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: `3.25rem repeat(${p.rangeDays.length}, minmax(0, 1fr))` }}>
           <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (

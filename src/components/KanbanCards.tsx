@@ -22,7 +22,7 @@ function MiniSheet({ title, open, onClose, children }: { title: string; open: bo
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [open, onClose]);
   return (
-    <MotionPopover open={open} className="absolute right-0 top-0 z-20 w-[min(92vw,20.5rem)] p-0">
+    <MotionPopover open={open} className="absolute left-0 top-full z-30 mt-2 w-[min(92vw,20.5rem)] p-0">
       <div ref={ref} className="relative overflow-hidden rounded-[1.15rem] bg-white shadow-[0_16px_40px_rgba(24,24,27,0.16)]">
         <div className="relative flex items-center justify-center border-b border-zinc-100 px-10 py-2.5">
           <h4 className="text-[13px] font-semibold text-zinc-700">{title}</h4>
@@ -107,9 +107,9 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
           <button type="button" onClick={onDelete} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100"><Trash2 className="h-4 w-4" /></button>
           <button type="button" onClick={onClose} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100"><X className="h-4 w-4" /></button>
         </div>
-        <div className="flex flex-col lg:flex-row">
-          <div className="min-w-0 flex-1 space-y-5 p-5 pt-3">
+        <div className="p-5 pt-3">
             <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveBasics} className="w-full bg-transparent text-xl font-semibold outline-none" />
+            <div className="relative mt-4">
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setPanel(panel === 'labels' ? null : 'labels')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><Tag className="h-3.5 w-3.5" /> + Add</button>
               <button type="button" onClick={() => setPanel(panel === 'dates' ? null : 'dates')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><CalIcon className="h-3.5 w-3.5" /> Dates</button>
@@ -117,24 +117,6 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
               <button type="button" onClick={() => setPanel(panel === 'attach' ? null : 'attach')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><Paperclip className="h-3.5 w-3.5" /> Attachment</button>
               {links ? <button type="button" onClick={() => setPanel(panel === 'connect' ? null : 'connect')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><Link2 className="h-3.5 w-3.5" /> Connect</button> : null}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-medium text-zinc-500">Labels</span>
-              {subj ? <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-white">{subj.shortName}</span> : null}
-              {startOn && startDate ? <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">Starts {formatStart(startDate)}</span> : null}
-              {due ? <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${dueTone(due)}`}><CalIcon className="h-3 w-3" />{formatDue(due)}</span> : null}
-            </div>
-            <section>
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><AlignLeft className="h-3.5 w-3.5" /> Description</h3>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} onBlur={saveBasics} rows={4} placeholder="Add a more detailed description…" className="min-h-[88px] w-full rounded-xl border border-zinc-200/70 bg-white/80 px-3 py-2 text-sm outline-none" />
-            </section>
-            {checklist.map((item) => (
-              <div key={item.id} className="flex items-center gap-2 py-1">
-                <input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} />
-                <span className={`flex-1 text-sm ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span>
-              </div>
-            ))}
-          </div>
-          <aside className="relative w-full overflow-visible border-t border-zinc-200/50 p-5 lg:w-64 lg:border-l lg:border-t-0">
             <MiniSheet title="Labels" open={panel === 'labels'} onClose={() => setPanel(null)}>
               <button type="button" onClick={() => { setSubject(''); onSave({ subject_key: null }); setPanel(null); }} className={`flex w-full items-center rounded-lg px-2.5 py-1.5 text-sm ${!subject ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-100'}`}>None</button>
               {SUBJECTS.map((s) => (
@@ -202,8 +184,24 @@ export function CardDetailModal({ task, lists, links, onClose, onDelete, onStatu
                 </div>
               </MiniSheet>
             )}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-zinc-500">Labels</span>
+              {subj ? <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-white">{subj.shortName}</span> : null}
+              {startOn && startDate ? <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">Starts {formatStart(startDate)}</span> : null}
+              {due ? <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${dueTone(due)}`}><CalIcon className="h-3 w-3" />{formatDue(due)}</span> : null}
+            </div>
+            <section className="mt-5">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><AlignLeft className="h-3.5 w-3.5" /> Description</h3>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} onBlur={saveBasics} rows={4} placeholder="Add a more detailed description..." className="min-h-[88px] w-full rounded-xl border border-zinc-200/70 bg-white/80 px-3 py-2 text-sm outline-none" />
+            </section>
             <CardComments comments={uniqueById(task.comments)} onSave={(comments) => onSave({ comments })} />
-          </aside>
+            {checklist.map((item) => (
+              <div key={item.id} className="flex items-center gap-2 py-1">
+                <input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} />
+                <span className={`flex-1 text-sm ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span>
+              </div>
+            ))}
         </div>
       </div>
     </div>

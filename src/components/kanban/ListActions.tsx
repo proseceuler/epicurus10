@@ -37,6 +37,19 @@ export function ListActions({
   const menuRef = useRef<HTMLDivElement>(null);
   const rules = loadAutomations().filter((r) => r.listId === list.id);
 
+  const placeMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const width = 256;
+    const height = menuRef.current?.offsetHeight || 340;
+    // Sit to the right of the list so the column stays readable, like Trello.
+    let left = r.right + 8;
+    if (left + width > window.innerWidth - 8) left = Math.max(8, r.left - width - 8);
+    let top = r.top;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - height - 8);
+    setPos({ top, left });
+  };
+
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
@@ -47,22 +60,15 @@ export function ListActions({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
+    // Position once after paint. Do not follow the button — sidebar hover
+    // shifts the board, and Trello keeps the menu parked where it opened.
+    const id = window.requestAnimationFrame(placeMenu);
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+      window.cancelAnimationFrame(id);
     };
-  }, [open]);
-
-  const placeMenu = () => {
-    const r = btnRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const width = 256;
-    const left = Math.min(Math.max(8, r.right - width), window.innerWidth - width - 8);
-    const approxH = 320;
-    const below = r.bottom + 6;
-    const top = below + approxH > window.innerHeight - 8 ? Math.max(8, r.top - approxH - 6) : below;
-    setPos({ top, left });
-  };
+  }, [open, section]);
 
   const addRule = (trigger: ListAutomation['trigger'], action: ListAutomation['action']) => {
     const next: ListAutomation = { id: kanbanUid(), listId: list.id, trigger, action, enabled: true };

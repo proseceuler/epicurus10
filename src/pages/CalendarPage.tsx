@@ -112,6 +112,7 @@ export default function CalendarPage() {
       kind: e.kind, subject_key: e.subject_key || '',
       linked_todo_id: e.linked_todo_id || '', linked_note_id: e.linked_note_id || '',
       linked_habit_id: e.linked_habit_id || '', linked_kanban_id: e.linked_kanban_id || '',
+      color: e.color || null,
     });
     setShowLinks(Boolean(e.linked_todo_id || e.linked_note_id || e.linked_habit_id || e.linked_kanban_id));
     setShowForm(true);
@@ -136,6 +137,7 @@ export default function CalendarPage() {
       linked_note_id: draft.linked_note_id || null,
       linked_habit_id: draft.linked_habit_id || null,
       linked_kanban_id: draft.linked_kanban_id || null,
+      color: draft.color || null,
     };
     const saved = draft.id ? updateCalendarEvent(draft.id, payload) : addCalendarEvent(payload);
     if (saved) await pushScheduleToLinked(saved);
@@ -309,6 +311,8 @@ export default function CalendarPage() {
                 slotDrag={slotDrag} slotDragRef={slotDragRef} setSlotDrag={setSlotDrag}
                 openForm={openForm} openEvent={openEvent} dropOn={dropOn}
                 readDrag={readDrag} writeDrag={writeDrag} setSelectedDay={setSelectedDay} todayStr={todayStr}
+                onColor={(id, color) => { updateCalendarEvent(id, { color }); setEvents(getCalendarEvents()); }}
+                onDelete={(id) => void deleteEvent(id)}
               />
             )}
           </Card>

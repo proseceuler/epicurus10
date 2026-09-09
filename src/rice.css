@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-09 15:53 PDT */
+/* vercel rebuild 2026-09-09 16:08 PDT — 2.3 only */
 
 .rice-shell {
   --rice-bg: #f5f5f7;

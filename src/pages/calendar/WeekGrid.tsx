@@ -25,8 +25,8 @@ type Props = {
 };
 
 export function WeekGrid(p: Props) {
-  const stepMin = p.density === 'comfortable' ? 15 : 60;
-  const rowH = p.density === 'compact' ? 22 : 32;
+  const stepMin = 30;
+  const rowH = p.density === 'compact' ? 36 : 48;
   const inSlotRange = (dayIso: string, label: string) => {
     if (!p.slotDrag || p.slotDrag.dayIso !== dayIso) return false;
     const a = labelToMinutes(p.slotDrag.start);
@@ -41,24 +41,16 @@ export function WeekGrid(p: Props) {
     const evs = p.eventsForDay(dayIso).filter((e) => e.all_day);
     const dueTodos = p.todosForDay(dayIso);
     const dueKanban = p.kanbanForDay(dayIso);
-    const dayNotes = p.notesForDay(dayIso);
-    const dayHabits = p.habitsForDay(dayIso);
     return (
       <div className="min-h-[52px] space-y-0.5 border-l border-zinc-100 p-1" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }} onDoubleClick={() => p.openForm(dayIso)}>
         {evs.map((e) => (
           <button key={e.id} type="button" draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'event', id: e.id })} onClick={() => p.openEvent(e)} className={`block w-full truncate rounded px-1 py-0.5 text-left text-[10px] ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}>{e.title}</button>
         ))}
         {dueTodos.map((t) => (
-          <div key={`td-${t.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'todo', id: t.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.todo} ${t.completed ? 'line-through opacity-50' : ''}`}>To-do \u00b7 {t.title}</div>
+          <div key={`td-${t.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'todo', id: t.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.todo} ${t.completed ? 'line-through opacity-50' : ''}`}>To-do - {t.title}</div>
         ))}
         {dueKanban.map((t) => (
-          <div key={`kb-${t.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'kanban', id: t.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.kanban}`}>Board \u00b7 {t.title}</div>
-        ))}
-        {dayNotes.map((n) => (
-          <div key={`nt-${n.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'note', id: n.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.note}`}>Note \u00b7 {n.title}</div>
-        ))}
-        {dayHabits.map((h) => (
-          <div key={`hb-${h.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'habit', id: h.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.habit}`}>Habit \u00b7 {h.name}</div>
+          <div key={`kb-${t.id}`} draggable onDragStart={(ev) => p.writeDrag(ev, { kind: 'kanban', id: t.id })} className={`truncate rounded px-1 py-0.5 text-[10px] ${SOURCE_STYLE.kanban}`}>Board - {t.title}</div>
         ))}
       </div>
     );
@@ -79,18 +71,19 @@ export function WeekGrid(p: Props) {
         <div className="flex items-end pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
         {p.rangeDays.map((d) => <AllDayCell key={`all-${iso(d)}`} dayIso={iso(d)} />)}
       </div>
-      <div className={p.density === 'compact' ? 'overflow-hidden' : 'max-h-[28rem] overflow-y-auto'} style={p.density === 'compact' ? { maxHeight: 'min(26rem, calc(100vh - 22rem))' } : undefined}>
+      <div className="overflow-y-auto" style={{ maxHeight: 'min(42rem, calc(100vh - 14rem))' }}>
         <div className="min-w-[560px]" style={{ display: 'grid', gridTemplateColumns: `3.25rem repeat(${p.rangeDays.length}, minmax(0, 1fr))` }}>
           {p.slots.map((slot) => (
             <div key={slot.label} className="contents">
-              <div className={`border-t border-zinc-100 pr-1 text-right text-[10px] text-zinc-400 ${p.density === 'compact' ? 'h-[22px] leading-[22px]' : 'h-8 leading-8'}`}>{slot.m === 0 ? slot.label : ''}</div>
+              <div className="border-t border-zinc-100 pr-1 text-right text-[10px] leading-none text-zinc-400" style={{ height: rowH, paddingTop: 4 }}>{slot.m === 0 ? slot.label : ''}</div>
               {p.rangeDays.map((d) => {
                 const dayIso = iso(d);
                 const selected = inSlotRange(dayIso, slot.label);
                 return (
                   <div
                     key={`${dayIso}-${slot.label}`}
-                    className={`${p.density === 'compact' ? 'min-h-[22px]' : 'min-h-[32px]'} border-l border-t border-zinc-100 p-0.5 select-none ${selected ? 'bg-zinc-900/10' : ''}`}
+                    className={`border-l border-t border-zinc-100 p-0.5 select-none ${selected ? 'bg-zinc-900/10' : ''}`}
+                    style={{ minHeight: rowH, height: rowH }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso, slot.label); }}
                     onDoubleClick={() => p.openForm(dayIso, { start: slot.label })}
@@ -147,10 +140,10 @@ export function WeekGrid(p: Props) {
                       }}
                       className={`pointer-events-auto absolute z-10 overflow-hidden rounded px-1 py-0.5 text-left text-[10px] leading-tight ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}
                       style={{ top, height, left, width }}
-                      title={`${(e.start_time || '').slice(0, 5)}${e.end_time ? `\u2013${e.end_time.slice(0, 5)}` : ''} ${e.title}`}
+                      title={`${(e.start_time || '').slice(0, 5)}${e.end_time ? `-${e.end_time.slice(0, 5)}` : ''} ${e.title}`}
                     >
                       <span className="font-medium">{e.title}</span>
-                      <span className="ml-1 opacity-70">{(e.start_time || '').slice(0, 5)}{e.end_time ? `\u2013${e.end_time.slice(0, 5)}` : ''}</span>
+                      <span className="ml-1 opacity-70">{(e.start_time || '').slice(0, 5)}{e.end_time ? `-${e.end_time.slice(0, 5)}` : ''}</span>
                     </button>
                   );
                 })}

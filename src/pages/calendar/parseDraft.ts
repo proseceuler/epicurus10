@@ -19,6 +19,6 @@ export function applyTitleParse(current: Draft, raw: string): Draft {
 export function detectedHint(title: string) {
   const parsed = parseNaturalWhen(title);
   if (parsed.title.trim() === title.trim() && parsed.all_day) return '';
-  const time = parsed.all_day ? 'all day' : `${parsed.start_time || ''}${parsed.end_time ? `\u2013${parsed.end_time}` : ''}`;
-  return `Detected ${parsed.start_date} \u00b7 ${time}`;
+  const time = parsed.all_day ? 'all day' : `${parsed.start_time || ''}${parsed.end_time ? `-${parsed.end_time}` : ''}`;
+  return `Detected ${parsed.start_date} - ${time}`;
 }

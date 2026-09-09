@@ -1,10 +1,41 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
+/* vercel rebuild 2026-09-09 */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
   --rice-accent: #18181b;
+  --assistant-w: 340px;
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+/* Site-wide monochrome. Notes/board/graph lift ONLY the workspace so
+   canvases keep hue. Chrome (sidebar, header, dock, count badges)
+   stays grayscale so Dynamic Badges never flash red/color. */
+.rice-shell.rice-shell--mono {
+  filter: grayscale(1);
+}
+.rice-shell.rice-shell--mono img,
+.rice-shell.rice-shell--mono video,
+.rice-shell.rice-shell--mono canvas {
+  filter: grayscale(1);
+}
+.rice-shell.rice-shell--notes {
+  filter: none;
+}
+.rice-shell.rice-shell--notes .rice-sidebar,
+.rice-shell.rice-shell--notes .rice-chrome,
+.rice-shell.rice-shell--notes [data-global-dock] {
+  filter: grayscale(1);
+}
+.rice-shell .chrome-badge,
+.rice-shell [data-chrome-badge],
+.rice-shell--notes .chrome-badge,
+.rice-shell--notes [data-chrome-badge],
+.rice-shell--notes .rice-sidebar .chrome-badge,
+.rice-shell--notes [data-global-dock] .chrome-badge {
+  background: #3f3f46 !important;
+  color: #fff !important;
+  filter: grayscale(1) !important;
 }
 
 .rice-shell .font-mono,
@@ -17,23 +48,27 @@
   pointer-events: none;
   position: fixed;
   inset: 0;
-  z-index: 70;
-  opacity: 0.04;
+  z-index: 8;
+  opacity: 0.05;
   mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-radial-gradient(circle at 20% 30%, rgba(20,20,20,0.18) 0 0.6px, transparent 0.7px 3px),
+    repeating-radial-gradient(circle at 80% 70%, rgba(10,10,10,0.14) 0 0.5px, transparent 0.6px 2.4px);
+  background-size: 180px 180px, 90px 90px, 70px 70px;
 }
 
 .ht-shell {
   color: #3f3f46;
 }
 
-.ht-card {
-  background: rgba(24, 24, 27, 0.06);
-  border: 1px solid rgba(24, 24, 27, 0.08);
-  border-radius: 14px;
+.ht-card,
+.ht-sheet {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
-  color: #27272a;
+  color: #3f3f46;
 }
 
 .ht-flat {
@@ -50,6 +85,35 @@
   color: #71717a;
 }
 
+.ht-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ht-table th,
+.ht-table td {
+  border: 1px solid #e4e4e7;
+  vertical-align: middle;
+}
+
+.ht-table thead th {
+  background: #fafafa;
+}
+
+.ht-hscroll {
+  display: flex;
+  gap: 2.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 1.5rem;
+}
+
+.ht-pane {
+  flex: 0 0 100%;
+  min-width: 100%;
+  scroll-snap-align: start;
+}
+
 .hud-panel {
   background: transparent;
   border: 0;
@@ -57,8 +121,20 @@
 }
 
 .hud-sigil {
-  color: #3f3f46;
+  color: #27272a;
   transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease;
+}
+
+.hud-sigil-frame {
+  width: 100%;
+  min-height: 14rem;
+  display: flex;
+  align-items: center;
+}
+
+.hud-sigil-frame pre {
+  width: 100%;
+  white-space: pre;
 }
 
 .hud-awake .hud-sigil {
@@ -90,13 +166,13 @@
 @media (min-width: 1024px) {
   .rice-main {
     padding-left: 4.75rem;
-    transition: padding-left 280ms ease;
+    transition: padding-left 280ms ease, padding-right 280ms ease;
   }
   .rice-sidebar:hover ~ .rice-main {
     padding-left: 15.5rem;
   }
   .rice-shell.assistant-open .rice-main {
-    padding-right: 22.5rem;
+    padding-right: calc(var(--assistant-w, 340px) + 1.25rem);
   }
 }
 
@@ -107,4 +183,27 @@
 .assistant-panel {
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+
+.rice-shell [data-global-dock] {
+  transition: right 280ms ease, left 280ms ease, bottom 280ms ease;
+}
+
+.rice-shell.assistant-open [data-global-dock] {
+  right: calc(var(--assistant-w, 340px) + 1.5rem);
+  left: auto;
+  bottom: 1rem;
+  transform: none;
+}
+
+.rice-main {
+  color: #27272a;
+}
+
+@media (min-width: 1024px) {
+  .rice-shell.assistant-open [data-global-dock] {
+    right: calc(var(--assistant-w, 340px) + 1.75rem);
+    left: auto;
+    bottom: 1.25rem;
+  }
 }

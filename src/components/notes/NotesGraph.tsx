@@ -63,7 +63,6 @@ function loadGraphSettings(): GraphSettings {
   return { ...DEFAULT_GSET };
 }
 
-
 function loadColors(): GraphColors {
   try {
     const raw = localStorage.getItem(COLOR_KEY);
@@ -148,7 +147,6 @@ export default function NotesGraph({
     return () => window.removeEventListener(BOARDS_CHANGED, on);
   }, []);
 
-  // Debounced size — ignore assistant/sidebar micro-resizes that used to restart the sim
   useEffect(() => {
     const el = svgRef.current?.parentElement;
     if (!el) return;
@@ -224,7 +222,6 @@ export default function NotesGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topologyKey]);
 
-  // Build simulation only when topology changes (not on every sidebar resize)
   useEffect(() => {
     const prevPos = new Map(nodesRef.current.map((n) => [n.id, { x: n.x, y: n.y }]));
     nodesRef.current = nodes.map((n) => {
@@ -246,7 +243,7 @@ export default function NotesGraph({
       .force('center', forceCenter(w / 2, h / 2))
       .force(
         'collide',
-        forceCollide<GNode>().radius((d) => 14 + Math.sqrt(d.degree + 1) * 5),
+        forceCollide<GNode>().radius((d) => 8 + Math.sqrt(d.degree + 1) * 2.4),
       )
       .alpha(0.85)
       .on('tick', () => setTick((x) => x + 1));
@@ -256,7 +253,6 @@ export default function NotesGraph({
     };
   }, [nodes, links]);
 
-  // Gentle re-center when size changes a lot — do not rebuild nodes
   useEffect(() => {
     const sim = simRef.current;
     if (!sim) return;
@@ -342,7 +338,6 @@ export default function NotesGraph({
     });
   };
 
-
   useEffect(() => {
     const sim = simRef.current;
     if (!sim) return;
@@ -425,9 +420,8 @@ export default function NotesGraph({
       )}
 
       <p className="pointer-events-none absolute right-3 top-3 z-10 text-[10px] text-zinc-400">
-        Drag to move · double-click to open
+        Drag to move \u00b7 double-click to open
       </p>
-
 
       {panelOpen && (
         <div className="absolute left-3 top-12 z-20 w-56 space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
@@ -483,8 +477,6 @@ export default function NotesGraph({
           const s = typeof l.source === 'object' ? l.source : nodesRef.current.find((n) => n.id === l.source);
           const t = typeof l.target === 'object' ? l.target : nodesRef.current.find((n) => n.id === l.target);
           if (!s || !t || s.x == null || t.x == null) return null;
-          const midX = (s.x! + t.x!) / 2;
-          const midY = (s.y! + t.y!) / 2 - 18;
           const active =
             !focusId ||
             focusId === s.id ||
@@ -493,19 +485,21 @@ export default function NotesGraph({
             neighbors.get(focusId)?.has(t.id);
           const dim = Boolean(focusId && !active);
           return (
-            <path
+            <line
               key={i}
-              d={`M ${s.x} ${s.y} Q ${midX} ${midY} ${t.x} ${t.y}`}
-              fill="none"
+              x1={s.x}
+              y1={s.y}
+              x2={t.x}
+              y2={t.y}
               stroke={dim ? 'rgba(24,24,27,0.08)' : 'rgba(24,24,27,0.42)'}
-              strokeWidth={dim ? 1 : 1.8}
+              strokeWidth={dim ? 1 : 1.4}
             />
           );
         })}
 
         {nodesRef.current.map((n) => {
           if (n.x == null || n.y == null) return null;
-          const r = 11 + Math.sqrt(n.degree + 1) * 4.2;
+          const r = 5.5 + Math.sqrt(n.degree + 1) * 2.2;
           const isFocus = focusId === n.id;
           const isNeighbor = focusId ? neighbors.get(focusId)?.has(n.id) : false;
           const dim = Boolean(focusId && !isFocus && !isNeighbor);
@@ -557,7 +551,7 @@ export default function NotesGraph({
                   fill={dim ? '#a1a1aa' : '#18181b'}
                   style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}
                 >
-                  {n.label.length > 18 ? `${n.label.slice(0, 16)}…` : n.label}
+                  {n.label.length > 18 ? `${n.label.slice(0, 16)}\u2026` : n.label}
                 </text>
               )}
             </g>
@@ -581,11 +575,11 @@ export default function NotesGraph({
           <p className="text-sm font-semibold text-zinc-900">{selectedNode.label}</p>
           <p className="mt-0.5 text-[11px] text-zinc-500">
             {selectedNode.degree} connection{selectedNode.degree === 1 ? '' : 's'}
-            {selectedNote?.folder ? ` · ${selectedNote.folder}` : ''}
+            {selectedNote?.folder ? ` \u00b7 ${selectedNote.folder}` : ''}
           </p>
           {selectedNote?.content && (
             <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-zinc-600">
-              {selectedNote.content.replace(/[#>*`\[\]]/g, '').slice(0, 160)}
+              {selectedNote.content.replace(/[#>*`$[\]]/g, '').slice(0, 160)}
             </p>
           )}
           <button

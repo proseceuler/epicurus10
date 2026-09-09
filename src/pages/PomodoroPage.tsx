@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
 import AnalyticsPage from '@/pages/AnalyticsPage';
+import { MotionSwap } from '@/components/MotionUI';
 import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3 } from 'lucide-react';
 
 type SessionType = 'focus' | 'short_break' | 'long_break';
@@ -116,15 +117,7 @@ export default function PomodoroPage() {
       <PageHeader
         title="Focus"
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 rounded-xl p-1 glass">
-              <button type="button" onClick={() => setSection('timer')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'timer' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
-                <Brain className="h-3.5 w-3.5" /> Timer
-              </button>
-              <button type="button" onClick={() => setSection('analytics')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
-                <BarChart3 className="h-3.5 w-3.5" /> Analytics
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {section === 'timer' && (
               <>
                 <Button variant="secondary" size="sm" onClick={() => setSoundOn(!soundOn)}>
@@ -136,9 +129,18 @@ export default function PomodoroPage() {
                 </Button>
               </>
             )}
+            <div className="flex gap-1 rounded-xl p-1 glass">
+              <button type="button" onClick={() => setSection('timer')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'timer' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <Brain className="h-3.5 w-3.5" /> Timer
+              </button>
+              <button type="button" onClick={() => setSection('analytics')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <BarChart3 className="h-3.5 w-3.5" /> Analytics
+              </button>
+            </div>
           </div>
         }
       />
+      <MotionSwap id={section}>
       {section === 'analytics' ? <AnalyticsPage embedded /> : null}
       {section === 'timer' && (
 
@@ -274,6 +276,7 @@ export default function PomodoroPage() {
         </div>
       </div>
       )}
+      </MotionSwap>
     </div>
   );
 }

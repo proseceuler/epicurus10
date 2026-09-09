@@ -4,7 +4,7 @@ import { Button, Input, Select } from '@/components/kit';
 import { KINDS } from '@/lib/calendarTheme';
 import { SUBJECTS, type Todo, type KanbanTask, type Note, type Habit } from '@/lib/types';
 import { applyTitleParse, detectedHint } from '@/pages/calendar/parseDraft';
-import type { Draft } from '@/pages/calendar/model';
+import { EVENT_COLORS, type Draft } from '@/pages/calendar/model';
 import { Link2, Sparkles, Trash2, X } from 'lucide-react';
 
 export function EventForm(props: {
@@ -47,6 +47,21 @@ export function EventForm(props: {
         <div className="grid grid-cols-2 gap-3">
           <Select value={props.draft.kind} onChange={(v) => props.setDraft({ ...props.draft, kind: v })} options={KINDS} />
           <Select value={props.draft.subject_key} onChange={(v) => props.setDraft({ ...props.draft, subject_key: v })} options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]} />
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs text-zinc-500">Color</p>
+          <div className="flex flex-wrap gap-1.5">
+            {EVENT_COLORS.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => props.setDraft({ ...props.draft, color: hex })}
+                className={`h-5 w-5 rounded-full border ${props.draft.color === hex ? 'ring-2 ring-zinc-900 ring-offset-1' : 'border-black/10'}`}
+                style={{ background: hex }}
+              />
+            ))}
+            <button type="button" onClick={() => props.setDraft({ ...props.draft, color: null })} className="rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600">Default</button>
+          </div>
         </div>
         <textarea value={props.draft.description} onChange={(e) => props.setDraft({ ...props.draft, description: e.target.value })} placeholder="Details (optional)" rows={2} className="glass-input w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400" />
         <div>

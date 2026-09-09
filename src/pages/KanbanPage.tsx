@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type Habit, type KanbanTask, type Note, type Todo } from '@/lib/types';
-import { type KanbanStatus as Status, type BoardList, normalizeTask, loadLists, saveLists, slugList, nextTint } from '@/lib/kanban';
+import { type KanbanStatus as Status, type BoardList, normalizeTask, loadLists, saveLists, slugList, nextTint, loadAutomations } from '@/lib/kanban';
 import { upsertLinkedCalendarEvent } from '@/lib/calendarStore';
 import { confirmDelete } from '@/lib/confirm';
-import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
+import { PageHeader, Button } from '@/components/kit';
 import { KanbanCardPreview, CardDetailModal } from '@/components/KanbanCards';
+import { ListActions } from '@/components/kanban/ListActions';
 import { FolderTree, Plus, X, GripVertical } from 'lucide-react';
 
 export default function KanbanPage() {
@@ -92,6 +93,30 @@ export default function KanbanPage() {
     if (!task || task.status === newStatus) return;
     const maxOrder = tasks.filter((t) => t.status === newStatus).reduce((max, t) => Math.max(max, t.sort_order), 0);
     await persist(taskId, { status: newStatus, sort_order: maxOrder + 1 });
+    const auto = loadAutomations().find((r) => r.listId === newStatus && r.enabled && r.trigger === 'card_added');
+    if (auto) await sortList(newStatus, auto.action === 'sort_by_title' ? 'title' : 'due');
+  };
+
+  const sortList = async (listId: string, by: 'title' | 'due') => {
+    const colTasks = tasks.filter((t) => t.status === listId).slice().sort((a, b) => {
+      if (by === 'title') return a.title.localeCompare(b.title);
+      return (a.due_date || '9999').localeCompare(b.due_date || '9999');
+    });
+    await Promise.all(colTasks.map((t, i) => persist(t.id, { sort_order: i + 1 })));
+  };
+
+  const copyList = async (listId: string) => {
+    const src = lists.find((l) => l.id === listId);
+    if (!src) return;
+    const id = slugList(`${src.label} copy`);
+    persistLists([...lists, { id, label: `${src.label} copy`, tint: nextTint(lists.length), color: src.color }]);
+    const colTasks = tasks.filter((t) => t.status === listId);
+    for (const t of colTasks) await addTask({ title: t.title, status: id });
+  };
+
+  const moveAll = async (fromId: string, toId: string) => {
+    const moving = tasks.filter((t) => t.status === fromId);
+    for (const t of moving) await updateStatus(t.id, toId);
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><FolderTree className="h-8 w-8 animate-pulse text-zinc-300" /></div>;
@@ -113,7 +138,7 @@ export default function KanbanPage() {
                 if (from >= 0 && to >= 0) { const [moved] = next.splice(from, 1); next.splice(to, 0, moved); persistLists(next); }
               }
               setDraggingId(null); setDraggingList(null); setDragOverCol(null);
-            }} className={`flex w-[272px] shrink-0 flex-col self-start rounded-2xl transition-[background-color,box-shadow] duration-200 ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: colTasks.length ? 'calc(100vh - 12rem)' : undefined }}>
+            }} className={`flex w-[272px] shrink-0 flex-col self-start rounded-2xl transition-[background-color,box-shadow] duration-200 ${dragOverCol === col.id ? 'bg-white/70 ring-2 ring-zinc-400/40' : 'bg-white/40'}`} style={{ maxHeight: colTasks.length ? 'calc(100vh - 12rem)' : undefined, background: col.color ? `${col.color}22` : undefined }}>
               <div
                 className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing"
                 draggable
@@ -121,10 +146,19 @@ export default function KanbanPage() {
                 onDragEnd={() => setDraggingList(null)}
               >
                 <GripVertical className="h-3.5 w-3.5 text-zinc-400" />
-                <span className={`h-2 w-2 rounded-full ${col.tint}`} />
+                <span className={`h-2 w-2 rounded-full ${col.color ? '' : col.tint}`} style={col.color ? { background: col.color } : undefined} />
                 {renaming === col.id ? <input autoFocus defaultValue={col.label} className="w-28 rounded border px-1 text-sm" onBlur={(e) => { const label = e.target.value.trim(); if (label) persistLists(lists.map((l) => (l.id === col.id ? { ...l, label } : l))); setRenaming(null); }} /> : <button type="button" className="text-sm font-semibold" onDoubleClick={() => setRenaming(col.id)}>{col.label}</button>}
-                <span className="rounded-full bg-zinc-200/70 px-1.5 text-[10px]">{colTasks.length}</span>
-                {lists.length > 1 && <button type="button" className="ml-auto text-zinc-300" onClick={() => void deleteList(col.id)}><X className="h-3.5 w-3.5" /></button>}
+                <ListActions
+                  list={col}
+                  count={colTasks.length}
+                  lists={lists}
+                  onAddCard={() => { setAddingCol(col.id); setQuickTitle(''); }}
+                  onCopyList={() => void copyList(col.id)}
+                  onMoveAll={(target) => void moveAll(col.id, target)}
+                  onSort={(by) => void sortList(col.id, by)}
+                  onColor={(hex) => persistLists(lists.map((l) => (l.id === col.id ? { ...l, color: hex } : l)))}
+                  onArchive={() => void deleteList(col.id)}
+                />
               </div>
               <div className="space-y-2 overflow-y-auto px-2 pb-2" style={{ maxHeight: colTasks.length > 4 ? 'calc(100vh - 16rem)' : undefined }}>
                 {colTasks.map((task) => (

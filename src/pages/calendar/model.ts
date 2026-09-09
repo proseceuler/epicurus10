@@ -48,9 +48,25 @@ export const emptyDraft = (date: string) => ({
   linked_note_id: '',
   linked_habit_id: '',
   linked_kanban_id: '',
+  color: null as string | null,
 });
 
-export type Draft = ReturnType<typeof emptyDraft>;
+export type Draft = ReturnType<typeof emptyDraft> & { color?: string | null };
+
+export const EVENT_COLORS = [
+  '#3b82f6', '#ef4444', '#f97316', '#eab308', '#22c55e',
+  '#14b8a6', '#06b6d4', '#6366f1', '#8b5cf6', '#d946ef',
+  '#f43f5e', '#a16207', '#71717a', '#a8a29e',
+];
+
+export function eventFill(kind: string, color?: string | null) {
+  if (color) return color;
+  if (kind === 'deadline') return '#f59e0b';
+  if (kind === 'exam') return '#f43f5e';
+  if (kind === 'reminder') return '#0ea5e9';
+  if (kind === 'holiday') return '#10b981';
+  return '#2563eb';
+}
 
 export type TimedBlock = {
   id: string;

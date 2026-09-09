@@ -55,7 +55,9 @@ export function ActionChip({ icon: Icon, label, active, onClick }: { icon: typeo
   );
 }
 
-export function MiniSheet({ title, open, onClose, children }: { title: string; open: boolean; onClose: () => void; children: React.ReactNode }) {
+export function MiniSheet({ title, open, onClose, children, align = 'left' }: {
+  title: string; open: boolean; onClose: () => void; children: React.ReactNode; align?: 'left' | 'right';
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -66,7 +68,7 @@ export function MiniSheet({ title, open, onClose, children }: { title: string; o
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [open, onClose]);
   return (
-    <MotionPopover open={open} className="absolute right-0 top-0 z-20 w-[min(92vw,20.5rem)] p-0">
+    <MotionPopover open={open} className={`absolute top-[calc(100%+6px)] z-30 w-[min(92vw,20.5rem)] p-0 ${align === 'right' ? 'right-0' : 'left-0'}`}>
       <div ref={ref} className="relative overflow-hidden rounded-[1.15rem] bg-white shadow-[0_16px_40px_rgba(24,24,27,0.16)]">
         <div className="relative flex items-center justify-center border-b border-zinc-100 px-10 py-2.5">
           <h4 className="text-[13px] font-semibold text-zinc-700">{title}</h4>

@@ -9,9 +9,9 @@ import { parseNaturalWhen } from '@/lib/parseWhen';
 import { confirmDelete } from '@/lib/confirm';
 import { pushScheduleToLinked, scheduleTodo, scheduleKanban } from '@/lib/calendarSync';
 import { Card, PageHeader, EmptyState, Button } from '@/components/kit';
-import { KIND_STYLE } from '@/lib/calendarTheme';
 import { iso, parse, hm, addOneHour, startOfWeek, addDays, emptyDraft, type CalView, type Density, type DragPayload } from '@/pages/calendar/model';
 import { WeekGrid } from '@/pages/calendar/WeekGrid';
+import { MonthGrid } from '@/pages/calendar/MonthGrid';
 import { EventForm } from '@/pages/calendar/EventForm';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, CheckSquare, FolderTree } from 'lucide-react';
 
@@ -81,8 +81,6 @@ export default function CalendarPage() {
   const todayIso = iso(today);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const eventsForDay = (dayIso: string) => events.filter((e) => e.start_date <= dayIso && e.end_date >= dayIso);
   const todosForDay = (dayIso: string) => todos.filter((t) => t.due_date === dayIso);
@@ -164,9 +162,13 @@ export default function CalendarPage() {
       const ev = events.find((e) => e.id === payload.id);
       if (!ev) return;
       const span = Math.max(0, (parse(ev.end_date).getTime() - parse(ev.start_date).getTime()) / 86400000);
+      // Moving an existing event only changes the date. Keep duration and clock times.
       const next = updateCalendarEvent(payload.id, {
-        start_date: date, end_date: iso(addDays(parse(date), span)),
-        all_day: allDay, start_time: start, end_time: allDay ? null : (ev.end_time && !allDay ? ev.end_time : end),
+        start_date: date,
+        end_date: iso(addDays(parse(date), span)),
+        all_day: ev.all_day,
+        start_time: ev.start_time,
+        end_time: ev.end_time,
       });
       if (next) await pushScheduleToLinked(next);
     } else if (payload.kind === 'todo') {
@@ -261,47 +263,24 @@ export default function CalendarPage() {
               </div>
             </div>
             {view === 'month' && (
-              <>
-                <div className="mb-1 grid grid-cols-7 gap-1">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => <div key={d} className="py-1 text-center text-xs font-medium text-zinc-400">{d}</div>)}</div>
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
-                  {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const dayDate = new Date(year, month, day);
-                    const dayIso = iso(dayDate);
-                    const isToday = dayDate.toDateString() === todayStr;
-                    const isSelected = selectedDay === dayIso;
-                    const dayEvents = eventsForDay(dayIso);
-                    const due = [...todosForDay(dayIso), ...kanbanForDay(dayIso)];
-                    const lo = monthDrag ? (monthDrag.start <= monthDrag.end ? monthDrag.start : monthDrag.end) : '';
-                    const hi = monthDrag ? (monthDrag.start <= monthDrag.end ? monthDrag.end : monthDrag.start) : '';
-                    return (
-                      <button key={day} type="button"
-                        onClick={() => setSelectedDay(dayIso)}
-                        onDoubleClick={() => openForm(dayIso)}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => { e.preventDefault(); void dropOn(readDrag(e), dayIso); }}
-                        onPointerDown={(e) => { if (e.button !== 0) return; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setMonthDrag({ start: dayIso, end: dayIso }); }}
-                        onPointerEnter={() => { const cur = monthDragRef.current; if (!cur) return; setMonthDrag({ ...cur, end: dayIso }); }}
-                        onPointerUp={(e) => {
-                          const cur = monthDragRef.current;
-                          if (!cur) return;
-                          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-                          const a = cur.start <= cur.end ? cur.start : cur.end;
-                          const b = cur.start <= cur.end ? cur.end : cur.start;
-                          setMonthDrag(null);
-                          setSelectedDay(a);
-                          if (a !== b) openForm(a, undefined, b);
-                        }}
-                        className={`min-h-[72px] rounded-xl border p-1 text-left text-xs ${monthDrag && dayIso >= lo && dayIso <= hi ? 'border-zinc-800 bg-zinc-900/10' : isSelected ? 'border-zinc-800 bg-white/70' : isToday ? 'border-zinc-800 bg-zinc-100/50' : 'border-zinc-200/30 hover:bg-white/40'}`}>
-                        <div className={`text-right font-medium ${isToday ? 'text-zinc-900' : 'text-zinc-500'}`}>{day}</div>
-                        {dayEvents.slice(0, 2).map((e) => <div key={e.id} className={`mt-0.5 truncate rounded px-1 py-0.5 text-[10px] ${KIND_STYLE[e.kind] ?? KIND_STYLE.event}`}>{e.title}</div>)}
-                        {due.slice(0, 2).map((d) => <div key={d.id} className="mt-0.5 truncate rounded bg-zinc-200/70 px-1 py-0.5 text-[10px] text-zinc-600">{d.title}</div>)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
+              <MonthGrid
+                currentDate={currentDate}
+                todayStr={todayStr}
+                selectedDay={selectedDay}
+                events={events}
+                todos={todos}
+                kanban={kanban}
+                monthDrag={monthDrag}
+                monthDragRef={monthDragRef}
+                setMonthDrag={setMonthDrag}
+                setSelectedDay={setSelectedDay}
+                setCurrentDate={setCurrentDate}
+                openForm={openForm}
+                openEvent={openEvent}
+                dropOn={dropOn}
+                readDrag={readDrag}
+                writeDrag={writeDrag}
+              />
             )}
             {(view === 'week' || view === 'day') && (
               <WeekGrid

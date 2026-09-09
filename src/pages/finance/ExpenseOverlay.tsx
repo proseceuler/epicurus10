@@ -20,7 +20,7 @@ export function ExpenseOverlay({
           <Select value={form.category} onChange={(v) => setForm({ ...form, category: v as ExpenseCategory })} options={EXPENSE_CATEGORIES.map((c) => ({ value: c.key, label: `${c.emoji} ${c.label}` }))} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-500">Amount (\u20b1)</label>
+          <label className="mb-1 block text-xs font-medium text-zinc-500">Amount (₱)</label>
           <Input value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} type="number" placeholder="0.00" />
         </div>
         <div>

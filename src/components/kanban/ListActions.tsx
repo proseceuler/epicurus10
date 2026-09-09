@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MotionPopover } from '@/components/MotionUI';
+import { createPortal } from 'react-dom';
 import { type BoardList, type ListAutomation, kanbanUid, loadAutomations, saveAutomations } from '@/lib/kanban';
 import { MoreHorizontal, X } from 'lucide-react';
 
@@ -32,17 +32,37 @@ export function ListActions({
 }) {
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<'root' | 'sort' | 'color' | 'move' | 'automation'>('root');
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const rules = loadAutomations().filter((r) => r.listId === list.id);
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
+
+  const placeMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const width = 256;
+    const left = Math.min(Math.max(8, r.right - width), window.innerWidth - width - 8);
+    const approxH = 320;
+    const below = r.bottom + 6;
+    const top = below + approxH > window.innerHeight - 8 ? Math.max(8, r.top - approxH - 6) : below;
+    setPos({ top, left });
+  };
 
   const addRule = (trigger: ListAutomation['trigger'], action: ListAutomation['action']) => {
     const next: ListAutomation = { id: kanbanUid(), listId: list.id, trigger, action, enabled: true };
@@ -55,23 +75,34 @@ export function ListActions({
   );
 
   return (
-    <div className="relative ml-auto flex items-center gap-1" ref={ref}>
+    <div className="relative ml-auto flex items-center gap-1">
       <span className="rounded-full bg-zinc-200/80 px-1.5 text-[10px] font-medium text-zinc-600">{count}</span>
       <button
+        ref={btnRef}
         type="button"
         className="rounded-md p-1 text-zinc-400 hover:bg-zinc-200/70 hover:text-zinc-700"
-        onClick={(e) => { e.stopPropagation(); setSection('root'); setOpen((v) => !v); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSection('root');
+          placeMenu();
+          setOpen((v) => !v);
+        }}
         aria-label="List actions"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
-      <MotionPopover open={open} className="absolute right-0 top-full z-30 mt-1 w-64 p-0">
-        <div className="overflow-hidden rounded-xl bg-white shadow-[0_16px_40px_rgba(24,24,27,0.16)]">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[90] w-64 overflow-hidden rounded-xl bg-white shadow-[0_16px_40px_rgba(24,24,27,0.16)]"
+          style={{ top: pos.top, left: pos.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="relative flex items-center justify-center border-b border-zinc-100 px-8 py-2">
             <h4 className="text-[13px] font-semibold text-zinc-700">{section === 'root' ? 'List actions' : section === 'sort' ? 'Sort by' : section === 'color' ? 'Change list color' : section === 'move' ? 'Move all cards' : 'Automation'}</h4>
             <button type="button" onClick={() => setOpen(false)} className="absolute right-2 top-1.5 rounded-md p-1 text-zinc-400 hover:bg-zinc-100"><X className="h-4 w-4" /></button>
           </div>
-          <div className="p-1.5">
+          <div className="max-h-[min(24rem,calc(100vh-6rem))] overflow-y-auto p-1.5">
             {section === 'root' && (
               <>
                 {item('Add card', () => { onAddCard(); setOpen(false); })}
@@ -123,8 +154,9 @@ export function ListActions({
               </div>
             )}
           </div>
-        </div>
-      </MotionPopover>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

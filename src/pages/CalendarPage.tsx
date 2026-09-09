@@ -9,7 +9,7 @@ import { parseNaturalWhen } from '@/lib/parseWhen';
 import { confirmDelete } from '@/lib/confirm';
 import { pushScheduleToLinked, scheduleTodo, scheduleKanban } from '@/lib/calendarSync';
 import { Card, PageHeader, EmptyState, Button } from '@/components/kit';
-import { iso, parse, hm, addOneHour, startOfWeek, addDays, emptyDraft, type CalView, type Density, type DragPayload } from '@/pages/calendar/model';
+import { iso, parse, hm, addOneHour, labelToMinutes, startOfWeek, addDays, emptyDraft, type CalView, type Density, type DragPayload } from '@/pages/calendar/model';
 import { WeekGrid } from '@/pages/calendar/WeekGrid';
 import { MonthGrid } from '@/pages/calendar/MonthGrid';
 import { EventForm } from '@/pages/calendar/EventForm';
@@ -162,13 +162,25 @@ export default function CalendarPage() {
       const ev = events.find((e) => e.id === payload.id);
       if (!ev) return;
       const span = Math.max(0, (parse(ev.end_date).getTime() - parse(ev.start_date).getTime()) / 86400000);
-      // Moving an existing event only changes the date. Keep duration and clock times.
+      let nextStart = ev.start_time;
+      let nextEnd = ev.end_time;
+      let nextAllDay = ev.all_day;
+      if (time) {
+        const prevStart = ev.start_time ? labelToMinutes(ev.start_time.slice(0, 5)) : null;
+        const prevEnd = ev.end_time ? labelToMinutes(ev.end_time.slice(0, 5)) : null;
+        const duration = prevStart != null ? Math.max(15, (prevEnd != null && prevEnd > prevStart ? prevEnd : prevStart + 60) - prevStart) : 60;
+        const startMin = labelToMinutes(time);
+        const endMin = Math.min(23 * 60 + 45, startMin + duration);
+        nextStart = time;
+        nextEnd = hm(Math.floor(endMin / 60), endMin % 60);
+        nextAllDay = false;
+      }
       const next = updateCalendarEvent(payload.id, {
         start_date: date,
         end_date: iso(addDays(parse(date), span)),
-        all_day: ev.all_day,
-        start_time: ev.start_time,
-        end_time: ev.end_time,
+        all_day: nextAllDay,
+        start_time: nextStart,
+        end_time: nextEnd,
       });
       if (next) await pushScheduleToLinked(next);
     } else if (payload.kind === 'todo') {

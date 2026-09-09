@@ -6,6 +6,7 @@ import {
 } from '@/lib/types';
 import { Card, PageHeader, Button, Input, Select, EmptyState } from '@/components/kit';
 import { ExpenseOverlay } from '@/pages/finance/ExpenseOverlay';
+import { MotionCollapse } from '@/components/MotionUI';
 import { Wallet, Plus, Trash2, Target, TrendingDown, PiggyBank, ArrowRight, TrendingUp, ExternalLink } from 'lucide-react';
 
 function normalizeGoalUrl(raw: string): string | null {
@@ -263,19 +264,24 @@ export default function FinancePage() {
               </div>
               <span className="font-semibold text-zinc-800">Savings Goals</span>
             </div>
-            <button onClick={() => setShowAddGoal(!showAddGoal)} className="text-zinc-400 hover:text-zinc-700">
-              <Plus className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => setShowAddGoal(!showAddGoal)}
+              aria-label={showAddGoal ? 'Close add goal' : 'Add goal'}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
+            >
+              <Plus className={`h-4 w-4 transition-transform duration-200 ${showAddGoal ? 'rotate-45' : ''}`} />
             </button>
           </div>
 
-          {showAddGoal && (
-            <div className="space-y-2 mb-3 pb-3 border-b border-zinc-200/40">
+          <MotionCollapse open={showAddGoal} className="mb-3">
+            <div className="space-y-2 pb-3 border-b border-zinc-200/40">
               <Input value={goalForm.name} onChange={(v) => setGoalForm({ ...goalForm, name: v })} placeholder="Goal name (e.g. Keyboard)" />
               <Input value={goalForm.target} onChange={(v) => setGoalForm({ ...goalForm, target: v })} type="number" placeholder="Target amount" />
               <Input value={goalForm.url} onChange={(v) => setGoalForm({ ...goalForm, url: v })} placeholder="Link (optional) - store, listing, wishlist" />
               <Button onClick={addGoal} size="sm" className="w-full">Add Goal</Button>
             </div>
-          )}
+          </MotionCollapse>
 
           {goals.length === 0 ? (
             <p className="text-sm text-zinc-400 text-center py-4">No savings goals yet.</p>

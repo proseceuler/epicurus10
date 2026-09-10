@@ -4,6 +4,7 @@ import { SUBJECTS, type Habit, type KanbanTask, type Note, type Todo } from '@/l
 import { type KanbanStatus as Status, type BoardList, normalizeTask, loadLists, saveLists, slugList, nextTint, loadAutomations } from '@/lib/kanban';
 import { upsertLinkedCalendarEvent } from '@/lib/calendarStore';
 import { confirmDelete } from '@/lib/confirm';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { PageHeader, Button } from '@/components/kit';
 import { KanbanCardPreview, CardDetailModal } from '@/components/KanbanCards';
 import { ListActions } from '@/components/kanban/ListActions';
@@ -38,6 +39,7 @@ export default function KanbanPage() {
     setLoading(false);
   }, []);
   useEffect(() => { loadTasks(); }, [loadTasks]);
+  useEffect(() => onDataChanged(() => { void loadTasks(); }), [loadTasks]);
   const selected = tasks.find((t) => t.id === selectedId) ?? null;
 
   const persist = async (id: string, patch: Partial<KanbanTask>) => {

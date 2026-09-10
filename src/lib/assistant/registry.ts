@@ -63,7 +63,18 @@ export function isWriteTool(name: string) {
   return WRITE_NAMES.has(name);
 }
 
-export const AUTO_APPLY_WRITES = new Set(['add_todo', 'update_todo', 'mark_habit']);
+export const AUTO_APPLY_WRITES = new Set([
+  'add_todo',
+  'update_todo',
+  'mark_habit',
+  'add_calendar_event',
+  'add_kanban_task',
+  'move_kanban_task',
+  'mark_attendance',
+  'update_class_hub',
+  'add_class_link',
+  'add_assessment',
+]);
 
 export async function dispatchTool(name: string, args: Record<string, unknown>, ctx: ToolContext) {
   for (const c of extras) {
@@ -84,8 +95,10 @@ export async function dispatchTool(name: string, args: Record<string, unknown>, 
 export function writeSummary(name: string, args: Record<string, unknown>) {
   if (name === 'add_todo' || name === 'update_todo') return `Task · ${String(args.title ?? 'Untitled')}${args.due_date ? ` · ${args.due_date}` : ''}`;
   if (name === 'add_note') return `Note · ${String(args.title ?? 'Untitled')}`;
-  if (name === 'add_calendar_event') return `Event · ${String(args.title ?? 'Untitled')}${args.start_date ? ` · ${args.start_date}` : ''}`;
+  if (name === 'add_calendar_event') return `Event · ${String(args.title ?? 'Untitled')}`;
   if (name === 'add_kanban_task') return `Board task · ${String(args.title ?? 'Untitled')}`;
+  if (name === 'move_kanban_task') return `Move card · ${String(args.title ?? '')} → ${String(args.status ?? '')}`;
+  if (name === 'mark_attendance') return `${args.status === 'skipped' ? 'Skip' : 'Attend'} · ${String(args.subject_key ?? '')}`;
   if (name === 'add_flashcard') return `Flashcard · ${String(args.front ?? args.title ?? 'New card')}`;
   if (name === 'add_assessment') return `Grade · ${String(args.name ?? 'Assessment')}`;
   if (name === 'log_expense') return `Expense · ₱${String(args.amount ?? '')} · ${String(args.category ?? '')}`;

@@ -37,10 +37,10 @@ function systemPrompt(page: PageId, search: boolean) {
     `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
     'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
     'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
-    'Task and habit writes apply immediately: add_todo, update_todo, mark_habit. Do not ask them to confirm those.',
-    'For "tomorrow" pass due_date as YYYY-MM-DD or leave it in the title; the app parses tomorrow/today.',
-    'Chem / chemistry maps to science. "I did reading" should call mark_habit with name reading.',
-    'Other writes still wait for confirm.',
+    'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment.',
+    '"I attended math today" -> mark_attendance. "Move lab report to review" -> move_kanban_task. "Log science written work 18/20 term 1" -> add_assessment.',
+    'For Friday/tomorrow leave the date in the title or pass YYYY-MM-DD. Chem maps to science.',
+    'log_expense still waits for confirm.',
     'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
     search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
   ].join(' ');
@@ -49,11 +49,12 @@ function systemPrompt(page: PageId, search: boolean) {
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
-  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done)\b/.test(t);
-  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read)\b/.test(t);
+  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move)\b/.test(t);
+  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
   const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
   if (actionVerb && actionNoun) layers.add('execute');
+  if (/\b(attended|skipped|attend|skip)\b/.test(t)) layers.add('execute');
   if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon))\b/.test(t)) layers.add('data');
   if (hasMedia) layers.add('chat');
   if (live) layers.add('chat');

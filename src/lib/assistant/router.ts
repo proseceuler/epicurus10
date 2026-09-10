@@ -41,7 +41,8 @@ function systemPrompt(page: PageId, search: boolean) {
     '"I attended math today" -> mark_attendance. "Move lab report to review" -> move_kanban_task. "Log science written work 18/20 term 1" -> add_assessment.',
     '"Save a note titled titration: used 0.1M HCl" -> add_note. "Add flashcard in Science, front mitochondria, back powerhouse" -> add_flashcard. "Start focus for math" -> start_focus_session.',
     'For Friday/tomorrow leave the date in the title or pass YYYY-MM-DD. Chem maps to science.',
-    'log_expense still waits for confirm. Money writes stay behind confirm.',
+    'Money writes still wait for confirm: log_expense, set_allowance, add_savings_goal.',
+    '"Set weekly allowance to 500" -> set_allowance. "Savings goal: earphones 1500" -> add_savings_goal.',
     'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
     search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
   ].join(' ');
@@ -51,7 +52,7 @@ export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolea
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
   const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move)\b/.test(t);
-  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
+  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
   const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
   if (actionVerb && actionNoun) layers.add('execute');

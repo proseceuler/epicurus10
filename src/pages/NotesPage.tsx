@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, DB_CHANGED } from '@/lib/supabase';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { type Note } from '@/lib/types';
 import Whiteboard from '@/components/board/Whiteboard';
 import NotesGraph from '@/components/notes/NotesGraph';
@@ -29,6 +30,7 @@ export default function NotesPage() {
     window.addEventListener(DB_CHANGED, on);
     return () => window.removeEventListener(DB_CHANGED, on);
   }, [loadNotes]);
+  useEffect(() => onDataChanged(() => { void loadNotes(); }), [loadNotes]);
 
   useEffect(() => {
     try {

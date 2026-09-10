@@ -1,45 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase, DB_CHANGED } from '@/lib/supabase';
-import { SUBJECTS, type Note } from '@/lib/types';
-import { Button, EmptyState, Input, Select } from '@/components/kit';
+import { type Note } from '@/lib/types';
 import Whiteboard from '@/components/board/Whiteboard';
 import NotesGraph from '@/components/notes/NotesGraph';
-import { NOTE_TEMPLATES } from '@/lib/note-templates';
-import NoteMarkdown from '@/components/notes/NoteMarkdown';
-import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle, escapeRegex } from '@/lib/wiki';
-/* boards loaded in NotesGraph/Whiteboard */
-import {
-  FileText,
-  Folder,
-  GitBranch,
-  LayoutGrid,
-  Link2,
-  Plus,
-  Search,
-  Tag,
-  Pin,
-  PinOff,
-  Trash2,
-  BookOpen,
-  CalendarDays,
-  Network,
-} from 'lucide-react';
+import NotesVault from './NotesVault';
+import { findNoteByTitle } from '@/lib/wiki';
+import { FileText, LayoutGrid, Network } from 'lucide-react';
 
 type Tab = 'notes' | 'board' | 'graph';
-
-function todayStamp() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function outline(content: string) {
-  return (content || '')
-    .split('\n')
-    .map((line) => {
-      const m = /^(#{1,3})\s+(.+)/.exec(line);
-      return m ? { level: m[1].length, text: m[2] } : null;
-    })
-    .filter((x): x is { level: number; text: string } => Boolean(x));
-}
 
 export default function NotesPage() {
   const [tab, setTab] = useState<Tab>('notes');

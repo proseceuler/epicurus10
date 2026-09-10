@@ -5,6 +5,7 @@ import Whiteboard from '@/components/board/Whiteboard';
 import NotesGraph from '@/components/notes/NotesGraph';
 import NotesVault from './NotesVault';
 import { findNoteByTitle } from '@/lib/wiki';
+import type { ImportDraft } from '@/lib/vault-import';
 import { FileText, LayoutGrid, Network } from 'lucide-react';
 
 type Tab = 'notes' | 'board' | 'graph';
@@ -73,6 +74,30 @@ export default function NotesPage() {
     return createNote({ title, folder: 'Vault' });
   };
 
+  const importNotes = async (rows: ImportDraft[]) => {
+    if (!rows.length) return;
+    const payload = rows.map((r) => ({
+      title: r.title,
+      content: r.content ?? '',
+      folder: r.folder || 'Imported',
+      tags: r.tags || [],
+      pinned: false,
+      linked_subject: null,
+      linked_board_ids: [],
+    }));
+    const added: Note[] = [];
+    for (let i = 0; i < payload.length; i += 40) {
+      const { data, error } = await supabase.from('notes').insert(payload.slice(i, i + 40)).select();
+      if (error) break;
+      if (data) added.push(...(data as Note[]));
+    }
+    if (added.length) {
+      setNotes((prev) => [...added, ...prev]);
+      setSelectedId(added[0].id);
+      setTab('notes');
+    }
+  };
+
   const openBoard = (name?: string | null) => {
     const n = (name ?? '').trim();
     if (!n) return;
@@ -119,6 +144,7 @@ export default function NotesPage() {
           onOpenOrCreate={openOrCreate}
           onOpenBoard={openBoard}
           onReload={loadNotes}
+          onImportNotes={importNotes}
         />
       )}
       {tab === 'board' && (

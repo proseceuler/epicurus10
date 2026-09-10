@@ -49,6 +49,7 @@ export const ACTION_CATALOG: ActionOp[] = [
   { domain: 'flashcards', op: 'create', tool: 'add_flashcard', kind: 'write', page: 'flashcards' },
   { domain: 'habits', op: 'list', tool: 'get_habits', kind: 'read', page: 'habits' },
   { domain: 'habits', op: 'check', tool: 'mark_habit', kind: 'write', page: 'habits' },
+  { domain: 'habits', op: 'stats', tool: 'get_habit_stats', kind: 'read', page: 'habits' },
   { domain: 'search', op: 'web', tool: 'web_search', kind: 'read', page: 'dashboard' },
 ];
 

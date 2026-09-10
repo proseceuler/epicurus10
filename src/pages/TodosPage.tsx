@@ -6,6 +6,7 @@ import { awardXP } from '@/lib/xp';
 import { SUBJECTS, type Todo, type SubjectKey } from '@/lib/types';
 import { upsertLinkedCalendarEvent, deleteCalendarEvent } from '@/lib/calendarStore';
 import { parseNaturalWhen } from '@/lib/parseWhen';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
 import { MotionOverlay } from '@/components/MotionUI';
 import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag, Pencil } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function TodosPage() {
     setLoading(false);
   }, []);
   useEffect(() => { loadTodos(); }, [loadTodos]);
+  useEffect(() => onDataChanged(() => { void loadTodos(); }), [loadTodos]);
 
   const saveTodo = async () => {
     if (!form.title.trim()) return;
@@ -106,7 +108,7 @@ export default function TodosPage() {
 
   return (
     <div>
-      <PageHeader title="Master To-Do List" subtitle="Eisenhower Matrix priority \u00b7 Urgent vs Important" action={<Button onClick={() => openEdit()}><Plus className="w-4 h-4" /> Add Task</Button>} />
+      <PageHeader title="Master To-Do List" subtitle="Eisenhower Matrix priority · Urgent vs Important" action={<Button onClick={() => openEdit()}><Plus className="w-4 h-4" /> Add Task</Button>} />
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.length}</div><div className="text-xs text-zinc-500">Total Tasks</div></Card>
         <Card className="p-4 text-center"><div className="text-2xl font-bold text-zinc-800">{todos.filter((t) => !t.completed).length}</div><div className="text-xs text-zinc-500">Pending</div></Card>

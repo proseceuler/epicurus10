@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { deleteCalendarEvent } from '@/lib/calendarStore';
+import { notifyDataChanged } from '@/lib/assistant/sync';
 
 export interface UndoRecord {
   id: string;
@@ -79,6 +80,32 @@ function buildRevert(
     const id = idOf(result, ['task']);
     return id ? () => del('kanban_tasks', id) : null;
   }
+  if (tool === 'move_kanban_task') {
+    const id = idOf(result, ['task']);
+    const previous = String(row.previous_status || '');
+    return id && previous
+      ? async () => {
+          const { error } = await supabase.from('kanban_tasks').update({ status: previous }).eq('id', id);
+          if (error) throw error;
+          return true;
+        }
+      : null;
+  }
+  if (tool === 'mark_attendance') {
+    const id = idOf(result, ['attendance']);
+    const previous = row.previous ? String(row.previous) : null;
+    return id
+      ? async () => {
+          if (previous) {
+            const { error } = await supabase.from('class_attendance').update({ status: previous }).eq('id', id);
+            if (error) throw error;
+          } else {
+            await del('class_attendance', id);
+          }
+          return true;
+        }
+      : null;
+  }
   if (tool === 'add_flashcard') {
     const id = idOf(result, ['card']);
     return id ? () => del('flashcards', id) : null;
@@ -131,6 +158,7 @@ export async function undoLastWrite(): Promise<{ ok: boolean; summary?: string; 
   if (!last) return { ok: false, error: 'Nothing to undo.' };
   try {
     await last.revert();
+    notifyDataChanged();
     return { ok: true, summary: last.summary };
   } catch (err) {
     stack.push(last);

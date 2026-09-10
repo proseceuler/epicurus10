@@ -144,6 +144,7 @@ export default function NotesPage() {
               setTab('notes');
             }}
             onOpenBoard={openBoard}
+            onCreateNote={(title) => openOrCreate(title)}
           />
         </div>
       )}

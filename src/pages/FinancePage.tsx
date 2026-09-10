@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { onDataChanged } from '@/lib/assistant/sync';
 import {
   type FinanceSettings, type FinanceTransaction, type FinanceGoal,
   type ExpenseCategory, EXPENSE_CATEGORIES,
@@ -58,6 +59,7 @@ export default function FinancePage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
 
   const saveAllowance = async () => {
     const amount = parseFloat(allowanceInput) || 0;

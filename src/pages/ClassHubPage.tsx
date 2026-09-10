@@ -4,6 +4,7 @@ import { SUBJECTS, type ClassHub, type ClassHubLink, type SubjectKey } from '@/l
 import { Card, Button, Input, EmptyState, TimeField } from '@/components/kit';
 import { FolderTree, Plus, Trash2, Link2, Clock, MapPin, User, Save, ExternalLink } from 'lucide-react';
 import { TimetableTab } from '@/pages/classhub/TimetableTab';
+import { onDataChanged } from '@/lib/assistant/sync';
 
 export default function ClassHubPage() {
   return (
@@ -66,6 +67,7 @@ function ClassInfoTab() {
   }, []);
 
   useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
 
   useEffect(() => {
     const hub = hubs[selected];

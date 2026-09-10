@@ -105,6 +105,8 @@ export function writeSummary(name: string, args: Record<string, unknown>) {
   if (name === 'add_flashcard') return `Flashcard · ${String(args.front ?? args.title ?? 'New card')}`;
   if (name === 'add_assessment') return `Grade · ${String(args.name ?? 'Assessment')}`;
   if (name === 'log_expense') return `Expense · ₱${String(args.amount ?? '')} · ${String(args.category ?? '')}`;
+  if (name === 'set_allowance') return `Allowance · ₱${String(args.amount ?? '')} · ${String(args.period ?? 'weekly')}`;
+  if (name === 'add_savings_goal') return `Savings goal · ${String(args.name ?? '')} · ₱${String(args.target_amount ?? '')}`;
   if (name === 'mark_habit') return `Habit · ${String(args.name ?? '')}`;
   if (name === 'update_class_hub') return `Class info · ${String(args.subject_key ?? '')}`;
   if (name === 'add_class_link') return `Class link · ${String(args.title ?? '')}`;

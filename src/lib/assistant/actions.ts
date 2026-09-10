@@ -48,6 +48,8 @@ export const ACTION_CATALOG: ActionOp[] = [
   { domain: 'pomodoro', op: 'start', tool: 'start_focus_session', kind: 'write', page: 'pomodoro' },
   { domain: 'baon', op: 'summary', tool: 'get_finance_summary', kind: 'read', page: 'finance' },
   { domain: 'baon', op: 'expense', tool: 'log_expense', kind: 'write', confirm: true, page: 'finance' },
+  { domain: 'baon', op: 'set_allowance', tool: 'set_allowance', kind: 'write', confirm: true, page: 'finance' },
+  { domain: 'baon', op: 'add_goal', tool: 'add_savings_goal', kind: 'write', confirm: true, page: 'finance' },
   { domain: 'flashcards', op: 'list', tool: 'get_flashcards', kind: 'read', page: 'flashcards' },
   { domain: 'flashcards', op: 'create', tool: 'add_flashcard', kind: 'write', page: 'flashcards' },
   { domain: 'habits', op: 'list', tool: 'get_habits', kind: 'read', page: 'habits' },

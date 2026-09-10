@@ -118,6 +118,33 @@ function buildRevert(
     const id = idOf(result, ['transaction']);
     return id ? () => del('finance_transactions', id) : null;
   }
+  if (tool === 'set_allowance') {
+    const settings = row.settings as { id?: string } | undefined;
+    const previous = row.previous as { allowance_amount?: number; allowance_period?: string } | undefined;
+    const created = Boolean(row.created);
+    if (created && settings?.id) {
+      return () => del('finance_settings', String(settings.id));
+    }
+    if (settings?.id && previous) {
+      return async () => {
+        const { error } = await supabase
+          .from('finance_settings')
+          .update({
+            allowance_amount: previous.allowance_amount,
+            allowance_period: previous.allowance_period,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', settings.id);
+        if (error) throw error;
+        return true;
+      };
+    }
+    return null;
+  }
+  if (tool === 'add_savings_goal') {
+    const id = idOf(result, ['goal']);
+    return id ? () => del('finance_goals', id) : null;
+  }
   if (tool === 'add_class_link') {
     const id = idOf(result, ['link']);
     return id ? () => del('class_hub_links', id) : null;
@@ -160,8 +187,7 @@ export async function undoLastWrite(): Promise<{ ok: boolean; summary?: string; 
     await last.revert();
     notifyDataChanged();
     return { ok: true, summary: last.summary };
-  } catch (err) {
-    stack.push(last);
-    return { ok: false, error: err instanceof Error ? err.message : 'Undo failed.' };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message || 'Undo failed.' };
   }
 }

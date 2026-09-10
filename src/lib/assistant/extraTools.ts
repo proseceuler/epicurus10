@@ -1,6 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS } from '@/lib/types';
 import { searchEpicure } from '@/lib/assistant/rag';
+import {
+  addTaskFromChat,
+  checkHabitFromChat,
+  completeTaskFromChat,
+  habitStatsFromChat,
+} from '@/lib/assistant/taskHabits';
 
 type ToolDef = {
   type: 'function';
@@ -21,7 +27,7 @@ export const EXTRA_TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'update_todo',
-      description: 'Update an existing to-do by title match: complete it, rename it, or change the due date.',
+      description: 'Update or complete an existing to-do by title match.',
       parameters: obj(
         {
           title: str('Current task title or part of it'),
@@ -31,6 +37,14 @@ export const EXTRA_TOOLS: ToolDef[] = [
         },
         ['title'],
       ),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_habit_stats',
+      description: 'Read habit streaks and what is still open today.',
+      parameters: obj({}),
     },
   },
   {
@@ -78,7 +92,7 @@ export const EXTRA_TOOLS: ToolDef[] = [
     function: {
       name: 'search_epicure',
       description:
-        'Semantic search over epicure help pages and the student notes vault. Use for how-the-app-works questions and “what did I write about X”.',
+        'Semantic search over epicure help pages and the student notes vault.',
       parameters: obj(
         {
           query: str('Search query'),
@@ -92,20 +106,14 @@ export const EXTRA_TOOLS: ToolDef[] = [
 
 export async function runExtraTool(name: string, args: Record<string, any>): Promise<unknown | undefined> {
   switch (name) {
-    case 'update_todo': {
-      const needle = String(args.title || '').toLowerCase();
-      const { data: todos } = await supabase.from('todos').select('*');
-      const match = (todos ?? []).find((t: any) => String(t.title).toLowerCase().includes(needle));
-      if (!match) return { ok: false, error: `No task matching "${args.title}".` };
-      const patch: Record<string, unknown> = {};
-      if (typeof args.new_title === 'string' && args.new_title.trim()) patch.title = args.new_title.trim();
-      if (typeof args.completed === 'boolean') patch.completed = args.completed;
-      if (args.due_date) patch.due_date = args.due_date;
-      if (!Object.keys(patch).length) return { ok: false, error: 'Nothing to update.' };
-      const { data, error } = await supabase.from('todos').update(patch).eq('id', match.id).select().single();
-      if (error) throw error;
-      return { ok: true, todo: data };
-    }
+    case 'add_todo':
+      return addTaskFromChat(args);
+    case 'update_todo':
+      return completeTaskFromChat(args);
+    case 'mark_habit':
+      return checkHabitFromChat(args);
+    case 'get_habit_stats':
+      return habitStatsFromChat();
     case 'update_class_hub': {
       const existing = await supabase.from('class_hub').select('*').eq('subject_key', args.subject_key).maybeSingle();
       const patch = {

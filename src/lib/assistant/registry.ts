@@ -1,5 +1,7 @@
 import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolContext, type ToolDef } from '@/lib/aiTools';
 import { EXTRA_TOOLS, runExtraTool } from '@/lib/assistant/extraTools';
+import { actionForTool, writeTools } from '@/lib/assistant/actions';
+import { pushUndo } from '@/lib/assistant/undo';
 
 /**
  * MCP-style connector registry.
@@ -23,11 +25,7 @@ export interface Connector {
   tools: ConnectorTool[];
 }
 
-const WRITE_NAMES = new Set([
-  'add_todo', 'update_todo', 'add_note', 'add_calendar_event', 'add_kanban_task',
-  'add_flashcard', 'add_assessment', 'log_expense', 'mark_habit',
-  'update_class_hub', 'add_class_link', 'start_focus_session',
-]);
+const WRITE_NAMES = new Set(writeTools());
 
 function wrap(def: ToolDef, connector: ConnectorId): ConnectorTool {
   return { connector, name: def.function.name, write: WRITE_NAMES.has(def.function.name), def };
@@ -78,8 +76,11 @@ export async function dispatchTool(name: string, args: Record<string, unknown>, 
     }
   }
   const extra = await runExtraTool(name, args);
-  if (extra !== undefined) return extra;
-  return runTool(name, args, ctx);
+  const result = extra !== undefined ? extra : await runTool(name, args, ctx);
+  if (WRITE_NAMES.has(name)) {
+    pushUndo(name, args, result, writeSummary(name, args));
+  }
+  return result;
 }
 
 export function writeSummary(name: string, args: Record<string, unknown>) {
@@ -97,17 +98,7 @@ export function writeSummary(name: string, args: Record<string, unknown>) {
   return name.replaceAll('_', ' ');
 }
 
-export const PAGE_FOR_WRITE: Record<string, string> = {
-  add_todo: 'todos',
-  update_todo: 'todos',
-  add_note: 'notes',
-  add_calendar_event: 'calendar',
-  add_kanban_task: 'kanban',
-  add_flashcard: 'flashcards',
-  add_assessment: 'grades',
-  log_expense: 'finance',
-  mark_habit: 'habits',
-  update_class_hub: 'classhub',
-  add_class_link: 'classhub',
-  start_focus_session: 'pomodoro',
-};
+export const PAGE_FOR_WRITE: Record<string, string> = Object.fromEntries(
+  writeTools()
+    .map((tool) => [tool, actionForTool(tool)?.page ?? 'dashboard']),
+);

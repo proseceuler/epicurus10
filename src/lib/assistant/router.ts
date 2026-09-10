@@ -1,5 +1,5 @@
 import { OPENROUTER_URL, LAYER_MODELS, LAYER_FALLBACKS, VISION_MODELS, type AssistantLayer } from './models';
-import { listToolDefs, isWriteTool, dispatchTool } from './registry';
+import { listToolDefs, isWriteTool, dispatchTool, AUTO_APPLY_WRITES } from './registry';
 import { attachmentPrompt, visionParts, type ChatAttachment } from './media';
 import type { ToolContext } from '@/lib/aiTools';
 import type { PageId } from '@/components/AppLayout';
@@ -37,7 +37,10 @@ function systemPrompt(page: PageId, search: boolean) {
     `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
     'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
     'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
-    'If they ask to create or change something in the app, call the matching tool. The app will confirm before saving writes.',
+    'Task and habit writes apply immediately: add_todo, update_todo, mark_habit. Do not ask them to confirm those.',
+    'For "tomorrow" pass due_date as YYYY-MM-DD or leave it in the title; the app parses tomorrow/today.',
+    'Chem / chemistry maps to science. "I did reading" should call mark_habit with name reading.',
+    'Other writes still wait for confirm.',
     'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
     search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
   ].join(' ');
@@ -46,8 +49,8 @@ function systemPrompt(page: PageId, search: boolean) {
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
-  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit)\b/.test(t);
-  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link)\b/.test(t);
+  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done)\b/.test(t);
+  const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read)\b/.test(t);
   const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
   if (actionVerb && actionNoun) layers.add('execute');
@@ -139,7 +142,7 @@ async function runCalls(
   for (const call of calls) {
     let args: Record<string, unknown> = {};
     try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* ignore */ }
-    if (isWriteTool(call.function.name)) {
+    if (isWriteTool(call.function.name) && !AUTO_APPLY_WRITES.has(call.function.name)) {
       writes.push({ name: call.function.name, args });
       continue;
     }

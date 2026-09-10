@@ -36,6 +36,7 @@ function systemPrompt(page: PageId, search: boolean) {
     'Stay on schoolwork and productivity. Do not write or edit app code.',
     `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
     'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
+    'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
     'If they ask to create or change something in the app, call the matching tool. The app will confirm before saving writes.',
     'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
     search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
@@ -47,7 +48,7 @@ export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolea
   const layers = new Set<AssistantLayer>(['chat']);
   const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit)\b/.test(t);
   const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|class|teacher|room|office hours|kanban|card|focus|pomodoro|link)\b/.test(t);
-  const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history)\b/.test(t);
+  const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
   if (actionVerb && actionNoun) layers.add('execute');
   if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon))\b/.test(t)) layers.add('data');
@@ -148,6 +149,10 @@ async function runCalls(
       const rows = (result as { results?: Array<{ title: string; url: string }> }).results || [];
       sources.push(...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.url })));
     }
+    if (call.function.name === 'search_epicure' && result && typeof result === 'object') {
+      const rows = (result as { hits?: Array<{ title: string; page?: string }> }).hits || [];
+      sources.push(...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.page ? `/${r.page}` : '/notes' })));
+    }
   }
   return { reads, writes, sources };
 }
@@ -177,7 +182,7 @@ export async function runAssistantTurn(opts: {
       layer: 'data',
       messages: [
         ...apiMessages,
-        { role: 'user', content: 'Search the student vault (notes, tasks, habits, grades) for anything relevant, then summarize the raw facts only.' },
+        { role: 'user', content: 'Search epicure help and the student vault for anything relevant. Prefer search_epicure, then summarize the raw facts only.' },
       ],
       tools: dataTools,
       temperature: 0.1,
@@ -185,6 +190,7 @@ export async function runAssistantTurn(opts: {
     if (data.tool_calls.length) {
       const ran = await runCalls(data.tool_calls, ctx);
       retrieval += ran.reads.join('\n');
+      sources.push(...ran.sources);
     } else if (data.content) {
       retrieval += data.content;
     }

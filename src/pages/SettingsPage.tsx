@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
 import { Key, Database, Download, Check, Cpu, Smartphone, Keyboard } from 'lucide-react';
-import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
+import {
+  OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, PINECONE_KEY, PINECONE_HOST,
+  getOpenRouterKey, getMwKey, getTavilyKey, getPineconeKey, getPineconeHost,
+  getDefaultModel, saveKey,
+} from '@/lib/apiKeys';
+import { ingestEpicure } from '@/lib/assistant/rag';
 import {
   getShortcuts, setShortcut, resetShortcuts, formatShortcut,
   SHORTCUT_LABELS, type ShortcutId, type ShortcutMap,
@@ -21,6 +26,10 @@ export default function SettingsPage() {
   const [openRouterKey, setOpenRouterKey] = useState(() => getOpenRouterKey());
   const [mwKey, setMwKey] = useState(() => getMwKey());
   const [tavilyKey, setTavilyKey] = useState(() => getTavilyKey());
+  const [pineconeKey, setPineconeKey] = useState(() => getPineconeKey());
+  const [pineconeHost, setPineconeHost] = useState(() => getPineconeHost());
+  const [indexMsg, setIndexMsg] = useState('');
+  const [indexing, setIndexing] = useState(false);
   const [defaultModel, setDefaultModel] = useState(() => getDefaultModel() || AI_MODELS[0].value);
   const [saved, setSaved] = useState(false);
   const [shortcuts, setShortcuts] = useState<ShortcutMap>(() => getShortcuts());
@@ -53,11 +62,21 @@ export default function SettingsPage() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [listening]);
 
-
   const updateOpenRouter = (v: string) => { setOpenRouterKey(v); saveKey(OPENROUTER_KEY, v.trim()); };
   const updateMw = (v: string) => { setMwKey(v); saveKey(MW_KEY, v.trim()); };
   const updateTavily = (v: string) => { setTavilyKey(v); saveKey(TAVILY_KEY, v.trim()); };
+  const updatePineconeKey = (v: string) => { setPineconeKey(v); saveKey(PINECONE_KEY, v.trim()); };
+  const updatePineconeHost = (v: string) => { setPineconeHost(v); saveKey(PINECONE_HOST, v.trim()); };
   const updateModel = (v: string) => { setDefaultModel(v); saveKey(MODEL_KEY, v); };
+
+  const reindex = async () => {
+    setIndexing(true);
+    setIndexMsg('');
+    const result = await ingestEpicure();
+    setIndexing(false);
+    setIndexMsg(result.ok ? `Indexed ${result.upserted} chunks.` : (result.error || 'Index failed.'));
+    flash();
+  };
 
   const exportData = async () => {
     const tables = ['assessments', 'class_hub', 'class_hub_links', 'todos', 'kanban_tasks',
@@ -138,8 +157,21 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm font-medium text-zinc-600 mb-1 block">Tavily Search API Key</label>
               <Input type="password" value={tavilyKey} onChange={updateTavily} placeholder="tvly-..." />
-              <p className="text-xs text-zinc-400 mt-1">Enables live web search in Study Assistant and Coding Agent modes. Get a free key at tavily.com — saved as you type.</p>
+              <p className="text-xs text-zinc-400 mt-1">Enables live web search in Study Assistant. Get a free key at tavily.com — saved as you type.</p>
             </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 mb-1 block">Pinecone API Key</label>
+              <Input type="password" value={pineconeKey} onChange={updatePineconeKey} placeholder="pcsk_..." />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 mb-1 block">Pinecone index host</label>
+              <Input value={pineconeHost} onChange={updatePineconeHost} placeholder="epicure-xxxx.svc.aped-4627-b74a.pinecone.io" />
+              <p className="text-xs text-zinc-400 mt-1">Starter index named epicure, model llama-text-embed-v2, dimension 1024, region us-east-1. If the browser blocks Pinecone, Arrodes still searches notes locally.</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => void reindex()} disabled={indexing}>
+              {indexing ? 'Indexing…' : 'Reindex help + notes'}
+            </Button>
+            {indexMsg && <p className="text-xs text-zinc-500">{indexMsg}</p>}
           </div>
         </Card>
         <Card className="p-6">

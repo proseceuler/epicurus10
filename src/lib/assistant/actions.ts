@@ -32,6 +32,7 @@ export const ACTION_CATALOG: ActionOp[] = [
   { domain: 'notes', op: 'search', tool: 'get_notes', kind: 'read', page: 'notes' },
   { domain: 'notes', op: 'create', tool: 'add_note', kind: 'write', page: 'notes' },
   { domain: 'notes', op: 'vault', tool: 'search_vault', kind: 'read', page: 'notes' },
+  { domain: 'search', op: 'epicure', tool: 'search_epicure', kind: 'read', page: 'notes' },
   { domain: 'calendar', op: 'list', tool: 'get_calendar', kind: 'read', page: 'calendar' },
   { domain: 'calendar', op: 'create', tool: 'add_calendar_event', kind: 'write', page: 'calendar' },
   { domain: 'kanban', op: 'create', tool: 'add_kanban_task', kind: 'write', page: 'kanban' },

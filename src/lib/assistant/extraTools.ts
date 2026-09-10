@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS } from '@/lib/types';
+import { searchEpicure } from '@/lib/assistant/rag';
 
 type ToolDef = {
   type: 'function';
@@ -72,6 +73,21 @@ export const EXTRA_TOOLS: ToolDef[] = [
       parameters: obj({ query: str('Keyword or phrase') }, ['query']),
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'search_epicure',
+      description:
+        'Semantic search over epicure help pages and the student notes vault. Use for how-the-app-works questions and “what did I write about X”.',
+      parameters: obj(
+        {
+          query: str('Search query'),
+          namespace: str('Which corpus', ['site', 'notes', 'all']),
+        },
+        ['query'],
+      ),
+    },
+  },
 ];
 
 export async function runExtraTool(name: string, args: Record<string, any>): Promise<unknown | undefined> {
@@ -132,6 +148,10 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
         kanban: (kanban.data ?? []).filter((t: any) => hit(`${t.title} ${t.description}`)).slice(0, 8),
         habits: (habits.data ?? []).filter((h: any) => hit(String(h.name))).slice(0, 8),
       };
+    }
+    case 'search_epicure': {
+      const namespace = args.namespace === 'site' || args.namespace === 'notes' ? args.namespace : 'all';
+      return searchEpicure(String(args.query || ''), namespace);
     }
     default:
       return undefined;

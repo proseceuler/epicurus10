@@ -2,13 +2,8 @@ import { DATA_TOOLS, SEARCH_TOOL, runTool, type ToolContext, type ToolDef } from
 import { EXTRA_TOOLS, runExtraTool } from '@/lib/assistant/extraTools';
 import { actionForTool, writeTools } from '@/lib/assistant/actions';
 import { pushUndo } from '@/lib/assistant/undo';
+import { notifyDataChanged } from '@/lib/assistant/sync';
 
-/**
- * MCP-style connector registry.
- * Site tools live here today. Gmail / Google Calendar / etc. register the same way later:
- *   registerConnector({ id: 'gmail', label: 'Gmail', tools: [...], run })
- * without changing the chat loop.
- */
 export type ConnectorId = 'site' | 'web' | 'mcp';
 
 export interface ConnectorTool {
@@ -68,6 +63,8 @@ export function isWriteTool(name: string) {
   return WRITE_NAMES.has(name);
 }
 
+export const AUTO_APPLY_WRITES = new Set(['add_todo', 'update_todo', 'mark_habit']);
+
 export async function dispatchTool(name: string, args: Record<string, unknown>, ctx: ToolContext) {
   for (const c of extras) {
     const hit = c.tools.find((t) => t.name === name);
@@ -79,6 +76,7 @@ export async function dispatchTool(name: string, args: Record<string, unknown>, 
   const result = extra !== undefined ? extra : await runTool(name, args, ctx);
   if (WRITE_NAMES.has(name)) {
     pushUndo(name, args, result, writeSummary(name, args));
+    notifyDataChanged(actionForTool(name)?.page);
   }
   return result;
 }
@@ -99,6 +97,5 @@ export function writeSummary(name: string, args: Record<string, unknown>) {
 }
 
 export const PAGE_FOR_WRITE: Record<string, string> = Object.fromEntries(
-  writeTools()
-    .map((tool) => [tool, actionForTool(tool)?.page ?? 'dashboard']),
+  writeTools().map((tool) => [tool, actionForTool(tool)?.page ?? 'dashboard']),
 );

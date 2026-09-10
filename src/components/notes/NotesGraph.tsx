@@ -5,133 +5,40 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
-  type SimulationNodeDatum,
-  type SimulationLinkDatum,
 } from 'd3-force';
-import { loadBoards, BOARDS_CHANGED, findBoardByName } from '@/lib/board-store';
-import { wikiBoardTitles, wikiLinkTitles, findNoteByTitle } from '@/lib/wiki';
+import { loadBoards, BOARDS_CHANGED } from '@/lib/board-store';
 import type { Note } from '@/lib/types';
 import { Palette } from 'lucide-react';
-
-type NodeKind = 'index' | 'daily' | 'topic' | 'board';
-
-type GNode = SimulationNodeDatum & {
-  id: string;
-  label: string;
-  kind: NodeKind;
-  degree: number;
-  inDegree: number;
-  outDegree: number;
-};
-
-type GLink = SimulationLinkDatum<GNode> & {
-  source: string | GNode;
-  target: string | GNode;
-  strength: number;
-};
-
-type GraphColors = Record<NodeKind, string>;
-type Cam = { x: number; y: number; k: number };
-
-const DEFAULT_COLORS: GraphColors = {
-  index: '#18181b',
-  daily: '#2563eb',
-  topic: '#3f3f46',
-  board: '#c2410c',
-};
-
-const COLOR_KEY = 'epicure:graph-colors';
-const GRAPH_SETTINGS_KEY = 'epicure:graph-settings:v2';
-
-type GraphSettings = {
-  bg: 'plain' | 'dots' | 'grid';
-  center: number;
-  charge: number;
-  linkForce: number;
-  linkDist: number;
-  showLabels: boolean;
-  enabled: NodeKind[];
-};
-
-const DEFAULT_GSET: GraphSettings = {
-  bg: 'plain',
-  center: 0.32,
-  charge: -180,
-  linkForce: 0.45,
-  linkDist: 96,
-  showLabels: true,
-  enabled: ['index', 'daily', 'topic', 'board'],
-};
-
-function loadGraphSettings(): GraphSettings {
-  try {
-    const raw = localStorage.getItem(GRAPH_SETTINGS_KEY) || localStorage.getItem('epicure:graph-settings:v1');
-    if (raw) return { ...DEFAULT_GSET, ...JSON.parse(raw) };
-  } catch {
-    /* */
-  }
-  return { ...DEFAULT_GSET };
-}
-
-function loadColors(): GraphColors {
-  try {
-    const raw = localStorage.getItem(COLOR_KEY);
-    if (raw) return { ...DEFAULT_COLORS, ...JSON.parse(raw) };
-  } catch {
-    /* ignore */
-  }
-  return { ...DEFAULT_COLORS };
-}
-
-function saveColors(c: GraphColors) {
-  try {
-    localStorage.setItem(COLOR_KEY, JSON.stringify(c));
-  } catch {
-    /* ignore */
-  }
-}
-
-function classifyNote(n: Note): NodeKind {
-  const title = (n.title || '').trim();
-  const folder = (n.folder || '').toLowerCase();
-  if (/^\d{4}-\d{2}-\d{2}/.test(title) || folder.includes('daily') || folder.includes('journal')) {
-    return 'daily';
-  }
-  if (/^(home|index|moc|map of content)$/i.test(title) || folder.includes('index')) {
-    return 'index';
-  }
-  return 'topic';
-}
-
-const KIND_LABEL: Record<NodeKind, string> = {
-  index: 'Index',
-  daily: 'Daily',
-  topic: 'Topic',
-  board: 'Board',
-};
-
-function safeLabel(v: unknown, fallback = 'Untitled') {
-  if (v == null) return fallback;
-  const s = String(v).trim();
-  return s || fallback;
-}
-
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
-}
-
-function linkEnds(l: GLink) {
-  const s = typeof l.source === 'object' ? l.source.id : l.source;
-  const t = typeof l.target === 'object' ? l.target.id : l.target;
-  return { s, t };
-}
+import {
+  type GNode,
+  type GLink,
+  type GraphColors,
+  type GraphSettings,
+  type NodeKind,
+  type Cam,
+  DEFAULT_COLORS,
+  DEFAULT_GSET,
+  GRAPH_SETTINGS_KEY,
+  KIND_LABEL,
+  buildNotesGraph,
+  classifyNote,
+  clamp,
+  fillForNode,
+  linkEnds,
+  loadColors,
+  loadGraphSettings,
+  saveColors,
+  safeLabel,
+} from '@/lib/notes-graph-model';
 
 export default function NotesGraph({
   notes,
+  focusNoteId,
   onOpenNote,
   onOpenBoard,
 }: {
   notes: Note[];
+  focusNoteId?: string | null;
   onOpenNote: (n: Note) => void;
   onOpenBoard: (name: string) => void;
 }) {
@@ -167,7 +74,7 @@ export default function NotesGraph({
   const fittedRef = useRef(false);
   const [size, setSize] = useState({ w: 900, h: 560 });
   const [cam, setCam] = useState<Cam>({ x: 0, y: 0, k: 1 });
-
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const enabled = new Set(gset.enabled?.length ? gset.enabled : DEFAULT_GSET.enabled);
 
   useEffect(() => {
@@ -200,80 +107,24 @@ export default function NotesGraph({
   }, []);
 
   const topologyKey = useMemo(() => {
-    const noteIds = notes.map((n) => n.id).join(',');
-    const boardIds = boards.map((b) => b.id).join(',');
-    return `${noteIds}|${boardIds}|${notes.map((n) => (n.content || '').length).join(',')}`;
+    const noteSig = notes.map((n) => `${n.id}:${n.title}:${(n.content || '').length}:${(n.tags || []).join(',')}`).join('|');
+    return `${noteSig}||${boards.map((b) => `${b.id}:${b.name}`).join(',')}`;
   }, [notes, boards]);
 
-  const { nodes, links } = useMemo(() => {
-    const all: GNode[] = [
-      ...notes.map((n) => ({
-        id: n.id,
-        label: safeLabel(n.title),
-        kind: classifyNote(n),
-        degree: 0,
-        inDegree: 0,
-        outDegree: 0,
-      })),
-      ...boards.map((b) => ({
-        id: `board:${b.id}`,
-        label: safeLabel(b.name, 'Board'),
-        kind: 'board' as const,
-        degree: 0,
-        inDegree: 0,
-        outDegree: 0,
-      })),
-    ];
-    const ns = all.filter((n) => enabled.has(n.kind));
-    const idSet = new Set(ns.map((n) => n.id));
-    const ls: GLink[] = [];
-    const inbound = new Map<string, number>();
-    const outbound = new Map<string, number>();
-    const bump = (from: string, to: string) => {
-      outbound.set(from, (outbound.get(from) || 0) + 1);
-      inbound.set(to, (inbound.get(to) || 0) + 1);
-    };
-    const addEdge = (from: string, to: string) => {
-      if (!idSet.has(from) || !idSet.has(to) || from === to) return;
-      ls.push({ source: from, target: to, strength: 1 });
-      bump(from, to);
-    };
-    for (const n of notes) {
-      for (const title of wikiLinkTitles(n.content || '')) {
-        const dest = findNoteByTitle(notes, title);
-        if (dest) addEdge(n.id, dest.id);
-      }
-      for (const title of wikiBoardTitles(n.content || '')) {
-        const b = findBoardByName(boards, title);
-        if (b) addEdge(n.id, `board:${b.id}`);
-      }
-    }
-    for (const n of ns) {
-      n.inDegree = inbound.get(n.id) || 0;
-      n.outDegree = outbound.get(n.id) || 0;
-      n.degree = n.inDegree + n.outDegree;
-    }
-    return { nodes: ns, links: ls };
+  const { nodes, links } = useMemo(
+    () => buildNotesGraph({ notes, boards, gset, focusNoteId }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topologyKey, gset.enabled.join('|')]);
+    [topologyKey, gset.enabled.join('|'), gset.search, gset.showOrphans, gset.hideUnresolved, gset.mode, gset.depth, focusNoteId],
+  );
 
   const applyForces = useCallback(
     (sim: ReturnType<typeof forceSimulation<GNode>>) => {
       const { w, h } = sizeRef.current;
       sim
-        .force(
-          'link',
-          forceLink<GNode, GLink>(linksRef.current)
-            .id((d) => d.id)
-            .distance(gset.linkDist)
-            .strength(gset.linkForce),
-        )
+        .force('link', forceLink<GNode, GLink>(linksRef.current).id((d) => d.id).distance(gset.linkDist).strength(gset.linkForce))
         .force('charge', forceManyBody().strength(gset.charge))
         .force('center', forceCenter(w / 2, h / 2).strength(gset.center))
-        .force(
-          'collide',
-          forceCollide<GNode>().radius((d) => 10 + Math.log1p(d.inDegree) * 6),
-        );
+        .force('collide', forceCollide<GNode>().radius((d) => 10 + Math.log1p(d.inDegree) * 6));
     },
     [gset.center, gset.charge, gset.linkForce, gset.linkDist],
   );
@@ -282,8 +133,7 @@ export default function NotesGraph({
     const prev = new Map(nodesRef.current.map((n) => [n.id, n]));
     nodesRef.current = nodes.map((n) => {
       const p = prev.get(n.id);
-      if (!p) return { ...n };
-      return { ...n, x: p.x, y: p.y, vx: p.vx, vy: p.vy, fx: p.fx, fy: p.fy };
+      return p ? { ...n, x: p.x, y: p.y, vx: p.vx, vy: p.vy, fx: p.fx, fy: p.fy } : { ...n };
     });
     linksRef.current = links.map((l) => ({ ...l }));
     simRef.current?.stop();
@@ -381,11 +231,7 @@ export default function NotesGraph({
     const gw = Math.max(maxX - minX, 80);
     const gh = Math.max(maxY - minY, 80);
     const k = clamp(0.84 * Math.min(w / gw, h / gh), 0.28, 2.4);
-    setCamera({
-      k,
-      x: w / 2 - k * ((minX + maxX) / 2),
-      y: h / 2 - k * ((minY + maxY) / 2),
-    });
+    setCamera({ k, x: w / 2 - k * ((minX + maxX) / 2), y: h / 2 - k * ((minY + maxY) / 2) });
   };
 
   const onPointerDownNode = (e: React.PointerEvent, id: string) => {
@@ -415,11 +261,7 @@ export default function NotesGraph({
       return;
     }
     if (panRef.current) {
-      setCamera({
-        ...camRef.current,
-        x: panRef.current.cx + (local.x - panRef.current.x),
-        y: panRef.current.cy + (local.y - panRef.current.y),
-      });
+      setCamera({ ...camRef.current, x: panRef.current.cx + (local.x - panRef.current.x), y: panRef.current.cy + (local.y - panRef.current.y) });
     }
   };
 
@@ -436,6 +278,7 @@ export default function NotesGraph({
     setSelectedId(null);
     setColorOpen(false);
     setPanelOpen(false);
+    setMenu(null);
   };
 
   const onWheel = (e: React.WheelEvent) => {
@@ -444,18 +287,13 @@ export default function NotesGraph({
     const c = camRef.current;
     const factor = e.deltaY > 0 ? 0.92 : 1.08;
     const nk = clamp(c.k * factor, 0.25, 4);
-    setCamera({
-      k: nk,
-      x: local.x - ((local.x - c.x) * nk) / c.k,
-      y: local.y - ((local.y - c.y) * nk) / c.k,
-    });
+    setCamera({ k: nk, x: local.x - ((local.x - c.x) * nk) / c.k, y: local.y - ((local.y - c.y) * nk) / c.k });
   };
 
   const openNode = useCallback(
     (id: string) => {
       if (id.startsWith('board:')) {
-        const node = nodesRef.current.find((n) => n.id === id);
-        const name = safeLabel(node?.label, '');
+        const name = safeLabel(nodesRef.current.find((n) => n.id === id)?.label, '');
         if (name) onOpenBoard(name);
         return;
       }
@@ -478,19 +316,19 @@ export default function NotesGraph({
     if (cur.has(kind)) {
       if (cur.size === 1) return;
       cur.delete(kind);
-    } else {
-      cur.add(kind);
-    }
+    } else cur.add(kind);
     persistGset({ ...gset, enabled: [...cur] });
   };
 
   const selectedNode = selectedId ? nodesRef.current.find((n) => n.id === selectedId) : null;
   const selectedNote = selectedId && !selectedId.startsWith('board:') ? notes.find((n) => n.id === selectedId) : null;
   const labelFade = clamp((cam.k - 0.4) / 0.45, 0, 1);
-  const counts: Record<NodeKind, number> = { index: 0, daily: 0, topic: 0, board: 0 };
+  const counts: Record<NodeKind, number> = { index: 0, daily: 0, topic: 0, board: 0, unresolved: 0 };
   for (const n of notes) counts[classifyNote(n)]++;
   counts.board = boards.length;
+  counts.unresolved = nodes.filter((n) => n.kind === 'unresolved').length;
   const nameOf = (id: string) => nodesRef.current.find((n) => n.id === id)?.label || id;
+  const fillFor = (n: GNode) => fillForNode(n, notes, colors, gset.groups || []);
 
   return (
     <div
@@ -507,25 +345,27 @@ export default function NotesGraph({
       }}
     >
       <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
-        {(Object.keys(KIND_LABEL) as NodeKind[]).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => toggleKind(k)}
-            className={`inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm ${
-              enabled.has(k) ? '' : 'opacity-35'
-            }`}
-            title={`Toggle ${KIND_LABEL[k]}`}
-          >
-            <span
-              className={k === 'board' ? 'h-2.5 w-2.5 rotate-45 rounded-[1px]' : 'h-2.5 w-2.5 rounded-full'}
-              style={{ background: colors[k] }}
-            />
+        <div className="inline-flex rounded-full border border-zinc-200 bg-white p-0.5 text-[10px] font-medium shadow-sm">
+          {(['global', 'local'] as const).map((m) => (
+            <button key={m} type="button" onClick={() => persistGset({ ...gset, mode: m })} className={`rounded-full px-2 py-0.5 capitalize ${gset.mode === m ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>
+              {m}
+            </button>
+          ))}
+        </div>
+        {gset.mode === 'local' && (
+          <label className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] text-zinc-600 shadow-sm">
+            Depth {gset.depth}
+            <input type="range" min={1} max={5} value={gset.depth} onChange={(e) => persistGset({ ...gset, depth: Number(e.target.value) })} className="w-16" />
+          </label>
+        )}
+        {(Object.keys(KIND_LABEL) as NodeKind[]).filter((k) => k !== 'unresolved').map((k) => (
+          <button key={k} type="button" onClick={() => toggleKind(k)} className={`inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm ${enabled.has(k) ? '' : 'opacity-35'}`} title={`Toggle ${KIND_LABEL[k]}`}>
+            <span className={k === 'board' ? 'h-2.5 w-2.5 rotate-45 rounded-[1px]' : 'h-2.5 w-2.5 rounded-full'} style={{ background: colors[k] }} />
             {KIND_LABEL[k]} {counts[k]}
           </button>
         ))}
-        <button type="button" onClick={() => { setPanelOpen((v) => !v); setColorOpen(false); }} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50" title="Graph settings">Settings</button>
-        <button type="button" onClick={() => { setColorOpen((v) => !v); setPanelOpen(false); }} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50" title="Customize colors"><Palette className="h-3 w-3" /> Colors</button>
+        <button type="button" onClick={() => { setPanelOpen((v) => !v); setColorOpen(false); }} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50">Settings</button>
+        <button type="button" onClick={() => { setColorOpen((v) => !v); setPanelOpen(false); }} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50"><Palette className="h-3 w-3" /> Colors</button>
         <button type="button" onClick={() => fitToContent()} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50">Fit</button>
       </div>
 
@@ -542,34 +382,62 @@ export default function NotesGraph({
         </div>
       )}
 
-      <p className="pointer-events-none absolute right-3 top-3 z-10 text-[10px] text-zinc-400">Drag to move \u00b7 scroll to zoom \u00b7 double-click to open</p>
+      <p className="pointer-events-none absolute right-3 top-3 z-10 text-[10px] text-zinc-400">Drag to move · scroll to zoom · double-click to open</p>
 
       {panelOpen && (
-        <div className="absolute left-3 top-12 z-20 w-60 space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
+        <div className="absolute left-3 top-12 z-20 max-h-[70vh] w-72 space-y-3 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-zinc-700">Forces</p>
-            <button type="button" className="text-[10px] text-zinc-500 hover:text-zinc-800" onClick={() => persistGset({ ...DEFAULT_GSET, bg: gset.bg, enabled: gset.enabled, showLabels: gset.showLabels })}>Reset</button>
+            <p className="text-[11px] font-semibold text-zinc-700">Graph settings</p>
+            <button type="button" className="text-[10px] text-zinc-500 hover:text-zinc-800" onClick={() => persistGset({ ...DEFAULT_GSET })}>Restore defaults</button>
           </div>
           <div>
-            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Background</p>
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Filters</p>
+            <input value={gset.search} onChange={(e) => persistGset({ ...gset, search: e.target.value })} placeholder="tag:#math OR path:Daily -file:Home" className="mb-2 w-full rounded-lg border border-zinc-200 px-2 py-1 text-[11px]" />
+            <label className="flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showOrphans} onChange={(e) => persistGset({ ...gset, showOrphans: e.target.checked })} />Orphans</label>
+            <label className="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.hideUnresolved} onChange={(e) => persistGset({ ...gset, hideUnresolved: e.target.checked })} />Existing files only</label>
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Groups</p>
+            {(gset.groups || []).map((g, i) => (
+              <div key={i} className="mb-1 flex items-center gap-1">
+                <input type="color" value={g.color} onChange={(e) => { const groups = gset.groups.slice(); groups[i] = { ...groups[i], color: e.target.value }; persistGset({ ...gset, groups }); }} className="h-6 w-7 cursor-pointer rounded border border-zinc-200 p-0" />
+                <input value={g.query} onChange={(e) => { const groups = gset.groups.slice(); groups[i] = { ...groups[i], query: e.target.value }; persistGset({ ...gset, groups }); }} placeholder="tag:#school" className="min-w-0 flex-1 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[11px]" />
+                <button type="button" className="text-[10px] text-zinc-400" onClick={() => persistGset({ ...gset, groups: gset.groups.filter((_, j) => j !== i) })}>×</button>
+              </div>
+            ))}
+            <button type="button" className="mt-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-600" onClick={() => persistGset({ ...gset, groups: [...(gset.groups || []), { query: '', color: '#2563eb' }] })}>New group</button>
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Display</p>
+            <label className="flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showArrows} onChange={(e) => persistGset({ ...gset, showArrows: e.target.checked })} />Arrows</label>
+            <label className="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showLabels} onChange={(e) => persistGset({ ...gset, showLabels: e.target.checked })} />Show labels</label>
+            <label className="mt-1 block text-[10px] text-zinc-500">Node size ({gset.nodeSize.toFixed(2)})<input type="range" min={0.5} max={2} step={0.05} value={gset.nodeSize} onChange={(e) => persistGset({ ...gset, nodeSize: Number(e.target.value) })} className="mt-1 w-full" /></label>
+            <label className="block text-[10px] text-zinc-500">Link thickness ({gset.lineSize.toFixed(2)})<input type="range" min={0.4} max={3} step={0.1} value={gset.lineSize} onChange={(e) => persistGset({ ...gset, lineSize: Number(e.target.value) })} className="mt-1 w-full" /></label>
+            <p className="mb-1 mt-2 text-[10px] uppercase tracking-wide text-zinc-400">Background</p>
             <div className="flex gap-1">
               {(['plain', 'dots', 'grid'] as const).map((b) => (
                 <button key={b} type="button" onClick={() => persistGset({ ...gset, bg: b })} className={`rounded-md px-2 py-1 text-[10px] capitalize ${gset.bg === b ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}>{b}</button>
               ))}
             </div>
           </div>
-          <label className="block text-[10px] text-zinc-500">Center ({gset.center.toFixed(2)})<input type="range" min={0} max={1} step={0.02} value={gset.center} onChange={(e) => persistGset({ ...gset, center: Number(e.target.value) })} className="mt-1 w-full" /></label>
-          <label className="block text-[10px] text-zinc-500">Repel ({gset.charge})<input type="range" min={-500} max={-40} value={gset.charge} onChange={(e) => persistGset({ ...gset, charge: Number(e.target.value) })} className="mt-1 w-full" /></label>
-          <label className="block text-[10px] text-zinc-500">Link force ({gset.linkForce.toFixed(2)})<input type="range" min={0.05} max={1} step={0.05} value={gset.linkForce} onChange={(e) => persistGset({ ...gset, linkForce: Number(e.target.value) })} className="mt-1 w-full" /></label>
-          <label className="block text-[10px] text-zinc-500">Link distance ({gset.linkDist})<input type="range" min={40} max={240} value={gset.linkDist} onChange={(e) => persistGset({ ...gset, linkDist: Number(e.target.value) })} className="mt-1 w-full" /></label>
-          <label className="flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showLabels} onChange={(e) => persistGset({ ...gset, showLabels: e.target.checked })} />Show labels</label>
+          <div>
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Forces</p>
+            <label className="block text-[10px] text-zinc-500">Center ({gset.center.toFixed(2)})<input type="range" min={0} max={1} step={0.02} value={gset.center} onChange={(e) => persistGset({ ...gset, center: Number(e.target.value) })} className="mt-1 w-full" /></label>
+            <label className="block text-[10px] text-zinc-500">Repel ({gset.charge})<input type="range" min={-500} max={-40} value={gset.charge} onChange={(e) => persistGset({ ...gset, charge: Number(e.target.value) })} className="mt-1 w-full" /></label>
+            <label className="block text-[10px] text-zinc-500">Link force ({gset.linkForce.toFixed(2)})<input type="range" min={0.05} max={1} step={0.05} value={gset.linkForce} onChange={(e) => persistGset({ ...gset, linkForce: Number(e.target.value) })} className="mt-1 w-full" /></label>
+            <label className="block text-[10px] text-zinc-500">Link distance ({gset.linkDist})<input type="range" min={40} max={240} value={gset.linkDist} onChange={(e) => persistGset({ ...gset, linkDist: Number(e.target.value) })} className="mt-1 w-full" /></label>
+          </div>
         </div>
       )}
+
       <svg ref={svgRef} className="h-full w-full touch-none" viewBox={`0 0 ${size.w} ${size.h}`} onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp} onWheel={onWheel}>
         <defs>
           <filter id="hubGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.3" />
           </filter>
+          <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(24,24,27,0.7)" />
+          </marker>
         </defs>
         <g transform={`translate(${cam.x} ${cam.y}) scale(${cam.k})`}>
           {linksRef.current.map((l, i) => {
@@ -578,21 +446,21 @@ export default function NotesGraph({
             if (!s || !t || s.x == null || t.x == null) return null;
             const hot = Boolean(focusId && (focusId === s.id || focusId === t.id));
             const dim = Boolean(focusId && !hot);
-            return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={dim ? 'rgba(24,24,27,0.07)' : hot ? 'rgba(24,24,27,0.72)' : 'rgba(24,24,27,0.38)'} strokeWidth={(dim ? 1 : hot ? 1.7 : 1.35) / cam.k} />;
+            return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={dim ? 'rgba(24,24,27,0.07)' : hot ? 'rgba(24,24,27,0.72)' : 'rgba(24,24,27,0.38)'} strokeWidth={((dim ? 1 : hot ? 1.7 : 1.35) * gset.lineSize) / cam.k} markerEnd={gset.showArrows && !dim ? 'url(#graph-arrow)' : undefined} />;
           })}
           {nodesRef.current.map((n) => {
             if (n.x == null || n.y == null) return null;
-            const r = 6 + Math.log1p(n.inDegree) * 5.4;
+            const r = (6 + Math.log1p(n.inDegree) * 5.4) * gset.nodeSize;
             const isFocus = focusId === n.id;
             const isNeighbor = focusId ? neighbors.get(focusId)?.has(n.id) : false;
             const dim = Boolean(focusId && !isFocus && !isNeighbor);
-            const fill = colors[n.kind] || DEFAULT_COLORS[n.kind];
+            const fill = fillFor(n);
             return (
-              <g key={n.id} transform={`translate(${n.x},${n.y})`} className="cursor-pointer" opacity={dim ? 0.12 : 1} filter={n.inDegree >= 2 ? 'url(#hubGlow)' : undefined} onPointerEnter={() => setHoverId(n.id)} onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))} onPointerDown={(e) => onPointerDownNode(e, n.id)} onClick={(e) => { e.stopPropagation(); if (lastDragMoved.current) return; setSelectedId(n.id); }} onDoubleClick={(e) => { e.stopPropagation(); openNode(n.id); }}>
+              <g key={n.id} transform={`translate(${n.x},${n.y})`} className="cursor-pointer" opacity={dim ? 0.12 : 1} filter={n.inDegree >= 2 ? 'url(#hubGlow)' : undefined} onPointerEnter={() => setHoverId(n.id)} onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))} onPointerDown={(e) => onPointerDownNode(e, n.id)} onClick={(e) => { e.stopPropagation(); if (!lastDragMoved.current) setSelectedId(n.id); }} onDoubleClick={(e) => { e.stopPropagation(); if (n.kind !== 'unresolved') openNode(n.id); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedId(n.id); setMenu({ x: e.clientX, y: e.clientY, id: n.id }); }}>
                 {n.kind === 'board' ? (
                   <rect x={-r * 0.75} y={-r * 0.75} width={r * 1.5} height={r * 1.5} rx={3} transform="rotate(45)" fill={fill} stroke={isFocus ? '#111' : 'rgba(255,255,255,0.55)'} strokeWidth={isFocus ? 2.5 : 1.2} />
                 ) : (
-                  <circle r={r} fill={fill} stroke={isFocus ? '#111' : 'rgba(255,255,255,0.5)'} strokeWidth={isFocus ? 2.5 : 1.2} />
+                  <circle r={r} fill={n.kind === 'unresolved' ? '#fafafa' : fill} stroke={n.kind === 'unresolved' ? fill : isFocus ? '#111' : 'rgba(255,255,255,0.5)'} strokeDasharray={n.kind === 'unresolved' ? '3 2' : undefined} strokeWidth={isFocus ? 2.5 : 1.2} />
                 )}
                 {gset.showLabels && (
                   <text y={r + 13} textAnchor="middle" fontSize={11} fill={dim ? '#a1a1aa' : '#18181b'} opacity={dim ? labelFade * 0.2 : Math.max(labelFade, isFocus || isNeighbor ? 0.85 : 0)} style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}>{n.label}</text>
@@ -613,7 +481,7 @@ export default function NotesGraph({
             <button type="button" className="text-xs text-zinc-400 hover:text-zinc-700" onClick={() => setSelectedId(null)}>Close</button>
           </div>
           <p className="text-sm font-semibold text-zinc-900">{selectedNode.label}</p>
-          <p className="mt-0.5 text-[11px] text-zinc-500">{selectedNode.inDegree} incoming \u00b7 {selectedNode.outDegree} outgoing{selectedNote?.folder ? ` \u00b7 ${selectedNote.folder}` : ''}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{selectedNode.inDegree} incoming · {selectedNode.outDegree} outgoing{selectedNote?.folder ? ` · ${selectedNote.folder}` : ''}</p>
           <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-zinc-600">
             <div>
               <p className="font-semibold text-zinc-800">Incoming</p>
@@ -630,7 +498,15 @@ export default function NotesGraph({
               </ul>
             </div>
           </div>
-          <button type="button" className="mt-2 w-full rounded-xl bg-zinc-900 py-1.5 text-xs font-medium text-white" onClick={() => openNode(selectedNode.id)}>Open {selectedNode.kind === 'board' ? 'board' : 'note'}</button>
+          <button type="button" className="mt-2 w-full rounded-xl bg-zinc-900 py-1.5 text-xs font-medium text-white disabled:opacity-40" disabled={selectedNode.kind === 'unresolved'} onClick={() => openNode(selectedNode.id)}>Open {selectedNode.kind === 'board' ? 'board' : 'note'}</button>
+        </div>
+      )}
+
+      {menu && (
+        <div className="fixed z-50 min-w-[148px] overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 text-xs shadow-lg" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100 disabled:text-zinc-400" disabled={nodesRef.current.find((n) => n.id === menu.id)?.kind === 'unresolved'} onClick={() => { openNode(menu.id); setMenu(null); }}>Open</button>
+          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { const n = nodesRef.current.find((x) => x.id === menu.id); if (n?.x != null && n.y != null) { const { w, h } = sizeRef.current; const k = Math.max(camRef.current.k, 1.2); setCamera({ k, x: w / 2 - k * n.x, y: h / 2 - k * n.y }); } setMenu(null); }}>Fit to node</button>
+          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { const n = nodesRef.current.find((x) => x.id === menu.id); if (n) { n.fx = null; n.fy = null; simRef.current?.alpha(0.4).restart(); } setMenu(null); }}>Unpin</button>
         </div>
       )}
     </div>

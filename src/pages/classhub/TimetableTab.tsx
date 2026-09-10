@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { addCalendarEvent, getCalendarEvents, deleteCalendarEvent } from '@/lib/calendarStore';
 import { SUBJECTS, type TimetableEntry, type ClassAttendance, type SubjectKey } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { Plus, Trash2, Clock, MapPin, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -25,7 +26,7 @@ async function syncTimetableToCalendar(entries: TimetableEntry[]) {
       const sub = subjects[entry.subject_key];
       addCalendarEvent({
         title: sub ? sub.shortName + ' class' : 'Class',
-        description: 'epicure:timetable \u00b7 ' + (entry.room || 'Room TBA'),
+        description: 'epicure:timetable · ' + (entry.room || 'Room TBA'),
         start_date: iso,
         end_date: iso,
         all_day: false,
@@ -66,6 +67,7 @@ export function TimetableTab() {
   }, []);
 
   useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
 
   const getWeekStart = () => {
     const d = new Date();

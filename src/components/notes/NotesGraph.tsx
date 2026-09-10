@@ -27,39 +27,36 @@ import {
   linkEnds,
   loadColors,
   loadGraphSettings,
+  loadPins,
   saveColors,
+  savePins,
   safeLabel,
 } from '@/lib/notes-graph-model';
+import { GraphEmpty, GraphHint, GraphStats, GraphTooltip } from './GraphP2Layer';
 
 export default function NotesGraph({
   notes,
   focusNoteId,
   onOpenNote,
   onOpenBoard,
+  onCreateNote,
 }: {
   notes: Note[];
   focusNoteId?: string | null;
   onOpenNote: (n: Note) => void;
   onOpenBoard: (name: string) => void;
+  onCreateNote?: (title: string) => void;
 }) {
   const [boards, setBoards] = useState(() => (typeof window === 'undefined' ? [] : loadBoards()));
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [colors, setColors] = useState<GraphColors>(() =>
-    typeof window === 'undefined' ? DEFAULT_COLORS : loadColors(),
-  );
+  const [colors, setColors] = useState<GraphColors>(() => (typeof window === 'undefined' ? DEFAULT_COLORS : loadColors()));
   const [colorOpen, setColorOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [gset, setGset] = useState<GraphSettings>(() =>
-    typeof window === 'undefined' ? DEFAULT_GSET : loadGraphSettings(),
-  );
+  const [gset, setGset] = useState<GraphSettings>(() => (typeof window === 'undefined' ? DEFAULT_GSET : loadGraphSettings()));
   const persistGset = (next: GraphSettings) => {
     setGset(next);
-    try {
-      localStorage.setItem(GRAPH_SETTINGS_KEY, JSON.stringify(next));
-    } catch {
-      /* */
-    }
+    try { localStorage.setItem(GRAPH_SETTINGS_KEY, JSON.stringify(next)); } catch { /* */ }
   };
   const [, setTick] = useState(0);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -75,6 +72,7 @@ export default function NotesGraph({
   const [size, setSize] = useState({ w: 900, h: 560 });
   const [cam, setCam] = useState<Cam>({ x: 0, y: 0, k: 1 });
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const enabled = new Set(gset.enabled?.length ? gset.enabled : DEFAULT_GSET.enabled);
 
   useEffect(() => {
@@ -100,10 +98,7 @@ export default function NotesGraph({
       }, 180);
     });
     ro.observe(el);
-    return () => {
-      if (t) window.clearTimeout(t);
-      ro.disconnect();
-    };
+    return () => { if (t) window.clearTimeout(t); ro.disconnect(); };
   }, []);
 
   const topologyKey = useMemo(() => {
@@ -114,42 +109,38 @@ export default function NotesGraph({
   const { nodes, links } = useMemo(
     () => buildNotesGraph({ notes, boards, gset, focusNoteId }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topologyKey, gset.enabled.join('|'), gset.search, gset.showOrphans, gset.hideUnresolved, gset.mode, gset.depth, focusNoteId],
+    [topologyKey, gset.enabled.join('|'), gset.search, gset.showOrphans, gset.hideUnresolved, gset.mode, gset.depth, gset.showTags, gset.neighborLinks, focusNoteId],
   );
 
-  const applyForces = useCallback(
-    (sim: ReturnType<typeof forceSimulation<GNode>>) => {
-      const { w, h } = sizeRef.current;
-      sim
-        .force('link', forceLink<GNode, GLink>(linksRef.current).id((d) => d.id).distance(gset.linkDist).strength(gset.linkForce))
-        .force('charge', forceManyBody().strength(gset.charge))
-        .force('center', forceCenter(w / 2, h / 2).strength(gset.center))
-        .force('collide', forceCollide<GNode>().radius((d) => 10 + Math.log1p(d.inDegree) * 6));
-    },
-    [gset.center, gset.charge, gset.linkForce, gset.linkDist],
-  );
+  const applyForces = useCallback((sim: ReturnType<typeof forceSimulation<GNode>>) => {
+    const { w, h } = sizeRef.current;
+    sim
+      .force('link', forceLink<GNode, GLink>(linksRef.current).id((d) => d.id).distance(gset.linkDist).strength(gset.linkForce))
+      .force('charge', forceManyBody().strength(gset.charge))
+      .force('center', forceCenter(w / 2, h / 2).strength(gset.center))
+      .force('collide', forceCollide<GNode>().radius((d) => 10 + Math.log1p(d.inDegree) * 6));
+  }, [gset.center, gset.charge, gset.linkForce, gset.linkDist]);
 
   useEffect(() => {
     const prev = new Map(nodesRef.current.map((n) => [n.id, n]));
+    const pins = typeof window === 'undefined' ? {} : loadPins();
     nodesRef.current = nodes.map((n) => {
       const p = prev.get(n.id);
-      return p ? { ...n, x: p.x, y: p.y, vx: p.vx, vy: p.vy, fx: p.fx, fy: p.fy } : { ...n };
+      const pin = pins[n.id];
+      if (p) return { ...n, x: p.x, y: p.y, vx: p.vx, vy: p.vy, fx: p.fx, fy: p.fy };
+      if (pin) return { ...n, x: pin.x, y: pin.y, fx: pin.x, fy: pin.y };
+      return { ...n };
     });
     linksRef.current = links.map((l) => ({ ...l }));
     simRef.current?.stop();
     fittedRef.current = false;
     const sim = forceSimulation<GNode>(nodesRef.current).alpha(0.9).on('tick', () => {
-      if (!fittedRef.current && sim.alpha() < 0.3) {
-        fittedRef.current = true;
-        fitToContent();
-      }
+      if (!fittedRef.current && sim.alpha() < 0.3) { fittedRef.current = true; fitToContent(); }
       setTick((x) => x + 1);
     });
     applyForces(sim);
     simRef.current = sim;
-    return () => {
-      sim.stop();
-    };
+    return () => { sim.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, links]);
 
@@ -193,29 +184,29 @@ export default function NotesGraph({
   }, [links]);
 
   const focusId = hoverId || selectedId;
-
   const clientToLocal = (clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
     const pt = svg.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
+    pt.x = clientX; pt.y = clientY;
     const ctm = svg.getScreenCTM();
     if (!ctm) return { x: 0, y: 0 };
     const local = pt.matrixTransform(ctm.inverse());
     return { x: local.x, y: local.y };
   };
-
-  const localToWorld = (lx: number, ly: number, c = camRef.current) => ({
-    x: (lx - c.x) / c.k,
-    y: (ly - c.y) / c.k,
-  });
-
-  const setCamera = (next: Cam) => {
-    camRef.current = next;
-    setCam(next);
+  const localToWorld = (lx: number, ly: number, c = camRef.current) => ({ x: (lx - c.x) / c.k, y: (ly - c.y) / c.k });
+  const setCamera = (next: Cam) => { camRef.current = next; setCam(next); };
+  const animateCamera = (next: Cam) => {
+    const start = camRef.current;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const u = Math.min(1, (now - t0) / 280);
+      const e = 1 - (1 - u) * (1 - u);
+      setCamera({ k: start.k + (next.k - start.k) * e, x: start.x + (next.x - start.x) * e, y: start.y + (next.y - start.y) * e });
+      if (u < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   };
-
   const fitToContent = () => {
     const list = nodesRef.current.filter((n) => n.x != null && n.y != null);
     const { w, h } = sizeRef.current;
@@ -228,10 +219,8 @@ export default function NotesGraph({
       maxX = Math.max(maxX, (n.x || 0) + r);
       maxY = Math.max(maxY, (n.y || 0) + r + 16);
     }
-    const gw = Math.max(maxX - minX, 80);
-    const gh = Math.max(maxY - minY, 80);
-    const k = clamp(0.84 * Math.min(w / gw, h / gh), 0.28, 2.4);
-    setCamera({ k, x: w / 2 - k * ((minX + maxX) / 2), y: h / 2 - k * ((minY + maxY) / 2) });
+    const k = clamp(0.84 * Math.min(w / Math.max(maxX - minX, 80), h / Math.max(maxY - minY, 80)), 0.28, 2.4);
+    animateCamera({ k, x: w / 2 - k * ((minX + maxX) / 2), y: h / 2 - k * ((minY + maxY) / 2) });
   };
 
   const onPointerDownNode = (e: React.PointerEvent, id: string) => {
@@ -241,11 +230,9 @@ export default function NotesGraph({
     const local = clientToLocal(e.clientX, e.clientY);
     const world = localToWorld(local.x, local.y);
     dragRef.current = { id, dx: world.x - (node.x || 0), dy: world.y - (node.y || 0), moved: false };
-    node.fx = node.x;
-    node.fy = node.y;
+    node.fx = node.x; node.fy = node.y;
     (e.target as Element).setPointerCapture?.(e.pointerId);
   };
-
   const onPointerMove = (e: React.PointerEvent) => {
     const local = clientToLocal(e.clientX, e.clientY);
     if (dragRef.current) {
@@ -255,113 +242,105 @@ export default function NotesGraph({
       const nx = world.x - dragRef.current.dx;
       const ny = world.y - dragRef.current.dy;
       if (Math.hypot(nx - (node.fx || 0), ny - (node.fy || 0)) > 2) dragRef.current.moved = true;
-      node.fx = nx;
-      node.fy = ny;
+      node.fx = nx; node.fy = ny;
       simRef.current?.alpha(0.22).restart();
       return;
     }
-    if (panRef.current) {
-      setCamera({ ...camRef.current, x: panRef.current.cx + (local.x - panRef.current.x), y: panRef.current.cy + (local.y - panRef.current.y) });
-    }
+    if (panRef.current) setCamera({ ...camRef.current, x: panRef.current.cx + (local.x - panRef.current.x), y: panRef.current.cy + (local.y - panRef.current.y) });
   };
-
+  const persistCurrentPins = () => {
+    const pins: Record<string, { x: number; y: number }> = {};
+    for (const n of nodesRef.current) if (n.fx != null && n.fy != null) pins[n.id] = { x: n.fx, y: n.fy };
+    savePins(pins);
+  };
   const onPointerUp = () => {
     lastDragMoved.current = Boolean(dragRef.current?.moved);
-    dragRef.current = null;
-    panRef.current = null;
+    if (dragRef.current?.moved) persistCurrentPins();
+    dragRef.current = null; panRef.current = null;
   };
-
   const onBgPointerDown = (e: React.PointerEvent) => {
     if (e.target !== svgRef.current && (e.target as Element).tagName !== 'svg') return;
     const local = clientToLocal(e.clientX, e.clientY);
     panRef.current = { x: local.x, y: local.y, cx: camRef.current.x, cy: camRef.current.y };
-    setSelectedId(null);
-    setColorOpen(false);
-    setPanelOpen(false);
-    setMenu(null);
+    setSelectedId(null); setColorOpen(false); setPanelOpen(false); setMenu(null);
   };
-
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const local = clientToLocal(e.clientX, e.clientY);
     const c = camRef.current;
-    const factor = e.deltaY > 0 ? 0.92 : 1.08;
-    const nk = clamp(c.k * factor, 0.25, 4);
+    const nk = clamp(c.k * (e.deltaY > 0 ? 0.92 : 1.08), 0.25, 4);
     setCamera({ k: nk, x: local.x - ((local.x - c.x) * nk) / c.k, y: local.y - ((local.y - c.y) * nk) / c.k });
   };
 
-  const openNode = useCallback(
-    (id: string) => {
-      if (id.startsWith('board:')) {
-        const name = safeLabel(nodesRef.current.find((n) => n.id === id)?.label, '');
-        if (name) onOpenBoard(name);
-        return;
-      }
-      const note = notes.find((n) => n.id === id);
-      if (note) onOpenNote(note);
-    },
-    [notes, onOpenBoard, onOpenNote],
-  );
+  const openNode = useCallback((id: string) => {
+    if (id.startsWith('board:')) {
+      const name = safeLabel(nodesRef.current.find((n) => n.id === id)?.label, '');
+      if (name) onOpenBoard(name);
+      return;
+    }
+    if (id.startsWith('missing:')) {
+      const node = nodesRef.current.find((n) => n.id === id);
+      if (node && onCreateNote) onCreateNote(node.label);
+      return;
+    }
+    const note = notes.find((n) => n.id === id);
+    if (note) onOpenNote(note);
+  }, [notes, onOpenBoard, onOpenNote, onCreateNote]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const c = camRef.current;
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); fitToContent(); }
+      else if (e.key === 'Escape') { setSelectedId(null); setMenu(null); persistGset({ ...gset, search: '' }); }
+      else if (e.key === 'g' || e.key === 'G') persistGset({ ...gset, mode: 'global' });
+      else if (e.key === 'l' || e.key === 'L') persistGset({ ...gset, mode: 'local' });
+      else if (e.key === '+' || e.key === '=') setCamera({ ...c, k: clamp(c.k * 1.12, 0.25, 4) });
+      else if (e.key === '-' || e.key === '_') setCamera({ ...c, k: clamp(c.k / 1.12, 0.25, 4) });
+      else if (e.key === 'ArrowLeft') setCamera({ ...c, x: c.x + (e.shiftKey ? 80 : 28) });
+      else if (e.key === 'ArrowRight') setCamera({ ...c, x: c.x - (e.shiftKey ? 80 : 28) });
+      else if (e.key === 'ArrowUp') setCamera({ ...c, y: c.y + (e.shiftKey ? 80 : 28) });
+      else if (e.key === 'ArrowDown') setCamera({ ...c, y: c.y - (e.shiftKey ? 80 : 28) });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [gset]);
 
   const setKindColor = (kind: NodeKind, hex: string) => {
-    setColors((prev) => {
-      const next = { ...prev, [kind]: hex };
-      saveColors(next);
-      return next;
-    });
+    setColors((prev) => { const next = { ...prev, [kind]: hex }; saveColors(next); return next; });
   };
-
   const toggleKind = (kind: NodeKind) => {
     const cur = new Set(gset.enabled);
-    if (cur.has(kind)) {
-      if (cur.size === 1) return;
-      cur.delete(kind);
-    } else cur.add(kind);
+    if (cur.has(kind)) { if (cur.size === 1) return; cur.delete(kind); } else cur.add(kind);
     persistGset({ ...gset, enabled: [...cur] });
   };
 
   const selectedNode = selectedId ? nodesRef.current.find((n) => n.id === selectedId) : null;
   const selectedNote = selectedId && !selectedId.startsWith('board:') ? notes.find((n) => n.id === selectedId) : null;
   const labelFade = clamp((cam.k - 0.4) / 0.45, 0, 1);
-  const counts: Record<NodeKind, number> = { index: 0, daily: 0, topic: 0, board: 0, unresolved: 0 };
+  const counts: Record<NodeKind, number> = { index: 0, daily: 0, topic: 0, board: 0, unresolved: 0, tag: 0 };
   for (const n of notes) counts[classifyNote(n)]++;
   counts.board = boards.length;
   counts.unresolved = nodes.filter((n) => n.kind === 'unresolved').length;
+  counts.tag = nodes.filter((n) => n.kind === 'tag').length;
   const nameOf = (id: string) => nodesRef.current.find((n) => n.id === id)?.label || id;
   const fillFor = (n: GNode) => fillForNode(n, notes, colors, gset.groups || []);
 
   return (
-    <div
-      className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200"
-      style={{
-        backgroundColor: '#fafafa',
-        backgroundImage:
-          gset.bg === 'dots'
-            ? 'radial-gradient(rgba(24,24,27,0.14) 1.1px, transparent 1.1px)'
-            : gset.bg === 'grid'
-              ? 'linear-gradient(to right, rgba(24,24,27,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(24,24,27,0.07) 1px, transparent 1px)'
-              : 'none',
-        backgroundSize: gset.bg === 'dots' ? '18px 18px' : gset.bg === 'grid' ? '24px 24px' : undefined,
-      }}
-    >
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200" style={{ backgroundColor: '#fafafa', backgroundImage: gset.bg === 'dots' ? 'radial-gradient(rgba(24,24,27,0.14) 1.1px, transparent 1.1px)' : gset.bg === 'grid' ? 'linear-gradient(to right, rgba(24,24,27,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(24,24,27,0.07) 1px, transparent 1px)' : 'none', backgroundSize: gset.bg === 'dots' ? '18px 18px' : gset.bg === 'grid' ? '24px 24px' : undefined }}>
       <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-full border border-zinc-200 bg-white p-0.5 text-[10px] font-medium shadow-sm">
           {(['global', 'local'] as const).map((m) => (
-            <button key={m} type="button" onClick={() => persistGset({ ...gset, mode: m })} className={`rounded-full px-2 py-0.5 capitalize ${gset.mode === m ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>
-              {m}
-            </button>
+            <button key={m} type="button" onClick={() => persistGset({ ...gset, mode: m })} className={`rounded-full px-2 py-0.5 capitalize ${gset.mode === m ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{m}</button>
           ))}
         </div>
         {gset.mode === 'local' && (
-          <label className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] text-zinc-600 shadow-sm">
-            Depth {gset.depth}
-            <input type="range" min={1} max={5} value={gset.depth} onChange={(e) => persistGset({ ...gset, depth: Number(e.target.value) })} className="w-16" />
-          </label>
+          <label className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] text-zinc-600 shadow-sm">Depth {gset.depth}<input type="range" min={1} max={5} value={gset.depth} onChange={(e) => persistGset({ ...gset, depth: Number(e.target.value) })} className="w-16" /></label>
         )}
-        {(Object.keys(KIND_LABEL) as NodeKind[]).filter((k) => k !== 'unresolved').map((k) => (
+        {(Object.keys(KIND_LABEL) as NodeKind[]).filter((k) => k !== 'unresolved' && k !== 'tag').map((k) => (
           <button key={k} type="button" onClick={() => toggleKind(k)} className={`inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm ${enabled.has(k) ? '' : 'opacity-35'}`} title={`Toggle ${KIND_LABEL[k]}`}>
-            <span className={k === 'board' ? 'h-2.5 w-2.5 rotate-45 rounded-[1px]' : 'h-2.5 w-2.5 rounded-full'} style={{ background: colors[k] }} />
-            {KIND_LABEL[k]} {counts[k]}
+            <span className={k === 'board' ? 'h-2.5 w-2.5 rotate-45 rounded-[1px]' : 'h-2.5 w-2.5 rounded-full'} style={{ background: colors[k] }} />{KIND_LABEL[k]} {counts[k]}
           </button>
         ))}
         <button type="button" onClick={() => { setPanelOpen((v) => !v); setColorOpen(false); }} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm hover:bg-zinc-50">Settings</button>
@@ -373,10 +352,7 @@ export default function NotesGraph({
         <div className="absolute left-3 top-12 z-20 w-56 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
           <p className="mb-2 text-[11px] font-semibold text-zinc-700">Node colors</p>
           {(Object.keys(KIND_LABEL) as NodeKind[]).map((k) => (
-            <label key={k} className="mb-2 flex items-center justify-between gap-2 text-xs text-zinc-600">
-              <span>{KIND_LABEL[k]}</span>
-              <input type="color" value={colors[k]} onChange={(e) => setKindColor(k, e.target.value)} className="h-7 w-10 cursor-pointer rounded border border-zinc-200 bg-transparent p-0" />
-            </label>
+            <label key={k} className="mb-2 flex items-center justify-between gap-2 text-xs text-zinc-600"><span>{KIND_LABEL[k]}</span><input type="color" value={colors[k]} onChange={(e) => setKindColor(k, e.target.value)} className="h-7 w-10 cursor-pointer rounded border border-zinc-200 bg-transparent p-0" /></label>
           ))}
           <button type="button" className="mt-1 w-full rounded-lg bg-zinc-100 py-1 text-[11px] text-zinc-600 hover:bg-zinc-200" onClick={() => { setColors(DEFAULT_COLORS); saveColors(DEFAULT_COLORS); }}>Reset defaults</button>
         </div>
@@ -386,15 +362,14 @@ export default function NotesGraph({
 
       {panelOpen && (
         <div className="absolute left-3 top-12 z-20 max-h-[70vh] w-72 space-y-3 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-zinc-700">Graph settings</p>
-            <button type="button" className="text-[10px] text-zinc-500 hover:text-zinc-800" onClick={() => persistGset({ ...DEFAULT_GSET })}>Restore defaults</button>
-          </div>
+          <div className="flex items-center justify-between"><p className="text-[11px] font-semibold text-zinc-700">Graph settings</p><button type="button" className="text-[10px] text-zinc-500 hover:text-zinc-800" onClick={() => persistGset({ ...DEFAULT_GSET })}>Restore defaults</button></div>
           <div>
             <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Filters</p>
             <input value={gset.search} onChange={(e) => persistGset({ ...gset, search: e.target.value })} placeholder="tag:#math OR path:Daily -file:Home" className="mb-2 w-full rounded-lg border border-zinc-200 px-2 py-1 text-[11px]" />
             <label className="flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showOrphans} onChange={(e) => persistGset({ ...gset, showOrphans: e.target.checked })} />Orphans</label>
             <label className="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.hideUnresolved} onChange={(e) => persistGset({ ...gset, hideUnresolved: e.target.checked })} />Existing files only</label>
+            <label className="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.showTags} onChange={(e) => persistGset({ ...gset, showTags: e.target.checked })} />Tags as nodes</label>
+            {gset.mode === 'local' && (<label className="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><input type="checkbox" checked={gset.neighborLinks} onChange={(e) => persistGset({ ...gset, neighborLinks: e.target.checked })} />Neighbor links</label>)}
           </div>
           <div>
             <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Groups</p>
@@ -414,11 +389,7 @@ export default function NotesGraph({
             <label className="mt-1 block text-[10px] text-zinc-500">Node size ({gset.nodeSize.toFixed(2)})<input type="range" min={0.5} max={2} step={0.05} value={gset.nodeSize} onChange={(e) => persistGset({ ...gset, nodeSize: Number(e.target.value) })} className="mt-1 w-full" /></label>
             <label className="block text-[10px] text-zinc-500">Link thickness ({gset.lineSize.toFixed(2)})<input type="range" min={0.4} max={3} step={0.1} value={gset.lineSize} onChange={(e) => persistGset({ ...gset, lineSize: Number(e.target.value) })} className="mt-1 w-full" /></label>
             <p className="mb-1 mt-2 text-[10px] uppercase tracking-wide text-zinc-400">Background</p>
-            <div className="flex gap-1">
-              {(['plain', 'dots', 'grid'] as const).map((b) => (
-                <button key={b} type="button" onClick={() => persistGset({ ...gset, bg: b })} className={`rounded-md px-2 py-1 text-[10px] capitalize ${gset.bg === b ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}>{b}</button>
-              ))}
-            </div>
+            <div className="flex gap-1">{(['plain', 'dots', 'grid'] as const).map((b) => (<button key={b} type="button" onClick={() => persistGset({ ...gset, bg: b })} className={`rounded-md px-2 py-1 text-[10px] capitalize ${gset.bg === b ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}>{b}</button>))}</div>
           </div>
           <div>
             <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-400">Forces</p>
@@ -432,12 +403,8 @@ export default function NotesGraph({
 
       <svg ref={svgRef} className="h-full w-full touch-none" viewBox={`0 0 ${size.w} ${size.h}`} onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp} onWheel={onWheel}>
         <defs>
-          <filter id="hubGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.3" />
-          </filter>
-          <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(24,24,27,0.7)" />
-          </marker>
+          <filter id="hubGlow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#18181b" floodOpacity="0.3" /></filter>
+          <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(24,24,27,0.7)" /></marker>
         </defs>
         <g transform={`translate(${cam.x} ${cam.y}) scale(${cam.k})`}>
           {linksRef.current.map((l, i) => {
@@ -456,20 +423,31 @@ export default function NotesGraph({
             const dim = Boolean(focusId && !isFocus && !isNeighbor);
             const fill = fillFor(n);
             return (
-              <g key={n.id} transform={`translate(${n.x},${n.y})`} className="cursor-pointer" opacity={dim ? 0.12 : 1} filter={n.inDegree >= 2 ? 'url(#hubGlow)' : undefined} onPointerEnter={() => setHoverId(n.id)} onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))} onPointerDown={(e) => onPointerDownNode(e, n.id)} onClick={(e) => { e.stopPropagation(); if (!lastDragMoved.current) setSelectedId(n.id); }} onDoubleClick={(e) => { e.stopPropagation(); if (n.kind !== 'unresolved') openNode(n.id); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedId(n.id); setMenu({ x: e.clientX, y: e.clientY, id: n.id }); }}>
+              <g key={n.id} transform={`translate(${n.x},${n.y})`} className="cursor-pointer" opacity={dim ? 0.12 : 1} filter={n.inDegree >= 2 ? 'url(#hubGlow)' : undefined} onPointerEnter={(e) => { setHoverId(n.id); setTip({ x: e.clientX, y: e.clientY }); }} onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))} onPointerMove={(e) => setTip({ x: e.clientX, y: e.clientY })} onPointerDown={(e) => onPointerDownNode(e, n.id)} onClick={(e) => { e.stopPropagation(); if (!lastDragMoved.current) setSelectedId(n.id); }} onDoubleClick={(e) => { e.stopPropagation(); openNode(n.id); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedId(n.id); setMenu({ x: e.clientX, y: e.clientY, id: n.id }); }}>
                 {n.kind === 'board' ? (
                   <rect x={-r * 0.75} y={-r * 0.75} width={r * 1.5} height={r * 1.5} rx={3} transform="rotate(45)" fill={fill} stroke={isFocus ? '#111' : 'rgba(255,255,255,0.55)'} strokeWidth={isFocus ? 2.5 : 1.2} />
+                ) : n.kind === 'tag' ? (
+                  <rect x={-r} y={-r * 0.62} width={r * 2} height={r * 1.24} rx={r} fill={fill} stroke={isFocus ? '#111' : 'rgba(255,255,255,0.55)'} strokeWidth={isFocus ? 2.5 : 1.2} />
                 ) : (
                   <circle r={r} fill={n.kind === 'unresolved' ? '#fafafa' : fill} stroke={n.kind === 'unresolved' ? fill : isFocus ? '#111' : 'rgba(255,255,255,0.5)'} strokeDasharray={n.kind === 'unresolved' ? '3 2' : undefined} strokeWidth={isFocus ? 2.5 : 1.2} />
                 )}
-                {gset.showLabels && (
-                  <text y={r + 13} textAnchor="middle" fontSize={11} fill={dim ? '#a1a1aa' : '#18181b'} opacity={dim ? labelFade * 0.2 : Math.max(labelFade, isFocus || isNeighbor ? 0.85 : 0)} style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}>{n.label}</text>
-                )}
+                {gset.showLabels && (<text y={r + 13} textAnchor="middle" fontSize={11} fill={dim ? '#a1a1aa' : '#18181b'} opacity={dim ? labelFade * 0.2 : Math.max(labelFade, isFocus || isNeighbor ? 0.85 : 0)} style={{ userSelect: 'none', fontFamily: 'Outfit, system-ui, sans-serif' }}>{n.label}</text>)}
               </g>
             );
           })}
         </g>
       </svg>
+
+      {nodes.length === 0 && <GraphEmpty hasFilter={Boolean(gset.search.trim()) || !gset.showOrphans || gset.hideUnresolved} />}
+      <GraphHint />
+      <GraphStats nodes={nodes.length} links={links.length} />
+      {hoverId && (() => {
+        const n = nodesRef.current.find((x) => x.id === hoverId);
+        if (!n) return null;
+        const note = notes.find((x) => x.id === n.id);
+        const meta = [note?.folder, (note?.tags || []).map((x) => `#${x}`).join(' ')].filter(Boolean).join(' · ');
+        return <GraphTooltip x={tip.x} y={tip.y} title={n.label} kind={n.kind} meta={meta || `${n.inDegree} in · ${n.outDegree} out`} />;
+      })()}
 
       {selectedNode && (
         <div className="absolute bottom-3 left-3 right-3 z-10 mx-auto max-w-sm rounded-2xl border border-zinc-200 bg-white p-3 shadow-lg sm:left-auto sm:right-3 sm:mx-0">
@@ -483,30 +461,18 @@ export default function NotesGraph({
           <p className="text-sm font-semibold text-zinc-900">{selectedNode.label}</p>
           <p className="mt-0.5 text-[11px] text-zinc-500">{selectedNode.inDegree} incoming · {selectedNode.outDegree} outgoing{selectedNote?.folder ? ` · ${selectedNote.folder}` : ''}</p>
           <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-zinc-600">
-            <div>
-              <p className="font-semibold text-zinc-800">Incoming</p>
-              <ul className="mt-0.5 space-y-0.5">
-                {(incomingOf.get(selectedNode.id) || []).length === 0 && <li className="text-zinc-400">None</li>}
-                {(incomingOf.get(selectedNode.id) || []).slice(0, 6).map((id) => <li key={id} className="truncate">{nameOf(id)}</li>)}
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold text-zinc-800">Outgoing</p>
-              <ul className="mt-0.5 space-y-0.5">
-                {(outgoingOf.get(selectedNode.id) || []).length === 0 && <li className="text-zinc-400">None</li>}
-                {(outgoingOf.get(selectedNode.id) || []).slice(0, 6).map((id) => <li key={id} className="truncate">{nameOf(id)}</li>)}
-              </ul>
-            </div>
+            <div><p className="font-semibold text-zinc-800">Incoming</p><ul className="mt-0.5 space-y-0.5">{(incomingOf.get(selectedNode.id) || []).length === 0 && <li className="text-zinc-400">None</li>}{(incomingOf.get(selectedNode.id) || []).slice(0, 6).map((id) => <li key={id} className="truncate">{nameOf(id)}</li>)}</ul></div>
+            <div><p className="font-semibold text-zinc-800">Outgoing</p><ul className="mt-0.5 space-y-0.5">{(outgoingOf.get(selectedNode.id) || []).length === 0 && <li className="text-zinc-400">None</li>}{(outgoingOf.get(selectedNode.id) || []).slice(0, 6).map((id) => <li key={id} className="truncate">{nameOf(id)}</li>)}</ul></div>
           </div>
-          <button type="button" className="mt-2 w-full rounded-xl bg-zinc-900 py-1.5 text-xs font-medium text-white disabled:opacity-40" disabled={selectedNode.kind === 'unresolved'} onClick={() => openNode(selectedNode.id)}>Open {selectedNode.kind === 'board' ? 'board' : 'note'}</button>
+          <button type="button" className="mt-2 w-full rounded-xl bg-zinc-900 py-1.5 text-xs font-medium text-white" onClick={() => openNode(selectedNode.id)}>{selectedNode.kind === 'unresolved' ? 'Create note' : selectedNode.kind === 'board' ? 'Open board' : 'Open note'}</button>
         </div>
       )}
 
       {menu && (
         <div className="fixed z-50 min-w-[148px] overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 text-xs shadow-lg" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
-          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100 disabled:text-zinc-400" disabled={nodesRef.current.find((n) => n.id === menu.id)?.kind === 'unresolved'} onClick={() => { openNode(menu.id); setMenu(null); }}>Open</button>
+          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { openNode(menu.id); setMenu(null); }}>{nodesRef.current.find((n) => n.id === menu.id)?.kind === 'unresolved' ? 'Create note' : 'Open'}</button>
           <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { const n = nodesRef.current.find((x) => x.id === menu.id); if (n?.x != null && n.y != null) { const { w, h } = sizeRef.current; const k = Math.max(camRef.current.k, 1.2); setCamera({ k, x: w / 2 - k * n.x, y: h / 2 - k * n.y }); } setMenu(null); }}>Fit to node</button>
-          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { const n = nodesRef.current.find((x) => x.id === menu.id); if (n) { n.fx = null; n.fy = null; simRef.current?.alpha(0.4).restart(); } setMenu(null); }}>Unpin</button>
+          <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-zinc-100" onClick={() => { const n = nodesRef.current.find((x) => x.id === menu.id); if (n) { n.fx = null; n.fy = null; simRef.current?.alpha(0.4).restart(); persistCurrentPins(); } setMenu(null); }}>Unpin</button>
         </div>
       )}
     </div>

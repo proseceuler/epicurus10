@@ -6,20 +6,11 @@ import { NOTE_TEMPLATES } from '@/lib/note-templates';
 import NoteMarkdown from '@/components/notes/NoteMarkdown';
 import { wikiBoardTitles, wikiLinkTitles, escapeRegex } from '@/lib/wiki';
 import {
-  FileText,
-  Folder,
-  GitBranch,
-  LayoutGrid,
-  Link2,
-  Plus,
-  Search,
-  Tag,
-  Pin,
-  PinOff,
-  Trash2,
-  BookOpen,
-  CalendarDays,
+  FileText, Folder, GitBranch, LayoutGrid, Link2, Plus, Search, Tag, Pin, PinOff, Trash2, BookOpen, CalendarDays, FolderUp,
 } from 'lucide-react';
+import FileTree from '@/components/notes/FileTree';
+import VaultImporter from '@/components/notes/VaultImporter';
+import type { ImportDraft } from '@/lib/vault-import';
 
 function todayStamp() {
   return new Date().toISOString().slice(0, 10);
@@ -36,14 +27,7 @@ function outline(content: string) {
 }
 
 export default function NotesVault({
-  notes,
-  selected,
-  loading,
-  onSelect,
-  onCreate,
-  onOpenOrCreate,
-  onOpenBoard,
-  onReload,
+  notes, selected, loading, onSelect, onCreate, onOpenOrCreate, onOpenBoard, onReload, onImportNotes,
 }: {
   notes: Note[];
   selected: Note | null;
@@ -53,6 +37,7 @@ export default function NotesVault({
   onOpenOrCreate: (title: string) => Promise<Note | null>;
   onOpenBoard: (name: string) => void;
   onReload: () => void;
+  onImportNotes?: (rows: ImportDraft[]) => Promise<void>;
 }) {
   const [search, setSearch] = useState('');
   const [activeFolder, setActiveFolder] = useState('All');
@@ -61,6 +46,7 @@ export default function NotesVault({
   const [draft, setDraft] = useState<Note | null>(null);
   const [linkPicker, setLinkPicker] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newFolder, setNewFolder] = useState('Vault');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,11 +80,7 @@ export default function NotesVault({
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       await supabase.from('notes').update({
-        title: next.title,
-        content: next.content,
-        tags: next.tags,
-        folder: next.folder,
-        linked_subject: next.linked_subject,
+        title: next.title, content: next.content, tags: next.tags, folder: next.folder, linked_subject: next.linked_subject,
       }).eq('id', next.id);
       onReload();
     }, 600);
@@ -115,8 +97,7 @@ export default function NotesVault({
     }
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? el.value.length;
-    const next = el.value.slice(0, start) + insertion + el.value.slice(end);
-    persistDraft({ ...draft, content: next });
+    persistDraft({ ...draft, content: el.value.slice(0, start) + insertion + el.value.slice(end) });
     setLinkPicker(false);
     requestAnimationFrame(() => {
       el.focus();
@@ -133,22 +114,14 @@ export default function NotesVault({
   };
 
   const backlinks = draft
-    ? notes.filter(
-        (n) =>
-          n.id !== draft.id &&
-          new RegExp(`\\[\\[\\s*${escapeRegex(draft.title)}\\s*(\\|[^\\]]+)?\\]\\]`, 'i').test(n.content || ''),
-      )
+    ? notes.filter((n) => n.id !== draft.id && new RegExp(`\\[\\[\\s*${escapeRegex(draft.title)}\\s*(\\|[^\\]]+)?\\]\\]`, 'i').test(n.content || ''))
     : [];
   const outgoing = draft ? wikiLinkTitles(draft.content || '') : [];
   const boardLinks = draft ? wikiBoardTitles(draft.content || '') : [];
   const heads = draft ? outline(draft.content || '') : [];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <FileText className="h-8 w-8 animate-pulse text-zinc-300" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-20"><FileText className="h-8 w-8 animate-pulse text-zinc-300" /></div>;
   }
 
   return (
@@ -158,17 +131,21 @@ export default function NotesVault({
           <CalendarDays className="h-4 w-4" /> Today
         </button>
         <div className="glass rounded-2xl p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700">
-            <Folder className="h-4 w-4 text-zinc-400" /> Folders
+          <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-zinc-700">
+            <span className="flex items-center gap-2"><Folder className="h-4 w-4 text-zinc-400" /> Files</span>
+            <button type="button" onClick={() => setShowImport(true)} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800">
+              <FolderUp className="h-3 w-3" /> Import
+            </button>
           </div>
-          <div className="space-y-0.5">
+          <div className="mb-2 space-y-0.5">
             {folders.map((f) => (
-              <button key={f} type="button" onClick={() => setActiveFolder(f)} className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm ${activeFolder === f ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}>
+              <button key={f} type="button" onClick={() => setActiveFolder(f)} className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1 text-left text-[11px] ${activeFolder === f ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}>
                 <span className="truncate">{f}</span>
                 <span className="text-[10px] opacity-60">{f === 'All' ? notes.length : notes.filter((n) => n.folder === f).length}</span>
               </button>
             ))}
           </div>
+          <FileTree notes={activeFolder === 'All' ? notes : notes.filter((n) => n.folder === activeFolder || n.folder.startsWith(activeFolder + '/'))} selectedId={selected?.id} onSelect={onSelect} />
         </div>
         <div className="glass rounded-2xl p-3">
           <div className="mb-2 text-sm font-semibold text-zinc-700">Templates</div>
@@ -186,14 +163,10 @@ export default function NotesVault({
         </div>
         {allTags.length > 0 && (
           <div className="glass rounded-2xl p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700">
-              <Tag className="h-4 w-4 text-zinc-400" /> Tags
-            </div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700"><Tag className="h-4 w-4 text-zinc-400" /> Tags</div>
             <div className="flex flex-wrap gap-1.5">
               {allTags.map((tag) => (
-                <button key={tag} type="button" onClick={() => setActiveTag(activeTag === tag ? null : tag)} className={`rounded-md px-2 py-0.5 text-xs ${activeTag === tag ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}>
-                  #{tag}
-                </button>
+                <button key={tag} type="button" onClick={() => setActiveTag(activeTag === tag ? null : tag)} className={`rounded-md px-2 py-0.5 text-xs ${activeTag === tag ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'}`}>#{tag}</button>
               ))}
             </div>
           </div>
@@ -205,9 +178,7 @@ export default function NotesVault({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search vault…" className="glass-input w-full rounded-xl py-2 pl-9 pr-3 text-sm" />
         </div>
-        <Button onClick={() => { setShowNew(true); setNewTitle(''); }}>
-          <Plus className="h-4 w-4" /> New note
-        </Button>
+        <Button onClick={() => { setShowNew(true); setNewTitle(''); }}><Plus className="h-4 w-4" /> New note</Button>
         <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1">
           {filtered.map((note) => (
             <button key={note.id} type="button" onClick={() => onSelect(note)} className={`w-full rounded-xl border p-3 text-left transition-all ${selected?.id === note.id ? 'border-zinc-800 bg-zinc-100/70' : 'glass border-zinc-200/40 glass-hover'}`}>
@@ -224,7 +195,9 @@ export default function NotesVault({
       </div>
 
       <div className="min-h-0">
-        {showNew ? (
+        {showImport && onImportNotes ? (
+          <VaultImporter existing={notes} onClose={() => setShowImport(false)} onImport={async (rows) => { await onImportNotes(rows); setShowImport(false); }} />
+        ) : showNew ? (
           <div className="glass rounded-2xl p-5">
             <h3 className="mb-3 font-semibold">New note</h3>
             <div className="space-y-2">
@@ -279,6 +252,10 @@ export default function NotesVault({
               <Input value={(draft.tags || []).join(', ')} onChange={(v) => persistDraft({ ...draft, tags: v.split(',').map((t) => t.trim()).filter(Boolean) })} placeholder="tags" className="max-w-xs" />
               <Select value={draft.linked_subject || ''} onChange={(v) => persistDraft({ ...draft, linked_subject: v || null })} options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]} />
             </div>
+            <div className="flex items-center justify-between border-t border-zinc-200/50 px-4 py-1 text-[10px] text-zinc-400">
+              <span>{(draft.content || '').trim().split(/\s+/).filter(Boolean).length} words · {(draft.content || '').length} chars</span>
+              <span>{notes.length} notes in vault · {backlinks.length} backlinks</span>
+            </div>
           </div>
         ) : (
           <div className="glass rounded-2xl p-6">
@@ -293,33 +270,17 @@ export default function NotesVault({
             <div className="glass rounded-2xl p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Outline</p>
               {heads.length === 0 && <p className="text-xs text-zinc-400">Headings appear here.</p>}
-              <div className="space-y-1">
-                {heads.map((h, i) => (
-                  <p key={i} className="truncate text-xs text-zinc-600" style={{ paddingLeft: (h.level - 1) * 8 }}>{h.text}</p>
-                ))}
-              </div>
+              <div className="space-y-1">{heads.map((h, i) => (<p key={i} className="truncate text-xs text-zinc-600" style={{ paddingLeft: (h.level - 1) * 8 }}>{h.text}</p>))}</div>
             </div>
             <div className="glass rounded-2xl p-3">
               <p className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400"><Link2 className="h-3 w-3" /> Links</p>
-              {outgoing.map((t) => (
-                <button key={t} type="button" onClick={() => onOpenOrCreate(t)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100">
-                  <FileText className="h-3 w-3 text-zinc-400" /> {t}
-                </button>
-              ))}
-              {boardLinks.map((t) => (
-                <button key={t} type="button" onClick={() => onOpenBoard(t)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100">
-                  <LayoutGrid className="h-3 w-3 text-zinc-400" /> {t}
-                </button>
-              ))}
+              {outgoing.map((t) => (<button key={t} type="button" onClick={() => onOpenOrCreate(t)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"><FileText className="h-3 w-3 text-zinc-400" /> {t}</button>))}
+              {boardLinks.map((t) => (<button key={t} type="button" onClick={() => onOpenBoard(t)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"><LayoutGrid className="h-3 w-3 text-zinc-400" /> {t}</button>))}
               {outgoing.length === 0 && boardLinks.length === 0 && <p className="text-xs text-zinc-400">No outgoing links.</p>}
             </div>
             <div className="glass rounded-2xl p-3">
               <p className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400"><GitBranch className="h-3 w-3" /> Backlinks</p>
-              {backlinks.map((n) => (
-                <button key={n.id} type="button" onClick={() => onSelect(n)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100">
-                  <FileText className="h-3 w-3 text-zinc-400" /> {n.title}
-                </button>
-              ))}
+              {backlinks.map((n) => (<button key={n.id} type="button" onClick={() => onSelect(n)} className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-100"><FileText className="h-3 w-3 text-zinc-400" /> {n.title}</button>))}
               {backlinks.length === 0 && <p className="text-xs text-zinc-400">Nothing links here yet.</p>}
             </div>
           </>

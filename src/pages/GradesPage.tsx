@@ -4,6 +4,7 @@ import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type S
 import { computeTermGrade, computeFinalGrade, gradeDescriptor, gradeTone, componentPercentage, exComponentPercentage } from '@/lib/gradeUtils';
 import { Card, PageHeader, Button, Input, Select, Badge, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import ForecastPage from '@/pages/ForecastPage';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { Calculator, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, TrendingUp } from 'lucide-react';
 
 const COMPONENT_LABELS: Record<ComponentType, string> = { ww: 'Written Works', pt: 'Performance Tasks', ex: 'Examinations' };
@@ -29,6 +30,7 @@ export default function GradesPage() {
   }, []);
 
   useEffect(() => { loadAssessments(); }, [loadAssessments]);
+  useEffect(() => onDataChanged(() => { void loadAssessments(); }), [loadAssessments]);
 
   const subjectAssessments = assessments.filter(
     (a) => a.subject_key === selectedSubject && a.quarter === selectedTerm

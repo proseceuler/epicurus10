@@ -7,6 +7,14 @@ import {
   completeTaskFromChat,
   habitStatsFromChat,
 } from '@/lib/assistant/taskHabits';
+import {
+  addEventFromChat,
+  addKanbanFromChat,
+  addScoreFromChat,
+  listKanbanFromChat,
+  markAttendanceFromChat,
+  moveKanbanFromChat,
+} from '@/lib/assistant/school';
 
 type ToolDef = {
   type: 'function';
@@ -45,6 +53,43 @@ export const EXTRA_TOOLS: ToolDef[] = [
       name: 'get_habit_stats',
       description: 'Read habit streaks and what is still open today.',
       parameters: obj({}),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_kanban',
+      description: 'List Kanban cards, optionally filtered by column.',
+      parameters: obj({ status: str('Column: todo, in_progress, review, done, or a custom list name') }),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'move_kanban_task',
+      description: 'Move a Kanban card to another column by title match.',
+      parameters: obj(
+        {
+          title: str('Card title or part of it'),
+          status: str('Target column: todo, in_progress, review, done'),
+        },
+        ['title', 'status'],
+      ),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'mark_attendance',
+      description: 'Mark a class period attended or skipped for a date (defaults to today).',
+      parameters: obj(
+        {
+          subject_key: str('Subject', SUBJECT_KEYS),
+          status: str('attended or skipped', ['attended', 'skipped']),
+          date: str('Class date YYYY-MM-DD or today/tomorrow'),
+        },
+        ['subject_key', 'status'],
+      ),
     },
   },
   {
@@ -91,8 +136,7 @@ export const EXTRA_TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'search_epicure',
-      description:
-        'Semantic search over epicure help pages and the student notes vault.',
+      description: 'Semantic search over epicure help pages and the student notes vault.',
       parameters: obj(
         {
           query: str('Search query'),
@@ -114,6 +158,18 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
       return checkHabitFromChat(args);
     case 'get_habit_stats':
       return habitStatsFromChat();
+    case 'add_calendar_event':
+      return addEventFromChat(args);
+    case 'add_kanban_task':
+      return addKanbanFromChat(args);
+    case 'get_kanban':
+      return listKanbanFromChat(args);
+    case 'move_kanban_task':
+      return moveKanbanFromChat(args);
+    case 'add_assessment':
+      return addScoreFromChat(args);
+    case 'mark_attendance':
+      return markAttendanceFromChat(args, args.status === 'skipped' ? 'skipped' : 'attended');
     case 'update_class_hub': {
       const existing = await supabase.from('class_hub').select('*').eq('subject_key', args.subject_key).maybeSingle();
       const patch = {

@@ -3,6 +3,8 @@ export const MW_KEY = 'epicure-mw-key';
 export const MODEL_KEY = 'epicure-default-model';
 export const TAVILY_KEY = 'epicure-tavily-key';
 export const SAPLING_KEY = 'epicure-sapling-key';
+export const PINECONE_KEY = 'epicure-pinecone-key';
+export const PINECONE_HOST = 'epicure-pinecone-host';
 
 function read(key: string, fallback = '') {
   if (typeof window === 'undefined') return fallback;
@@ -22,6 +24,12 @@ export const getSaplingKey = () =>
   (typeof window !== 'undefined' ? localStorage.getItem(SAPLING_KEY) : null) ||
   import.meta.env.VITE_SAPLING_API_KEY ||
   '';
+
+export const getPineconeKey = () =>
+  read(PINECONE_KEY, import.meta.env.VITE_PINECONE_API_KEY || '');
+
+export const getPineconeHost = () =>
+  read(PINECONE_HOST, import.meta.env.VITE_PINECONE_HOST || '');
 
 export const getDefaultModel = () => read(MODEL_KEY);
 

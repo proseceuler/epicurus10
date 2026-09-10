@@ -165,6 +165,35 @@ export const DATA_TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'set_allowance',
+      description: 'Set or update the weekly/monthly baon allowance amount and period.',
+      parameters: obj(
+        {
+          amount: num('Allowance amount in pesos'),
+          period: str('Allowance period', ['weekly', 'monthly']),
+        },
+        ['amount'],
+      ),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_savings_goal',
+      description: 'Add a savings goal in the Baon Tracker (name + target amount).',
+      parameters: obj(
+        {
+          name: str('Goal name, e.g. earphones'),
+          target_amount: num('Target amount in pesos'),
+          url: str('Optional store or wishlist link'),
+        },
+        ['name', 'target_amount'],
+      ),
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'mark_habit',
       description: 'Mark a habit as done for a date (defaults to today).',
       parameters: obj({ name: str('Habit name or part of it'), date: str('Date YYYY-MM-DD') }, ['name']),
@@ -395,6 +424,62 @@ export async function runTool(name: string, args: Args, ctx: ToolContext): Promi
           .single();
         if (error) throw error;
         return { ok: true, transaction: data };
+      }
+      case 'set_allowance': {
+        const amount = Number(args.amount);
+        if (!Number.isFinite(amount) || amount < 0) return { ok: false, error: 'Amount must be a non-negative number.' };
+        const period = args.period === 'monthly' ? 'monthly' : 'weekly';
+        const { data: existing } = await supabase.from('finance_settings').select('*').maybeSingle();
+        if (existing) {
+          const { data, error } = await supabase
+            .from('finance_settings')
+            .update({
+              allowance_amount: amount,
+              allowance_period: period,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+            .select()
+            .single();
+          if (error) throw error;
+          return {
+            ok: true,
+            settings: data,
+            previous: {
+              allowance_amount: existing.allowance_amount,
+              allowance_period: existing.allowance_period,
+            },
+          };
+        }
+        const { data, error } = await supabase
+          .from('finance_settings')
+          .insert({ allowance_amount: amount, allowance_period: period })
+          .select()
+          .single();
+        if (error) throw error;
+        return { ok: true, settings: data, created: true };
+      }
+      case 'add_savings_goal': {
+        const target = Number(args.target_amount);
+        if (!String(args.name || '').trim()) return { ok: false, error: 'Goal name is required.' };
+        if (!Number.isFinite(target) || target <= 0) return { ok: false, error: 'Target amount must be positive.' };
+        let url: string | null = null;
+        if (args.url && String(args.url).trim()) {
+          const raw = String(args.url).trim();
+          url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+        }
+        const { data, error } = await supabase
+          .from('finance_goals')
+          .insert({
+            name: String(args.name).trim(),
+            target_amount: target,
+            saved_amount: 0,
+            url,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return { ok: true, goal: data };
       }
       case 'mark_habit': {
         const { data: habits } = await supabase.from('habits').select('*');

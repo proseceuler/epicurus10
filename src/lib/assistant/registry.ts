@@ -74,6 +74,9 @@ export const AUTO_APPLY_WRITES = new Set([
   'update_class_hub',
   'add_class_link',
   'add_assessment',
+  'add_note',
+  'add_flashcard',
+  'start_focus_session',
 ]);
 
 export async function dispatchTool(name: string, args: Record<string, unknown>, ctx: ToolContext) {

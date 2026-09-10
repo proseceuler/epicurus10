@@ -37,10 +37,11 @@ function systemPrompt(page: PageId, search: boolean) {
     `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
     'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
     'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
-    'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment.',
+    'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment, add_note, add_flashcard, start_focus_session.',
     '"I attended math today" -> mark_attendance. "Move lab report to review" -> move_kanban_task. "Log science written work 18/20 term 1" -> add_assessment.',
+    '"Save a note titled titration: used 0.1M HCl" -> add_note. "Add flashcard in Science, front mitochondria, back powerhouse" -> add_flashcard. "Start focus for math" -> start_focus_session.',
     'For Friday/tomorrow leave the date in the title or pass YYYY-MM-DD. Chem maps to science.',
-    'log_expense still waits for confirm.',
+    'log_expense still waits for confirm. Money writes stay behind confirm.',
     'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
     search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
   ].join(' ');

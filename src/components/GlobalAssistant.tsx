@@ -8,6 +8,7 @@ import { fileToAttachment, createRecorder, type ChatAttachment } from '@/lib/ass
 import { createRecognizer, speakText, stopSpeech, speechRecognitionCtor } from '@/lib/assistant/voice';
 import { runAssistantTurn, type ChatTurn, type PendingWrite } from '@/lib/assistant/router';
 import { dispatchTool, writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
+import { undoLastWrite } from '@/lib/assistant/undo';
 
 const SUGGESTS = [
   { label: 'Summarize this page', text: 'Summarize what I should focus on on this page.' },
@@ -198,6 +199,28 @@ export default function GlobalAssistant({
     }
   };
 
+  const revertWrite = async (index: number) => {
+    const msg = messages[index];
+    if (!msg?.pending?.done) return;
+    setBusy(true);
+    try {
+      const result = await undoLastWrite();
+      if (!result.ok) {
+        setError(result.error || 'Nothing to undo.');
+        return;
+      }
+      setMessages((list) => list.map((m, i) => (
+        i === index
+          ? { ...m, pending: undefined, content: `${m.content}\n\nUndid: ${result.summary ?? 'last change'}.` }
+          : m
+      )));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not undo that.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const startDrag = (e: React.PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX; const startW = width;
@@ -289,7 +312,7 @@ export default function GlobalAssistant({
                       ) : (
                         <>
                           <button type="button" onClick={() => navigate?.((PAGE_FOR_WRITE[m.pending!.name] as PageId) ?? page)} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-zinc-700 ring-1 ring-zinc-200"><ExternalLink className="h-3 w-3" /> View</button>
-                          <button type="button" onClick={() => setMessages((list) => list.map((mm, ii) => ii === i ? { ...mm, pending: undefined, content: `${mm.content}\n\nMarked undone.` } : mm))} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-zinc-600 ring-1 ring-zinc-200"><Undo2 className="h-3 w-3" /> Undo</button>
+                          <button type="button" onClick={() => void revertWrite(i)} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-zinc-600 ring-1 ring-zinc-200"><Undo2 className="h-3 w-3" /> Undo</button>
                         </>
                       )}
                     </div>

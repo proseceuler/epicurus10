@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { SUBJECTS, type FlashcardDeck, type Flashcard, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
 import { Plus, Trash2, Layers, ChevronLeft, ChevronRight, RotateCcw, Check, X, BookOpen } from 'lucide-react';
@@ -40,6 +41,7 @@ export default function FlashcardsPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
 
   const today = new Date().toISOString().split('T')[0];
   const deckCards = (deckId: string) => cards.filter((c) => c.deck_id === deckId);
@@ -183,7 +185,7 @@ export default function FlashcardsPage() {
       <div>
         <PageHeader
           title={selectedDeck.name}
-          subtitle={`${dCards.length} cards \u00b7 ${dDue.length} due today`}
+          subtitle={`${dCards.length} cards · ${dDue.length} due today`}
           action={
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => setSelectedDeck(null)}><ChevronLeft className="w-4 h-4" /> Back</Button>
@@ -222,7 +224,7 @@ export default function FlashcardsPage() {
                     ) : (
                       <Badge>Next: {new Date(card.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Badge>
                     )}
-                    <span className="text-xs text-zinc-400">\u00b7 {card.review_count} reviews</span>
+                    <span className="text-xs text-zinc-400">· {card.review_count} reviews</span>
                   </div>
                 </Card>
               );

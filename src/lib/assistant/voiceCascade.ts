@@ -1,12 +1,14 @@
-import { getFishKey, getGroqKey } from '@/lib/apiKeys';
-import { speakText as speakBrowser, stopSpeech as stopBrowser } from '@/lib/assistant/voice';
+import { getGroqKey } from '@/lib/apiKeys';
+import { speakReply, stopReply } from '@/lib/assistant/tts';
+
+export { speakReply, stopReply };
 
 export function groqConfigured() {
   return Boolean(getGroqKey());
 }
 
 function isJunkTranscript(text: string) {
-  const t = text.trim().toLowerCase().replace(/[.?!,…]/g, '').replace(/\s+/g, ' ');
+  const t = text.trim().toLowerCase().replace(/[.?!,\u2026]/g, '').replace(/\s+/g, ' ');
   if (t.length < 2) return true;
   return /^(thanks for watching|thank you for watching|thank you|thanks|you|subtitle[s]?|\[?music\]?|\[?applause\]?|\[?silence\]?)$/.test(t);
 }
@@ -42,99 +44,6 @@ export async function transcribeAudio(blob: Blob): Promise<{ text: string; error
   }
   const data = await res.json();
   return { text: String(data.text || '').trim() };
-}
-
-async function speakFish(text: string): Promise<HTMLAudioElement | null> {
-  const key = getFishKey();
-  if (!key) return null;
-  const res = await fetch('https://api.fish.audio/v1/tts', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      model: 's1',
-    },
-    body: JSON.stringify({ text: text.slice(0, 600), format: 'mp3', latency: 'normal' }),
-  });
-  if (!res.ok) return null;
-  const buf = await res.arrayBuffer();
-  const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
-  const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
-  return audio;
-}
-
-let currentAudio: HTMLAudioElement | null = null;
-let speakDone: (() => void) | null = null;
-
-function finishSpeak() {
-  const done = speakDone;
-  speakDone = null;
-  done?.();
-}
-
-function waitForSpeechEnd(): Promise<void> {
-  return new Promise((resolve) => {
-    const started = performance.now();
-    const tick = () => {
-      if (!window.speechSynthesis?.speaking && !window.speechSynthesis?.pending) {
-        resolve();
-        return;
-      }
-      if (performance.now() - started > 30_000) {
-        resolve();
-        return;
-      }
-      window.setTimeout(tick, 80);
-    };
-    tick();
-  });
-}
-
-export async function speakReply(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
-  const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, ' ').trim().slice(0, 600);
-  if (!clean) { hooks?.onEnd?.(); return; }
-  stopReply();
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      currentAudio = null;
-      hooks?.onEnd?.();
-      if (speakDone === settle) speakDone = null;
-      resolve();
-    };
-    speakDone = settle;
-    const playFish = async () => {
-      try {
-        const audio = await speakFish(clean);
-        if (settled) return;
-        if (audio) {
-          currentAudio = audio;
-          audio.onplay = () => hooks?.onStart?.();
-          audio.onended = settle;
-          audio.onerror = settle;
-          void audio.play().catch(settle);
-          return;
-        }
-      } catch {
-        /* fall through to browser voice */
-      }
-      if (settled) return;
-      hooks?.onStart?.();
-      speakBrowser(clean, { onStart: hooks?.onStart, onEnd: settle });
-      void waitForSpeechEnd().then(settle);
-    };
-    void playFish();
-  });
-}
-
-export function stopReply() {
-  try { currentAudio?.pause(); } catch { /* ignore */ }
-  currentAudio = null;
-  stopBrowser();
-  finishSpeak();
 }
 
 export type VoiceStatus = 'idle' | 'listening' | 'transcribing';
@@ -256,7 +165,7 @@ export function startVoiceLoop(opts: {
       return;
     }
     opts.onStatus?.('transcribing');
-    opts.onCaption?.('Transcribing…');
+    opts.onCaption?.('Transcribing\u2026');
     const result = await transcribeAudio(blob);
     if (result.error) opts.onError?.(result.error);
     else if (result.text && !isJunkTranscript(result.text)) {

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSession } from '@/lib/types';
 import { Card, PageHeader, EmptyState } from '@/components/kit';
 import { MotionSwap } from '@/components/MotionUI';
+import { onDataChanged } from '@/lib/assistant/sync';
 import { BarChart3, Clock, Flame, Target } from 'lucide-react';
 
 export default function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
@@ -17,6 +18,7 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
   }, []);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
+  useEffect(() => onDataChanged(() => { void loadSessions(); }), [loadSessions]);
 
   const focusSessions = sessions.filter((s) => s.session_type === 'focus');
   const now = new Date();

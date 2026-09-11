@@ -8,6 +8,7 @@ import {
   getDefaultModel, saveKey,
 } from '@/lib/apiKeys';
 import { ingestEpicure } from '@/lib/assistant/rag';
+import { VoiceKeysCard } from '@/components/VoiceKeysCard';
 import {
   getShortcuts, setShortcut, resetShortcuts, formatShortcut,
   SHORTCUT_LABELS, type ShortcutId, type ShortcutMap,
@@ -123,20 +124,11 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-600">API key</label>
-              <Input
-                type="password"
-                value={owKey}
-                onChange={(v) => { setOwKey(v); setWeatherKey(v); flash(); }}
-                placeholder="OpenWeatherMap API key"
-              />
+              <Input type="password" value={owKey} onChange={(v) => { setOwKey(v); setWeatherKey(v); flash(); }} placeholder="OpenWeatherMap API key" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-600">City</label>
-              <Input
-                value={wCity}
-                onChange={(v) => { setWCity(v); setWeatherCity(v); flash(); }}
-                placeholder="Manila"
-              />
+              <Input value={wCity} onChange={(v) => { setWCity(v); setWeatherCity(v); flash(); }} placeholder="Manila" />
             </div>
           </div>
         </Card>
@@ -174,6 +166,7 @@ export default function SettingsPage() {
             {indexMsg && <p className="text-xs text-zinc-500">{indexMsg}</p>}
           </div>
         </Card>
+        <VoiceKeysCard />
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Cpu className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">Study Assistant</h3></div>
           <div>

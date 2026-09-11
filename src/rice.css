@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-12 03:55 PDT — gothic frame fill */
+/* vercel rebuild 2026-09-12 — Removal-543 frame + no voice divider */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
@@ -56,13 +56,9 @@
 }
 
 .ht-shell { color: #3f3f46; }
-.ht-card, .ht-sheet {
-  background: transparent; border: 0; border-radius: 0; box-shadow: none; color: #3f3f46;
-}
+.ht-card, .ht-sheet { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: #3f3f46; }
 .ht-flat { background: transparent; border: 0; box-shadow: none; }
-.ht-label {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a;
-}
+.ht-label { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a; }
 .ht-table { width: 100%; border-collapse: collapse; }
 .ht-table th, .ht-table td { border: 1px solid #e4e4e7; vertical-align: middle; }
 .ht-table thead th { background: #fafafa; }
@@ -75,7 +71,11 @@
 .hud-awake .hud-sigil { color: #18181b; text-shadow: 0 0 24px rgba(24, 24, 27, 0.18); }
 
 .rice-sidebar .rice-nav-label {
-  opacity: 0; width: 0; overflow: hidden; white-space: nowrap; transition: opacity 160ms ease;
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 160ms ease;
 }
 .rice-sidebar:hover .rice-nav-label,
 .rice-sidebar.w-56 .rice-nav-label { opacity: 1; width: auto; }
@@ -92,17 +92,18 @@
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
+.assistant-panel[data-voice='1'] form { border-top: 0 !important; }
 
 .arrodes-stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem 0 0.45rem;
+  padding: 0.15rem 0 0.4rem;
 }
 .arrodes-well {
   position: relative;
-  width: 118px;
-  aspect-ratio: 449 / 600;
+  width: 124px;
+  aspect-ratio: 180 / 221;
   animation: arrodes-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
 }
@@ -115,12 +116,12 @@
 }
 .arrodes-blob {
   z-index: 1;
-  clip-path: polygon(40.62% 15.89%, 30.63% 18.22%, 28.12% 20.56%, 28.12% 22.43%, 23.75% 22.90%, 23.12% 23.83%, 23.12% 35.05%, 25.62% 37.38%, 28.12% 37.85%, 28.12% 38.79%, 24.38% 39.25%, 24.38% 41.12%, 25.62% 42.06%, 33.75% 42.52%, 28.75% 44.39%, 32.50% 46.73%, 32.50% 48.13%, 28.75% 50.47%, 33.75% 52.34%, 25.00% 52.80%, 23.75% 53.74%, 23.75% 55.14%, 27.50% 56.54%, 21.88% 59.35%, 21.25% 71.96%, 22.50% 73.83%, 26.88% 74.30%, 26.88% 77.10%, 30.00% 78.97%, 43.75% 82.24%, 60.62% 82.24%, 66.25% 81.31%, 71.88% 79.44%, 72.50% 76.64%, 76.25% 76.17%, 78.12% 73.83%, 78.12% 62.62%, 73.12% 59.35%, 76.88% 58.41%, 77.50% 56.54%, 76.25% 55.61%, 67.50% 55.14%, 71.88% 53.27%, 68.75% 50.47%, 68.75% 49.07%, 72.50% 46.73%, 67.50% 44.86%, 76.88% 44.39%, 78.12% 42.99%, 76.88% 41.59%, 73.75% 40.65%, 78.75% 37.38%, 79.38% 24.30%, 78.75% 23.36%, 74.38% 22.90%, 74.38% 20.56%, 71.88% 18.69%, 60.62% 15.89%);
+  clip-path: polygon(42.18% 11.92%, 29.86% 14.81%, 27.25% 16.54%, 26.54% 19.42%, 22.51% 20.58%, 21.33% 22.31%, 21.33% 32.69%, 22.99% 35.58%, 26.54% 37.31%, 25.59% 38.46%, 22.51% 39.04%, 22.75% 40.19%, 23.22% 40.77%, 32.23% 41.35%, 32.46% 42.50%, 29.15% 44.81%, 30.33% 45.38%, 31.28% 47.69%, 30.57% 49.42%, 27.96% 51.73%, 31.75% 54.04%, 23.46% 54.62%, 22.51% 55.77%, 24.64% 56.92%, 25.59% 59.23%, 22.75% 60.96%, 20.85% 63.27%, 20.14% 75.96%, 21.09% 77.69%, 25.12% 78.27%, 25.12% 80.58%, 26.30% 81.73%, 36.02% 85.77%, 40.05% 86.92%, 56.16% 87.31%, 67.54% 85.58%, 71.56% 83.85%, 72.51% 80.38%, 76.78% 79.81%, 77.96% 75.19%, 77.73% 66.54%, 76.30% 63.65%, 73.22% 61.35%, 74.41% 60.19%, 76.54% 59.62%, 76.78% 58.46%, 76.30% 57.88%, 67.54% 57.31%, 67.30% 56.73%, 70.14% 53.85%, 68.48% 52.12%, 68.01% 50.38%, 70.38% 46.92%, 67.54% 45.19%, 67.54% 44.04%, 77.25% 43.46%, 77.73% 42.88%, 77.49% 41.73%, 74.64% 41.15%, 74.17% 40.00%, 77.73% 38.27%, 78.91% 35.96%, 79.62% 26.73%, 79.15% 22.12%, 78.20% 20.96%, 74.64% 20.38%, 72.99% 16.35%, 67.77% 14.04%, 59.24% 12.31%);
 }
 .arrodes-frame {
   z-index: 2;
   pointer-events: none;
-  object-fit: contain;
+  object-fit: fill;
 }
 @keyframes arrodes-float {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }

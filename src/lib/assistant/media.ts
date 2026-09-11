@@ -59,13 +59,23 @@ function videoPoster(file: File): Promise<string | undefined> {
   });
 }
 
+const AUDIO_EXT = /\.(webm|wav|mp3|m4a|ogg|aac|flac|mpeg|oga|opus)$/i;
+
+export function isAudioFile(file: { name?: string; type?: string; mime?: string; kind?: string }) {
+  const mime = String(file.type || file.mime || '');
+  const name = String(file.name || '');
+  if (file.kind === 'audio') return true;
+  if (mime.startsWith('audio/')) return true;
+  return AUDIO_EXT.test(name);
+}
+
 export async function fileToAttachment(file: File): Promise<ChatAttachment> {
   const mime = file.type || 'application/octet-stream';
   const kind: MediaKind = mime.startsWith('image/')
     ? 'image'
-    : mime.startsWith('video/')
+    : mime.startsWith('video/') && !isAudioFile(file)
       ? 'video'
-      : mime.startsWith('audio/')
+      : mime.startsWith('audio/') || isAudioFile(file)
         ? 'audio'
         : 'file';
   const dataUrl = await readAsDataUrl(file);
@@ -88,7 +98,7 @@ export function attachmentPrompt(attachments: ChatAttachment[]) {
   return attachments.map((a) => {
     if (a.kind === 'image') return `[Attached image: ${a.name}]`;
     if (a.kind === 'video') return `[Attached video still from ${a.name}]`;
-    if (a.kind === 'audio') return `[Attached audio: ${a.name}${a.durationSec ? `, ${Math.round(a.durationSec)}s` : ''}]`;
+    if (a.kind === 'audio') return `[Voice note "${a.name}" — treat the user text as the transcript. Do not say you cannot hear audio.]`;
     return `[Attached file: ${a.name}]`;
   }).join('\n');
 }

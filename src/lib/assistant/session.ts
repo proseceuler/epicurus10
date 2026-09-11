@@ -18,7 +18,7 @@ export function historyKey(owner = getAssistantOwner()) {
 
 export function loadHistory<T>(fallback: T[]): T[] {
   try {
-    const raw = sessionStorage.getItem(historyKey()) || localStorage.getItem(historyKey());
+    const raw = localStorage.getItem(historyKey()) || sessionStorage.getItem(historyKey());
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as T[];
     return Array.isArray(parsed) ? parsed : fallback;
@@ -27,10 +27,54 @@ export function loadHistory<T>(fallback: T[]): T[] {
   }
 }
 
+function compact<T>(messages: T[]): T[] {
+  return messages.map((m: any) => {
+    if (!m || typeof m !== 'object') return m;
+    const next = { ...m };
+    if (Array.isArray(next.attachments)) {
+      next.attachments = next.attachments.map((a: any) => ({
+        ...a,
+        dataUrl: typeof a?.dataUrl === 'string' ? a.dataUrl.slice(0, 48) : '',
+        posterUrl: undefined,
+      }));
+    }
+    return next;
+  });
+}
+
 export function saveHistory<T>(messages: T[]) {
-  const payload = JSON.stringify(messages.slice(-50));
-  try { sessionStorage.setItem(historyKey(), payload); } catch { /* ignore */ }
-  try { localStorage.setItem(historyKey(), payload); } catch { /* ignore */ }
+  // Keep the full text of the thread. Never drop user/assistant words to save space.
+  let keep = messages.slice(-80);
+  const write = (payload: string) => {
+    localStorage.setItem(historyKey(), payload);
+    try { sessionStorage.setItem(historyKey(), payload); } catch { /* ignore */ }
+  };
+  try {
+    write(JSON.stringify(compact(keep)));
+    return;
+  } catch {
+    /* quota — drop attachments first, then oldest turns, but keep text */
+  }
+  try {
+    write(JSON.stringify(keep.map((m: any) => ({
+      role: m?.role,
+      content: String(m?.content || ''),
+      pending: m?.pending,
+      sources: m?.sources,
+    }))));
+    return;
+  } catch {
+    /* still too big */
+  }
+  while (keep.length > 8) {
+    keep = keep.slice(2);
+    try {
+      write(JSON.stringify(keep.map((m: any) => ({ role: m?.role, content: String(m?.content || '') }))));
+      return;
+    } catch {
+      /* keep shrinking */
+    }
+  }
 }
 
 export function loadSearchEnabled(): boolean {

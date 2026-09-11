@@ -70,7 +70,7 @@ export async function completeTaskFromChat(args: Record<string, unknown>) {
   if (args.due_date) patch.due_date = args.due_date;
   const { data, error } = await supabase.from('todos').update(patch).eq('id', match.id).select().single();
   if (error) throw error;
-  return { ok: true, todo: data };
+  return { ok: true, todo: data, previous: match };
 }
 
 function matchHabit(habits: Array<{ id: string; name: string }>, name: string) {

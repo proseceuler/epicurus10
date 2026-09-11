@@ -5,7 +5,8 @@ import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
 import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '@/lib/assistant/session';
 import { fileToAttachment, createRecorder, type ChatAttachment } from '@/lib/assistant/media';
-import { createRecognizer, speakText, stopSpeech, speechRecognitionCtor } from '@/lib/assistant/voice';
+import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
+import { groqConfigured, startVoiceLoop, speakReply, stopReply, type VoiceLoop } from '@/lib/assistant/voiceCascade';
 import { runAssistantTurn, type ChatTurn, type PendingWrite } from '@/lib/assistant/router';
 import { dispatchTool, writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import { undoLastWrite } from '@/lib/assistant/undo';
@@ -49,6 +50,9 @@ export default function GlobalAssistant({
   const recorderRef = useRef<ReturnType<typeof createRecorder> | null>(null);
   const voiceOnRef = useRef(false);
   const holdRef = useRef(false);
+  const loopRef = useRef<VoiceLoop | null>(null);
+  const busyRef = useRef(false);
+  const speakingRef = useRef(false);
 
   useEffect(() => {
     const slim = messages.map((m, i) => {
@@ -59,6 +63,9 @@ export default function GlobalAssistant({
     saveHistory(slim);
   }, [messages]);
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+  useEffect(() => { busyRef.current = busy; }, [busy]);
+  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+  useEffect(() => () => { loopRef.current?.stop(); stopReply(); }, []);
   useEffect(() => { if (open && scrollRef.current) scrollRef.current.scrollTop = scrollPos.current; }, [open, page]);
   useEffect(() => {
     if (!open) return;
@@ -68,9 +75,16 @@ export default function GlobalAssistant({
     return () => cancelAnimationFrame(id);
   }, [messages, busy, open, interim]);
 
-  const speak = (text: string) => {
+  const speak = async (text: string) => {
     if (!voiceOnRef.current) return;
-    speakText(text, { onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
+    speakingRef.current = true;
+    setSpeaking(true);
+    await speakReply(text, {
+      onStart: () => { speakingRef.current = true; setSpeaking(true); },
+      onEnd: () => { speakingRef.current = false; setSpeaking(false); },
+    });
+    speakingRef.current = false;
+    setSpeaking(false);
   };
 
   const startListen = (continuous: boolean) => {
@@ -80,7 +94,7 @@ export default function GlobalAssistant({
       onStart: () => setListening(true),
       onEnd: () => {
         setListening(false);
-        if (voiceOnRef.current && continuous && !holdRef.current) {
+        if (voiceOnRef.current && continuous && !holdRef.current && !busyRef.current && !speakingRef.current) {
           try { rec?.start(); } catch { /* ignore */ }
         }
       },
@@ -103,27 +117,48 @@ export default function GlobalAssistant({
     setInterim('');
   };
 
+  const startCascade = () => {
+    loopRef.current?.stop();
+    loopRef.current = startVoiceLoop({
+      onListening: setListening,
+      onCaption: setInterim,
+      onTranscript: (text) => send(text),
+      onError: setError,
+      shouldContinue: () => voiceOnRef.current && !busyRef.current && !speakingRef.current,
+    });
+  };
+
   const toggleVoice = () => {
     if (voiceOn) {
       voiceOnRef.current = false;
+      loopRef.current?.stop();
+      loopRef.current = null;
       stopListen();
-      stopSpeech();
+      stopReply();
       setVoiceOn(false);
       setSpeaking(false);
+      setInterim('');
       return;
     }
     setVoiceOn(true);
     voiceOnRef.current = true;
+    setError('');
+    if (groqConfigured()) {
+      startCascade();
+      return;
+    }
     startListen(true);
   };
 
   const pressTalkDown = () => {
+    if (groqConfigured()) return;
     holdRef.current = true;
     setVoiceOn(true);
     voiceOnRef.current = true;
     startListen(false);
   };
   const pressTalkUp = () => {
+    if (!holdRef.current) return;
     holdRef.current = false;
     stopListen();
     const said = input.trim();
@@ -158,14 +193,17 @@ export default function GlobalAssistant({
 
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
-    if ((!content && !attachments.length) || busy) return;
+    if ((!content && !attachments.length) || busyRef.current) return;
     const key = getOpenRouterKey();
     if (!key) { setError('Add an OpenRouter key in Settings first.'); return; }
+    stopReply();
     setError(''); setInput('');
     const user: Msg = { role: 'user', content: content || attachmentPromptFallback(attachments), attachments };
     setAttachments([]);
     const next = [...messages, user];
-    setMessages(next); setBusy(true);
+    setMessages(next);
+    busyRef.current = true;
+    setBusy(true);
     try {
       const reply = await runAssistantTurn({
         key,
@@ -181,10 +219,11 @@ export default function GlobalAssistant({
       });
       const assistant: Msg = { role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
       setMessages([...next, assistant]);
-      if (voiceOnRef.current && reply.content) speak(reply.content);
+      if (voiceOnRef.current && reply.content) await speak(reply.content);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -243,7 +282,11 @@ export default function GlobalAssistant({
   };
 
   if (rail && !open) return null;
-  const voiceReady = Boolean(speechRecognitionCtor());
+  const whisperOn = groqConfigured();
+  const voiceReady = whisperOn || Boolean(speechRecognitionCtor());
+  const voiceTitle = whisperOn
+    ? 'Voice mode \u2014 click to talk. Mic \u2192 Whisper \u2192 same chat \u2192 Fish or browser voice.'
+    : 'Voice mode \u2014 click for continuous, or hold to talk';
 
   return (
     <>
@@ -262,7 +305,7 @@ export default function GlobalAssistant({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
               <p className="truncate text-[11px] text-zinc-500">
-                {listening ? 'Listening…' : speaking ? 'Speaking…' : recording ? 'Recording audio…' : 'One chat for answers and actions'}
+                {listening ? 'Listening\u2026' : speaking ? 'Speaking\u2026' : recording ? 'Recording audio\u2026' : voiceOn ? (whisperOn ? 'Voice on \u00b7 Whisper' : 'Voice on') : 'One chat for answers and actions'}
               </p>
             </div>
           </div>
@@ -342,14 +385,14 @@ export default function GlobalAssistant({
           {(listening || speaking || interim) && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">
               <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : 'bg-zinc-300'}`} />
-              {listening ? (interim || 'Listening — press the mic to stop') : speaking ? 'Speaking reply' : interim}
+              {listening ? (interim || 'Listening \u2014 press the mic to stop') : speaking ? 'Speaking reply' : interim}
             </div>
           )}
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((a) => (
                 <button key={a.id} type="button" onClick={() => setAttachments((cur) => cur.filter((x) => x.id !== a.id))} className="max-w-[140px] truncate rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600">
-                  {a.kind} · {a.name} ×
+                  {a.kind} \u00b7 {a.name} \u00d7
                 </button>
               ))}
             </div>
@@ -369,7 +412,7 @@ export default function GlobalAssistant({
                 onPointerDown={(e) => { if (e.button === 0 && !voiceOn) pressTalkDown(); }}
                 onPointerUp={() => { if (holdRef.current) pressTalkUp(); }}
                 className={`flex h-8 w-8 items-center justify-center rounded-full ${voiceOn || listening ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-200'}`}
-                title="Voice mode — click for continuous, or hold to talk"
+                title={voiceTitle}
               >
                 {voiceOn || listening ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
               </button>
@@ -379,7 +422,7 @@ export default function GlobalAssistant({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
               rows={1}
-              placeholder={searchOn ? 'Ask, attach, or search the web…' : 'Ask anything…'}
+              placeholder={searchOn ? 'Ask, attach, or search the web\u2026' : 'Ask anything\u2026'}
               className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
             />
             <button type="submit" disabled={busy || (!input.trim() && !attachments.length)} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30">
@@ -401,7 +444,7 @@ function attachmentPromptFallback(attachments: ChatAttachment[]) {
 function AttachmentChip({ att, inverted }: { att: ChatAttachment; inverted?: boolean }) {
   return (
     <span className={`inline-flex max-w-[140px] truncate rounded-full px-2 py-1 text-[11px] ${inverted ? 'bg-white/15 text-white' : 'bg-zinc-100 text-zinc-600'}`}>
-      {att.kind} · {att.name}
+      {att.kind} \u00b7 {att.name}
     </span>
   );
 }

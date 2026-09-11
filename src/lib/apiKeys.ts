@@ -5,6 +5,8 @@ export const TAVILY_KEY = 'epicure-tavily-key';
 export const SAPLING_KEY = 'epicure-sapling-key';
 export const PINECONE_KEY = 'epicure-pinecone-key';
 export const PINECONE_HOST = 'epicure-pinecone-host';
+export const GROQ_KEY = 'epicure-groq-key';
+export const FISH_KEY = 'epicure-fish-key';
 
 function read(key: string, fallback = '') {
   if (typeof window === 'undefined') return fallback;
@@ -30,6 +32,12 @@ export const getPineconeKey = () =>
 
 export const getPineconeHost = () =>
   read(PINECONE_HOST, import.meta.env.VITE_PINECONE_HOST || '');
+
+export const getGroqKey = () =>
+  read(GROQ_KEY, import.meta.env.VITE_GROQ_API_KEY || '');
+
+export const getFishKey = () =>
+  read(FISH_KEY, import.meta.env.VITE_FISH_API_KEY || '');
 
 export const getDefaultModel = () => read(MODEL_KEY);
 

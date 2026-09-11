@@ -10,6 +10,10 @@ export function groqConfigured() {
 function isJunkTranscript(text: string) {
   const t = text.trim().toLowerCase().replace(/[.?!,\u2026]/g, '').replace(/\s+/g, ' ');
   if (t.length < 2) return true;
+  if (t.includes('english or filipino')) return true;
+  if (t.includes('tasks, grades, baon')) return true;
+  if (t.includes('canteen, class hub')) return true;
+  if (t.includes('student talking to a study assistant')) return true;
   return /^(thanks for watching|thank you for watching|thank you|thanks|you|subtitle[s]?|\[?music\]?|\[?applause\]?|\[?silence\]?)$/.test(t);
 }
 
@@ -32,7 +36,7 @@ export async function transcribeAudio(blob: Blob): Promise<{ text: string; error
   body.append('model', 'whisper-large-v3');
   body.append('response_format', 'json');
   body.append('temperature', '0');
-  body.append('prompt', 'Student talking to a study assistant. English or Filipino. Tasks, grades, baon, canteen, class hub.');
+  body.append('language', 'en');
   const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },

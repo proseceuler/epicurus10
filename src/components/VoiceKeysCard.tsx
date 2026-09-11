@@ -9,7 +9,7 @@ export function VoiceKeysCard() {
     <Card className="p-6">
       <h3 className="mb-1 font-semibold text-zinc-800">Voice</h3>
       <p className="mb-4 text-xs text-zinc-400">
-        Required for the Start Voice button in chat (waveform icon). Without a Groq key the composer only shows attach-a-file. Pipeline: mic → pause detect → Whisper Turbo → same thread → Fish or browser voice.
+        Used by the waveform button in Arrodes. Voice stays on until you tap it again. Pipeline: mic → pause detect → Whisper Turbo → same thread → Fish or browser voice.
       </p>
       <div className="space-y-3">
         <div>

@@ -20,6 +20,7 @@ import {
   deleteFlashcardFromChat,
   updateFlashcardFromChat,
 } from '@/lib/assistant/cardsHabits';
+import { listNotesFromChat } from '@/lib/assistant/notesRead';
 
 type ToolDef = {
   type: 'function';
@@ -220,6 +221,8 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
       return updateFlashcardFromChat(args);
     case 'delete_flashcard':
       return deleteFlashcardFromChat(args);
+    case 'get_notes':
+      return listNotesFromChat(args);
     case 'update_class_hub': {
       const existing = await supabase.from('class_hub').select('*').eq('subject_key', args.subject_key).maybeSingle();
       const patch = {

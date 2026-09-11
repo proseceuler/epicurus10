@@ -117,7 +117,7 @@ export function writeSummary(name: string, args: Record<string, unknown>) {
   if (name === 'log_expense') return `Expense · P${String(args.amount ?? '')} · ${String(args.category ?? '')}`;
   if (name === 'set_allowance') return `Allowance · P${String(args.amount ?? '')} · ${String(args.period ?? 'weekly')}`;
   if (name === 'add_savings_goal') return `Savings goal · ${String(args.name ?? '')} · P${String(args.target_amount ?? '')}`;
-  if (name === 'mark_habit') return `Habit · ${String(args.name ?? '')}`;
+  if (name === 'mark_habit') return `Habit · ${String(args.name ?? '')} · ${String(args.date ?? 'today')}`;
   if (name === 'add_habit') return `New habit · ${String(args.name ?? '')}`;
   if (name === 'update_class_hub') return `Class info · ${String(args.subject_key ?? '')}`;
   if (name === 'add_class_link') return `Class link · ${String(args.title ?? '')}`;

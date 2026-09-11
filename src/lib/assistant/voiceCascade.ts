@@ -5,6 +5,12 @@ export function groqConfigured() {
   return Boolean(getGroqKey());
 }
 
+function isJunkTranscript(text: string) {
+  const t = text.trim().toLowerCase().replace(/[.?!,…]/g, '').replace(/\s+/g, ' ');
+  if (t.length < 2) return true;
+  return /^(thanks for watching|thank you for watching|thank you|thanks|you|subtitle[s]?|\[?music\]?|\[?applause\]?|\[?silence\]?)$/.test(t);
+}
+
 function rmsFromTimeDomain(buf: Uint8Array) {
   let sum = 0;
   for (let i = 0; i < buf.length; i++) {
@@ -185,8 +191,10 @@ export function startVoiceLoop(opts: {
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
 
     let heard = false;
+    let voicedMs = 0;
     let silentMs = 0;
     let last = performance.now();
+    const startedAt = last;
     rec.start(200);
     opts.onListening?.(true);
     opts.onStatus?.('listening');
@@ -204,12 +212,22 @@ export function startVoiceLoop(opts: {
         const now = performance.now();
         const dt = now - last;
         last = now;
-        if (level > 0.045) {
-          heard = true;
-          silentMs = 0;
-        } else if (heard) {
-          silentMs += dt;
-          if (silentMs > 900) {
+        if (level > 0.09) {
+          voicedMs += dt;
+          if (voicedMs > 220) {
+            heard = true;
+            silentMs = 0;
+          }
+        } else {
+          voicedMs = 0;
+          if (heard) {
+            silentMs += dt;
+            if (silentMs > 1200) {
+              try { rec.stop(); } catch { /* ignore */ }
+              resolve();
+              return;
+            }
+          } else if (now - startedAt > 12_000) {
             try { rec.stop(); } catch { /* ignore */ }
             resolve();
             return;
@@ -229,7 +247,7 @@ export function startVoiceLoop(opts: {
 
     if (stopped || !chunks.length) return;
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-    if (blob.size < 2000) {
+    if (blob.size < 8000) {
       if (!stopped) void listenOnce();
       return;
     }
@@ -237,9 +255,11 @@ export function startVoiceLoop(opts: {
     opts.onCaption?.('Transcribing…');
     const result = await transcribeAudio(blob);
     if (result.error) opts.onError?.(result.error);
-    else if (result.text) {
+    else if (result.text && !isJunkTranscript(result.text)) {
       opts.onCaption?.(result.text);
       await opts.onTranscript(result.text);
+    } else {
+      opts.onCaption?.('');
     }
     opts.onStatus?.('idle');
     if (!stopped) void listenOnce();

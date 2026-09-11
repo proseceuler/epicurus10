@@ -231,11 +231,11 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
       if (existing.data?.id) {
         const { data, error } = await supabase.from('class_hub').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', existing.data.id).select().single();
         if (error) throw error;
-        return { ok: true, hub: data };
+        return { ok: true, hub: data, previous: existing.data };
       }
       const { data, error } = await supabase.from('class_hub').insert({ subject_key: args.subject_key, ...patch }).select().single();
       if (error) throw error;
-      return { ok: true, hub: data };
+      return { ok: true, hub: data, created: true };
     }
     case 'add_class_link': {
       const { data, error } = await supabase.from('class_hub_links').insert({

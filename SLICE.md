@@ -23,10 +23,13 @@ Mic to pause detect to Groq Whisper Turbo to the same thread to Fish Audio or br
 ## 6 Gaps closed
 - Flashcard update + delete from chat (CRUD)
 - Add habit from chat
-- Calendar refreshes after chat writes
+- Calendar + dashboard + focus stats refresh after chat writes
 - Task edit / flashcard edit-delete / new habit / class-hub edit can undo
+- Class Hub updates store the previous row so undo can restore it
 - New notes try to ingest into Pinecone
 - Click mic while Arrodes is speaking to interrupt without turning voice off
+- Speak wait unblocks on interrupt so the mic can listen again
+- Router auto-applies add_habit / update_flashcard / delete_flashcard
 
 Money writes still wait for Confirm. Voice is a cascade, not full-duplex.
 

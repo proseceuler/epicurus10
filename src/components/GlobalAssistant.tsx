@@ -285,8 +285,8 @@ export default function GlobalAssistant({
   const whisperOn = groqConfigured();
   const voiceReady = whisperOn || Boolean(speechRecognitionCtor());
   const voiceTitle = whisperOn
-    ? 'Voice mode \u2014 click to talk. Mic \u2192 Whisper \u2192 same chat \u2192 Fish or browser voice.'
-    : 'Voice mode \u2014 click for continuous, or hold to talk';
+    ? 'Voice mode - click to talk. Mic -> Whisper -> same chat -> Fish or browser voice.'
+    : 'Voice mode - click for continuous, or hold to talk';
 
   return (
     <>
@@ -305,7 +305,7 @@ export default function GlobalAssistant({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
               <p className="truncate text-[11px] text-zinc-500">
-                {listening ? 'Listening\u2026' : speaking ? 'Speaking\u2026' : recording ? 'Recording audio\u2026' : voiceOn ? (whisperOn ? 'Voice on \u00b7 Whisper' : 'Voice on') : 'One chat for answers and actions'}
+                {listening ? 'Listening...' : speaking ? 'Speaking...' : recording ? 'Recording audio...' : voiceOn ? (whisperOn ? 'Voice on / Whisper' : 'Voice on') : 'One chat for answers and actions'}
               </p>
             </div>
           </div>
@@ -385,14 +385,14 @@ export default function GlobalAssistant({
           {(listening || speaking || interim) && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">
               <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : 'bg-zinc-300'}`} />
-              {listening ? (interim || 'Listening \u2014 press the mic to stop') : speaking ? 'Speaking reply' : interim}
+              {listening ? (interim || 'Listening - press the mic to stop') : speaking ? 'Speaking reply' : interim}
             </div>
           )}
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((a) => (
                 <button key={a.id} type="button" onClick={() => setAttachments((cur) => cur.filter((x) => x.id !== a.id))} className="max-w-[140px] truncate rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600">
-                  {a.kind} \u00b7 {a.name} \u00d7
+                  {a.kind} / {a.name} x
                 </button>
               ))}
             </div>
@@ -422,7 +422,7 @@ export default function GlobalAssistant({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
               rows={1}
-              placeholder={searchOn ? 'Ask, attach, or search the web\u2026' : 'Ask anything\u2026'}
+              placeholder={searchOn ? 'Ask, attach, or search the web...' : 'Ask anything...'}
               className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
             />
             <button type="submit" disabled={busy || (!input.trim() && !attachments.length)} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30">
@@ -444,7 +444,7 @@ function attachmentPromptFallback(attachments: ChatAttachment[]) {
 function AttachmentChip({ att, inverted }: { att: ChatAttachment; inverted?: boolean }) {
   return (
     <span className={`inline-flex max-w-[140px] truncate rounded-full px-2 py-1 text-[11px] ${inverted ? 'bg-white/15 text-white' : 'bg-zinc-100 text-zinc-600'}`}>
-      {att.kind} \u00b7 {att.name}
+      {att.kind} / {att.name}
     </span>
   );
 }

@@ -15,6 +15,11 @@ import {
   markAttendanceFromChat,
   moveKanbanFromChat,
 } from '@/lib/assistant/school';
+import {
+  addHabitFromChat,
+  deleteFlashcardFromChat,
+  updateFlashcardFromChat,
+} from '@/lib/assistant/cardsHabits';
 
 type ToolDef = {
   type: 'function';
@@ -53,6 +58,21 @@ export const EXTRA_TOOLS: ToolDef[] = [
       name: 'get_habit_stats',
       description: 'Read habit streaks and what is still open today.',
       parameters: obj({}),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_habit',
+      description: 'Create a new habit in the tracker.',
+      parameters: obj(
+        {
+          name: str('Habit name'),
+          emoji: str('Optional emoji'),
+          goal_target: { type: 'number', description: 'Days per month goal, default 30' },
+        },
+        ['name'],
+      ),
     },
   },
   {
@@ -127,6 +147,30 @@ export const EXTRA_TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'update_flashcard',
+      description: 'Edit an existing flashcard by matching the current front text.',
+      parameters: obj(
+        {
+          front: str('Current front / question, or part of it'),
+          new_front: str('Replacement front text'),
+          new_back: str('Replacement back text'),
+          back: str('Alias for new_back'),
+        },
+        ['front'],
+      ),
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_flashcard',
+      description: 'Delete a flashcard by matching the front text.',
+      parameters: obj({ front: str('Front / question, or part of it') }, ['front']),
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_vault',
       description: 'Search the student archive: notes, tasks, kanban cards and habits by keyword.',
       parameters: obj({ query: str('Keyword or phrase') }, ['query']),
@@ -156,6 +200,8 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
       return completeTaskFromChat(args);
     case 'mark_habit':
       return checkHabitFromChat(args);
+    case 'add_habit':
+      return addHabitFromChat(args);
     case 'get_habit_stats':
       return habitStatsFromChat();
     case 'add_calendar_event':
@@ -170,6 +216,10 @@ export async function runExtraTool(name: string, args: Record<string, any>): Pro
       return addScoreFromChat(args);
     case 'mark_attendance':
       return markAttendanceFromChat(args, args.status === 'skipped' ? 'skipped' : 'attended');
+    case 'update_flashcard':
+      return updateFlashcardFromChat(args);
+    case 'delete_flashcard':
+      return deleteFlashcardFromChat(args);
     case 'update_class_hub': {
       const existing = await supabase.from('class_hub').select('*').eq('subject_key', args.subject_key).maybeSingle();
       const patch = {

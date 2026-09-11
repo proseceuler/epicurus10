@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type SubjectKey } from '@/lib/types';
 import { parseNaturalWhen } from '@/lib/parseWhen';
-import { lastNDays, todayIso } from '@/lib/habit-stats';
+import { addDays, lastNDays, todayIso } from '@/lib/habit-stats';
 import { upsertLinkedCalendarEvent } from '@/lib/calendarStore';
 
 const SUBJECT_HINTS: Array<{ keys: string[]; subject: SubjectKey }> = [
@@ -83,23 +83,58 @@ function matchHabit(habits: Array<{ id: string; name: string }>, name: string) {
   );
 }
 
-export async function checkHabitFromChat(args: Record<string, unknown>) {
-  const { data: habits } = await supabase.from('habits').select('*');
-  const match = matchHabit(habits ?? [], String(args.name || ''));
-  if (!match) {
-    return { ok: false, error: `No habit matching "${args.name}".`, habits: (habits ?? []).map((h: { name: string }) => h.name) };
-  }
-  const date = String(args.date || todayIso());
+export function resolveHabitDate(raw?: unknown) {
+  const t = String(raw ?? 'today').trim().toLowerCase();
+  if (!t || t === 'today' || t === 'current' || t === 'now') return todayIso();
+  if (/^(yesterday|previous|prev|last day|the day before)$/.test(t)) return addDays(todayIso(), -1);
+  if (/^(tomorrow|next|next day|the day after)$/.test(t)) return addDays(todayIso(), 1);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const parsed = parseNaturalWhen(t);
+  return parsed.start_date || todayIso();
+}
+
+async function setHabitDay(
+  habit: { id: string; name: string },
+  date: string,
+  done: boolean,
+) {
   const { data: existing } = await supabase
     .from('habit_completions')
     .select('id')
-    .eq('habit_id', match.id)
+    .eq('habit_id', habit.id)
     .eq('completion_date', date)
     .maybeSingle();
-  if (existing?.id) return { ok: true, habit: match.name, date, already: true };
-  const { error } = await supabase.from('habit_completions').insert({ habit_id: match.id, completion_date: date });
+  if (done) {
+    if (existing?.id) return { habit: habit.name, date, already: true, done: true };
+    const { error } = await supabase.from('habit_completions').insert({ habit_id: habit.id, completion_date: date });
+    if (error) throw error;
+    return { habit: habit.name, date, done: true };
+  }
+  if (!existing?.id) return { habit: habit.name, date, already: true, done: false };
+  const { error } = await supabase.from('habit_completions').delete().eq('id', existing.id);
   if (error) throw error;
-  return { ok: true, habit: match.name, date };
+  return { habit: habit.name, date, done: false };
+}
+
+export async function checkHabitFromChat(args: Record<string, unknown>) {
+  const { data: habits } = await supabase.from('habits').select('*');
+  const list = (habits ?? []) as Array<{ id: string; name: string }>;
+  const date = resolveHabitDate(args.date);
+  const done = args.done === false || args.done === 'false' ? false : true;
+  const rawName = String(args.name || '').trim();
+  if (!rawName) return { ok: false, error: 'Need a habit name, or say all.' };
+  const targets = /^(all|every|everything)$/i.test(rawName)
+    ? list
+    : (() => {
+        const match = matchHabit(list, rawName);
+        return match ? [match] : [];
+      })();
+  if (!targets.length) {
+    return { ok: false, error: `No habit matching "${rawName}".`, habits: list.map((h) => h.name) };
+  }
+  const results = [];
+  for (const habit of targets) results.push(await setHabitDay(habit, date, done));
+  return { ok: true, date, done, results };
 }
 
 export async function habitStatsFromChat() {

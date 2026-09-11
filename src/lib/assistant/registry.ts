@@ -3,6 +3,7 @@ import { EXTRA_TOOLS, runExtraTool } from '@/lib/assistant/extraTools';
 import { actionForTool, writeTools } from '@/lib/assistant/actions';
 import { pushUndo } from '@/lib/assistant/undo';
 import { notifyDataChanged } from '@/lib/assistant/sync';
+import { ingestNote } from '@/lib/assistant/rag';
 
 export type ConnectorId = 'site' | 'web' | 'mcp';
 
@@ -94,28 +95,32 @@ export async function dispatchTool(name: string, args: Record<string, unknown>, 
   if (WRITE_NAMES.has(name)) {
     pushUndo(name, args, result, writeSummary(name, args));
     notifyDataChanged(actionForTool(name)?.page);
+    if (name === 'add_note' && result && typeof result === 'object') {
+      const note = (result as { note?: unknown }).note ?? result;
+      void ingestNote(note);
+    }
   }
   return result;
 }
 
 export function writeSummary(name: string, args: Record<string, unknown>) {
-  if (name === 'add_todo' || name === 'update_todo') return `Task \u00b7 ${String(args.title ?? 'Untitled')}${args.due_date ? ` \u00b7 ${args.due_date}` : ''}`;
-  if (name === 'add_note') return `Note \u00b7 ${String(args.title ?? 'Untitled')}`;
-  if (name === 'add_calendar_event') return `Event \u00b7 ${String(args.title ?? 'Untitled')}`;
-  if (name === 'add_kanban_task') return `Board task \u00b7 ${String(args.title ?? 'Untitled')}`;
-  if (name === 'move_kanban_task') return `Move card \u00b7 ${String(args.title ?? '')} -> ${String(args.status ?? '')}`;
-  if (name === 'mark_attendance') return `${args.status === 'skipped' ? 'Skip' : 'Attend'} \u00b7 ${String(args.subject_key ?? '')}`;
-  if (name === 'add_flashcard') return `Flashcard \u00b7 ${String(args.front ?? args.title ?? 'New card')}`;
-  if (name === 'update_flashcard') return `Edit card \u00b7 ${String(args.front ?? args.title ?? '')}`;
-  if (name === 'delete_flashcard') return `Delete card \u00b7 ${String(args.front ?? args.title ?? '')}`;
-  if (name === 'add_assessment') return `Grade \u00b7 ${String(args.name ?? 'Assessment')}`;
-  if (name === 'log_expense') return `Expense \u00b7 P${String(args.amount ?? '')} \u00b7 ${String(args.category ?? '')}`;
-  if (name === 'set_allowance') return `Allowance \u00b7 P${String(args.amount ?? '')} \u00b7 ${String(args.period ?? 'weekly')}`;
-  if (name === 'add_savings_goal') return `Savings goal \u00b7 ${String(args.name ?? '')} \u00b7 P${String(args.target_amount ?? '')}`;
-  if (name === 'mark_habit') return `Habit \u00b7 ${String(args.name ?? '')}`;
-  if (name === 'add_habit') return `New habit \u00b7 ${String(args.name ?? '')}`;
-  if (name === 'update_class_hub') return `Class info \u00b7 ${String(args.subject_key ?? '')}`;
-  if (name === 'add_class_link') return `Class link \u00b7 ${String(args.title ?? '')}`;
+  if (name === 'add_todo' || name === 'update_todo') return `Task · ${String(args.title ?? 'Untitled')}${args.due_date ? ` · ${args.due_date}` : ''}`;
+  if (name === 'add_note') return `Note · ${String(args.title ?? 'Untitled')}`;
+  if (name === 'add_calendar_event') return `Event · ${String(args.title ?? 'Untitled')}`;
+  if (name === 'add_kanban_task') return `Board task · ${String(args.title ?? 'Untitled')}`;
+  if (name === 'move_kanban_task') return `Move card · ${String(args.title ?? '')} -> ${String(args.status ?? '')}`;
+  if (name === 'mark_attendance') return `${args.status === 'skipped' ? 'Skip' : 'Attend'} · ${String(args.subject_key ?? '')}`;
+  if (name === 'add_flashcard') return `Flashcard · ${String(args.front ?? args.title ?? 'New card')}`;
+  if (name === 'update_flashcard') return `Edit card · ${String(args.front ?? args.title ?? '')}`;
+  if (name === 'delete_flashcard') return `Delete card · ${String(args.front ?? args.title ?? '')}`;
+  if (name === 'add_assessment') return `Grade · ${String(args.name ?? 'Assessment')}`;
+  if (name === 'log_expense') return `Expense · P${String(args.amount ?? '')} · ${String(args.category ?? '')}`;
+  if (name === 'set_allowance') return `Allowance · P${String(args.amount ?? '')} · ${String(args.period ?? 'weekly')}`;
+  if (name === 'add_savings_goal') return `Savings goal · ${String(args.name ?? '')} · P${String(args.target_amount ?? '')}`;
+  if (name === 'mark_habit') return `Habit · ${String(args.name ?? '')}`;
+  if (name === 'add_habit') return `New habit · ${String(args.name ?? '')}`;
+  if (name === 'update_class_hub') return `Class info · ${String(args.subject_key ?? '')}`;
+  if (name === 'add_class_link') return `Class link · ${String(args.title ?? '')}`;
   if (name === 'start_focus_session') return 'Start a focus session';
   return name.replaceAll('_', ' ');
 }

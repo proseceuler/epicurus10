@@ -24,8 +24,19 @@ Mic to pause detect to Groq Whisper Turbo to the same thread to Fish Audio or br
 - Flashcard update + delete from chat (CRUD)
 - Add habit from chat
 - Calendar refreshes after chat writes
-- Task edit undo restores the previous row
+- Task edit / flashcard edit-delete / new habit / class-hub edit can undo
 - New notes try to ingest into Pinecone
 - Click mic while Arrodes is speaking to interrupt without turning voice off
 
 Money writes still wait for Confirm. Voice is a cascade, not full-duplex.
+
+## Module coverage
+- todos: add / complete / edit
+- calendar: add + live refresh
+- kanban: add / move
+- classhub: timetable read, fields update, links, attend/skip
+- grades: list / add score
+- pomodoro: start / stats
+- baon: summary / expense / allowance / goal (money Confirm)
+- flashcards: create / read / update / delete
+- habits: list / add / check / stats

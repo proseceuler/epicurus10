@@ -153,3 +153,23 @@ export async function searchEpicure(query: string, namespace: 'site' | 'notes' |
 
   return { query: q, hits: await localSearch(q, namespace), mode: 'local' };
 }
+
+export async function ingestNote(note: { id?: string; title?: string; content?: string } | unknown) {
+  if (!pineconeConfigured() || !note || typeof note !== 'object') return;
+  const row = note as { id?: string; title?: string; content?: string };
+  const id = String(row.id || '').trim();
+  const text = `${row.title || ''}\n${row.content || ''}`.trim();
+  if (!id || !text) return;
+  try {
+    const parts = chunk(text);
+    const values = await embedTexts(parts, 'passage');
+    const vectors = parts.map((body, i) => ({
+      id: `note-${id}-${i}`,
+      values: values[i] || [],
+      metadata: { title: String(row.title || 'Untitled'), page: 'notes', source: 'notes', body: body.slice(0, 400) },
+    })).filter((v) => v.values.length);
+    if (vectors.length) await upsertVectors('notes', vectors);
+  } catch {
+    /* local search still works without Pinecone */
+  }
+}

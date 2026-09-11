@@ -167,7 +167,77 @@ function buildRevert(
       return true;
     };
   }
-  if (tool === 'update_todo' && row.todo && typeof row.todo === 'object') {
+  if (tool === 'update_todo') {
+    const prev = row.previous as Record<string, unknown> | undefined;
+    if (prev?.id) {
+      return async () => {
+        const { error } = await supabase
+          .from('todos')
+          .update({
+            title: prev.title,
+            completed: prev.completed,
+            due_date: prev.due_date ?? null,
+            subject_key: prev.subject_key ?? null,
+            priority: prev.priority,
+          })
+          .eq('id', prev.id);
+        if (error) throw error;
+        return true;
+      };
+    }
+    return null;
+  }
+  if (tool === 'add_habit') {
+    const id = idOf(result, ['habit']);
+    return id ? () => del('habits', id) : null;
+  }
+  if (tool === 'update_flashcard') {
+    const prev = row.previous as { id?: string; front?: string; back?: string } | undefined;
+    if (prev?.id) {
+      return async () => {
+        const { error } = await supabase
+          .from('flashcards')
+          .update({ front: prev.front, back: prev.back })
+          .eq('id', prev.id);
+        if (error) throw error;
+        return true;
+      };
+    }
+    return null;
+  }
+  if (tool === 'delete_flashcard') {
+    const deleted = row.deleted as Record<string, unknown> | undefined;
+    if (deleted?.id) {
+      return async () => {
+        const { error } = await supabase.from('flashcards').insert(deleted);
+        if (error) throw error;
+        return true;
+      };
+    }
+    return null;
+  }
+  if (tool === 'update_class_hub') {
+    const prev = row.previous as Record<string, unknown> | undefined;
+    const hub = row.hub as { id?: string } | undefined;
+    if (prev?.id) {
+      return async () => {
+        const { error } = await supabase
+          .from('class_hub')
+          .update({
+            teacher_name: prev.teacher_name ?? '',
+            office_hours: prev.office_hours ?? '',
+            room: prev.room ?? '',
+            notes: prev.notes ?? '',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', prev.id);
+        if (error) throw error;
+        return true;
+      };
+    }
+    if (hub?.id && row.created) {
+      return () => del('class_hub', String(hub.id));
+    }
     return null;
   }
   return null;

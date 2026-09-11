@@ -57,6 +57,13 @@ async function speakFish(text: string): Promise<HTMLAudioElement | null> {
 }
 
 let currentAudio: HTMLAudioElement | null = null;
+let speakDone: (() => void) | null = null;
+
+function finishSpeak() {
+  const done = speakDone;
+  speakDone = null;
+  done?.();
+}
 
 function waitForSpeechEnd(): Promise<void> {
   return new Promise((resolve) => {
@@ -80,42 +87,46 @@ export async function speakReply(text: string, hooks?: { onStart?: () => void; o
   const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, ' ').trim().slice(0, 600);
   if (!clean) { hooks?.onEnd?.(); return; }
   stopReply();
-  try {
-    const audio = await speakFish(clean);
-    if (audio) {
-      currentAudio = audio;
-      await new Promise<void>((resolve) => {
-        audio.onplay = () => hooks?.onStart?.();
-        audio.onended = () => {
-          hooks?.onEnd?.();
-          currentAudio = null;
-          resolve();
-        };
-        audio.onerror = () => {
-          hooks?.onEnd?.();
-          currentAudio = null;
-          resolve();
-        };
-        void audio.play().catch(() => {
-          hooks?.onEnd?.();
-          currentAudio = null;
-          resolve();
-        });
-      });
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  hooks?.onStart?.();
-  speakBrowser(clean, { onStart: hooks?.onStart, onEnd: hooks?.onEnd });
-  await waitForSpeechEnd();
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      currentAudio = null;
+      hooks?.onEnd?.();
+      if (speakDone === settle) speakDone = null;
+      resolve();
+    };
+    speakDone = settle;
+    const playFish = async () => {
+      try {
+        const audio = await speakFish(clean);
+        if (settled) return;
+        if (audio) {
+          currentAudio = audio;
+          audio.onplay = () => hooks?.onStart?.();
+          audio.onended = settle;
+          audio.onerror = settle;
+          void audio.play().catch(settle);
+          return;
+        }
+      } catch {
+        /* fall through to browser voice */
+      }
+      if (settled) return;
+      hooks?.onStart?.();
+      speakBrowser(clean, { onStart: hooks?.onStart, onEnd: settle });
+      void waitForSpeechEnd().then(settle);
+    };
+    void playFish();
+  });
 }
 
 export function stopReply() {
   try { currentAudio?.pause(); } catch { /* ignore */ }
   currentAudio = null;
   stopBrowser();
+  finishSpeak();
 }
 
 export type VoiceStatus = 'idle' | 'listening' | 'transcribing';

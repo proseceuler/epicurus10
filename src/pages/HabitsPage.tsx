@@ -4,6 +4,7 @@ import { Select } from '@/components/kit';
 import { supabase } from '@/lib/supabase';
 import type { Habit, HabitCompletion } from '@/lib/types';
 import { HomeView, TrackView, DashView, InsightsView, type View } from '@/components/habits/views';
+import CheckOffBar from '@/components/habits/CheckOffBar';
 import {
   MONTHS, monthDays, doneSet, isDone, todayIso, lastNDays, lifetimePct,
 } from '@/lib/habit-stats';
@@ -135,9 +136,12 @@ export default function HabitsPage() {
           <Select className="w-[4.5rem]" value={String(year)} onChange={(v) => setYear(Number(v))} options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
       </div>
+      {view === 'home' && (
+        <CheckOffBar habits={habits} done={done} today={today} onToggle={(id, date) => void toggle(id, date)} />
+      )}
       <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden' : ''}>
       <MotionSwap id={view}>
-      {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} onToggle={toggle} />}
+      {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
       {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} year={year} />}
       {view === 'insights' && <InsightsView habits={habits} days={days} weeks={weeks} done={done} />}

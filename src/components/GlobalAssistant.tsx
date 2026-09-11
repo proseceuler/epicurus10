@@ -12,6 +12,7 @@ import { dispatchTool, writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/regi
 import { undoLastWrite } from '@/lib/assistant/undo';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
+import ArrodesVoiceMirror, { type ArrodesVoiceMode } from '@/components/ArrodesVoiceMirror';
 
 const SUGGESTS = [
   { label: 'Summarize this page', text: 'Summarize what I should focus on on this page.' },
@@ -288,25 +289,33 @@ export default function GlobalAssistant({
   const voiceTitle = voiceOn
     ? 'Voice is on — tap to stop. Tap while speaking to interrupt.'
     : 'Start Voice. Stays on until you turn it off.';
+  const voiceMode: ArrodesVoiceMode = speaking
+    ? 'speaking'
+    : busy
+      ? 'thinking'
+      : listening
+        ? 'listening'
+        : 'idle';
 
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-transparent lg:hidden" onClick={onClose} />}
       <aside
         aria-hidden={!open}
-        className={`assistant-panel fixed inset-y-0 right-0 z-50 flex flex-col border-l border-zinc-200/80 bg-white/96 shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
+        data-voice={voiceOn ? '1' : '0'}
+        className={`assistant-panel fixed inset-y-0 right-0 z-50 flex flex-col border-l shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'} ${voiceOn ? 'border-zinc-800 bg-zinc-950' : 'border-zinc-200/80 bg-white/96'}`}
         style={{ width }}
       >
         <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize lg:block" onPointerDown={startDrag} />
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className={`assistant-chrome flex items-center justify-between px-4 py-3 ${voiceOn ? 'text-zinc-200' : ''}`}>
           <div className="flex min-w-0 items-center gap-2">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white ${listening || speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full ${voiceOn ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900 text-white'} ${listening || speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>
               <Bot className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
-              <p className="truncate text-[11px] text-zinc-500">
-                {listening ? 'Listening…' : speaking ? 'Speaking…' : voiceOn ? 'Voice on — tap waveform to stop or interrupt' : 'Works from any page'}
+              <p className={`text-sm font-semibold ${voiceOn ? 'text-zinc-100' : 'text-zinc-800'}`}>Arrodes</p>
+              <p className={`truncate text-[11px] ${voiceOn ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {listening ? 'Listening…' : speaking ? 'Speaking…' : busy && voiceOn ? 'Thinking…' : voiceOn ? 'Voice on — tap waveform to stop or interrupt' : 'Works from any page'}
               </p>
             </div>
           </div>
@@ -314,17 +323,24 @@ export default function GlobalAssistant({
             <button
               type="button"
               onClick={() => { const next = !searchOn; setSearchOn(next); saveSearchEnabled(next); }}
-              className={`rounded-full p-1.5 ${searchOn ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}
+              className={`rounded-full p-1.5 ${searchOn ? 'bg-zinc-900 text-white' : voiceOn ? 'text-zinc-400 hover:bg-zinc-800' : 'text-zinc-500 hover:bg-zinc-100'}`}
               title={searchOn ? 'Web search on' : 'Web search off'}
             >
               <Globe className="h-4 w-4" />
             </button>
-            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100" title="Close Arrodes"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={onClose} className={`rounded-full p-1.5 ${voiceOn ? 'text-zinc-400 hover:bg-zinc-800' : 'text-zinc-500 hover:bg-zinc-100'}`} title="Close Arrodes"><X className="h-4 w-4" /></button>
           </div>
         </div>
 
-        <div ref={scrollRef} onScroll={(e) => { scrollPos.current = e.currentTarget.scrollTop; }} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">
-          {messages.length === 0 && (
+        <div ref={scrollRef} onScroll={(e) => { scrollPos.current = e.currentTarget.scrollTop; }} className={`min-h-0 flex-1 ${voiceOn ? 'overflow-hidden px-2 py-2' : 'space-y-4 overflow-y-auto px-4 py-2'}`}>
+          {voiceOn && (
+            <ArrodesVoiceMirror
+              active={voiceOn}
+              mode={voiceMode}
+              caption={interim || (speaking ? 'Truth revealed' : busy ? 'The glass is turning' : listening ? 'Speak — the glass is listening' : 'A faint mist waits in the glass')}
+            />
+          )}
+          {!voiceOn && messages.length === 0 && (
             <div className="pt-4">
               <p className="text-sm leading-relaxed text-zinc-500">Ask a question, attach a photo, or tell me to update a task, habit, or class field. Writes wait for confirm.</p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -334,7 +350,7 @@ export default function GlobalAssistant({
               </div>
             </div>
           )}
-          {messages.map((m, i) => (
+          {!voiceOn && messages.map((m, i) => (
             <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-2'}>
               {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><Bot className="h-3 w-3" /></div>)}
               <div className={m.role === 'user' ? 'max-w-[85%] rounded-2xl bg-zinc-900 px-3 py-2 text-sm text-white' : 'max-w-[90%] text-sm leading-relaxed text-zinc-800'}>
@@ -377,15 +393,15 @@ export default function GlobalAssistant({
               </div>
             </div>
           ))}
-          {busy && (<div className="flex items-center gap-2 text-sm text-zinc-500"><span className="flex gap-1"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:120ms]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:240ms]" /></span>Thinking</div>)}
-          {error && <p className="text-xs text-zinc-500">{error}</p>}
+          {!voiceOn && busy && (<div className="flex items-center gap-2 text-sm text-zinc-500"><span className="flex gap-1"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:120ms]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:240ms]" /></span>Thinking</div>)}
+          {error && <p className={`text-xs ${voiceOn ? 'px-2 text-zinc-400' : 'text-zinc-500'}`}>{error}</p>}
         </div>
 
-        <form className="border-t border-zinc-200/70 p-3 pb-5" onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
-          {(listening || speaking || interim || voiceOn) && (
+        <form className={`p-3 pb-5 ${voiceOn ? 'border-t border-zinc-800' : 'border-t border-zinc-200/70'}`} onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
+          {!voiceOn && (listening || speaking || interim) && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">
-              <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : voiceOn ? 'bg-zinc-400' : 'bg-zinc-300'}`} />
-              {listening ? (interim || 'Listening — keep talking, I wait for a pause') : speaking ? 'Speaking — tap waveform to interrupt' : voiceOn ? 'Voice stays on until you tap the waveform' : interim}
+              <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : 'bg-zinc-300'}`} />
+              {listening ? (interim || 'Listening — keep talking, I wait for a pause') : speaking ? 'Speaking — tap waveform to interrupt' : interim}
             </div>
           )}
           {attachments.length > 0 && (
@@ -397,9 +413,9 @@ export default function GlobalAssistant({
               ))}
             </div>
           )}
-          <div className="flex items-end gap-1.5 rounded-2xl bg-zinc-100 px-2 py-2">
+          <div className={`flex items-end gap-1.5 rounded-2xl px-2 py-2 ${voiceOn ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
             <input ref={fileRef} type="file" accept="image/*,video/*,audio/*" multiple className="hidden" onChange={(e) => { void pickFiles(e.target.files); e.target.value = ''; }} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200" title="Attach a file">
+            <button type="button" onClick={() => fileRef.current?.click()} className={`flex h-8 w-8 items-center justify-center rounded-full ${voiceOn ? 'text-zinc-400 hover:bg-zinc-800' : 'text-zinc-500 hover:bg-zinc-200'}`} title="Attach a file">
               <Paperclip className="h-3.5 w-3.5" />
             </button>
             <textarea
@@ -408,17 +424,17 @@ export default function GlobalAssistant({
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (hasDraft) void send(); } }}
               rows={1}
               placeholder={voiceOn ? 'Voice on — type to send instead…' : 'Ask anything…'}
-              className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
+              className={`max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm outline-none ${voiceOn ? 'text-zinc-100 placeholder:text-zinc-500' : 'text-zinc-800'}`}
             />
             {hasDraft ? (
-              <button type="submit" disabled={busy} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30" title="Send">
+              <button type="submit" disabled={busy} className={`flex h-8 w-8 items-center justify-center rounded-full text-white disabled:opacity-30 ${voiceOn ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900'}`} title="Send">
                 <Send className="h-3.5 w-3.5" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={toggleVoice}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white"
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${voiceOn ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900 text-white'}`}
                 title={voiceTitle}
                 aria-label={voiceOn ? 'Stop voice' : 'Start Voice'}
               >

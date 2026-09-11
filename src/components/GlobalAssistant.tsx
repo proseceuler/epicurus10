@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, X, Send, Check, Ban, Mic, MicOff, PanelRight, ExternalLink, Undo2, Paperclip, Globe, Square } from 'lucide-react';
+import { Bot, X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
 import { getOpenRouterKey } from '@/lib/apiKeys';
 import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
 import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '@/lib/assistant/session';
-import { fileToAttachment, createRecorder, type ChatAttachment } from '@/lib/assistant/media';
+import { fileToAttachment, isAudioFile, type ChatAttachment } from '@/lib/assistant/media';
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
-import { groqConfigured, startVoiceLoop, speakReply, stopReply, type VoiceLoop } from '@/lib/assistant/voiceCascade';
+import { groqConfigured, startVoiceLoop, speakReply, stopReply, transcribeAudio, type VoiceLoop } from '@/lib/assistant/voiceCascade';
 import { runAssistantTurn, type ChatTurn, type PendingWrite } from '@/lib/assistant/router';
 import { dispatchTool, writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import { undoLastWrite } from '@/lib/assistant/undo';
@@ -42,14 +42,11 @@ export default function GlobalAssistant({
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState('');
-  const [recording, setRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPos = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createRecognizer>>(null);
-  const recorderRef = useRef<ReturnType<typeof createRecorder> | null>(null);
   const voiceOnRef = useRef(false);
-  const holdRef = useRef(false);
   const loopRef = useRef<VoiceLoop | null>(null);
   const busyRef = useRef(false);
   const speakingRef = useRef(false);
@@ -94,7 +91,7 @@ export default function GlobalAssistant({
       onStart: () => setListening(true),
       onEnd: () => {
         setListening(false);
-        if (voiceOnRef.current && continuous && !holdRef.current && !busyRef.current && !speakingRef.current) {
+        if (voiceOnRef.current && continuous && !busyRef.current && !speakingRef.current) {
           try { rec?.start(); } catch { /* ignore */ }
         }
       },
@@ -102,8 +99,7 @@ export default function GlobalAssistant({
       onInterim: (text) => setInterim(text),
       onFinal: (text) => {
         setInterim('');
-        if (holdRef.current) setInput((v) => (v ? `${v} ${text}` : text));
-        else void send(text);
+        if (text.trim()) void send(text);
       },
     });
     if (!rec) { setError('Voice input is not available in this browser.'); return; }
@@ -129,6 +125,13 @@ export default function GlobalAssistant({
   };
 
   const toggleVoice = () => {
+    if (voiceOn && (speakingRef.current || speaking)) {
+      stopReply();
+      speakingRef.current = false;
+      setSpeaking(false);
+      setInterim('Interrupted — still listening');
+      return;
+    }
     if (voiceOn) {
       voiceOnRef.current = false;
       loopRef.current?.stop();
@@ -140,29 +143,16 @@ export default function GlobalAssistant({
       setInterim('');
       return;
     }
+    if (!groqConfigured() && !speechRecognitionCtor()) {
+      setError('Add a Groq API key in Settings → Voice to start voice mode.');
+      navigate?.('settings');
+      return;
+    }
     setVoiceOn(true);
     voiceOnRef.current = true;
     setError('');
-    if (groqConfigured()) {
-      startCascade();
-      return;
-    }
-    startListen(true);
-  };
-
-  const pressTalkDown = () => {
-    if (groqConfigured()) return;
-    holdRef.current = true;
-    setVoiceOn(true);
-    voiceOnRef.current = true;
-    startListen(false);
-  };
-  const pressTalkUp = () => {
-    if (!holdRef.current) return;
-    holdRef.current = false;
-    stopListen();
-    const said = input.trim();
-    if (said) void send();
+    if (groqConfigured()) startCascade();
+    else startListen(true);
   };
 
   const pickFiles = async (files: FileList | null) => {
@@ -175,30 +165,41 @@ export default function GlobalAssistant({
     setAttachments((cur) => [...cur, ...next].slice(0, 6));
   };
 
-  const toggleRecord = async () => {
-    if (recording) {
-      const att = await recorderRef.current?.stop();
-      setRecording(false);
-      if (att) setAttachments((cur) => [...cur, att]);
-      return;
-    }
-    try {
-      recorderRef.current = createRecorder();
-      await recorderRef.current.start();
-      setRecording(true);
-    } catch {
-      setError('Microphone was blocked. You can attach an audio file instead.');
-    }
-  };
-
   const send = async (text?: string) => {
-    const content = (text ?? input).trim();
-    if ((!content && !attachments.length) || busyRef.current) return;
+    let content = (text ?? input).trim();
+    const audioAtt = attachments.filter((a) => a.kind === 'audio' || isAudioFile(a));
+    const pendingAtt = attachments.filter((a) => a.kind !== 'audio' && !isAudioFile(a));
+    if (audioAtt.length) {
+      if (!groqConfigured()) {
+        setError('Audio files need a Groq key in Settings → Voice.');
+        navigate?.('settings');
+        return;
+      }
+      setInterim('Transcribing…');
+      const spoken: string[] = [];
+      for (const att of audioAtt) {
+        if (!att.dataUrl) continue;
+        const result = await transcribeAudio(dataUrlToBlob(att.dataUrl));
+        if (result.text) spoken.push(result.text);
+        else if (result.error) setError(result.error);
+      }
+      setInterim('');
+      if (spoken.length) content = [content, `Transcript: ${spoken.join(' ')}`].filter(Boolean).join('\n').trim();
+      else if (!content && !pendingAtt.length) {
+        setError('Could not transcribe that audio. Use the waveform button to talk live.');
+        return;
+      }
+    }
+    if ((!content && !pendingAtt.length) || busyRef.current) return;
     const key = getOpenRouterKey();
     if (!key) { setError('Add an OpenRouter key in Settings first.'); return; }
     stopReply();
     setError(''); setInput('');
-    const user: Msg = { role: 'user', content: content || attachmentPromptFallback(attachments), attachments };
+    const user: Msg = {
+      role: 'user',
+      content: content || attachmentPromptFallback(pendingAtt),
+      attachments: pendingAtt.length ? pendingAtt : undefined,
+    };
     setAttachments([]);
     const next = [...messages, user];
     setMessages(next);
@@ -283,17 +284,17 @@ export default function GlobalAssistant({
 
   if (rail && !open) return null;
   const whisperOn = groqConfigured();
-  const voiceReady = whisperOn || Boolean(speechRecognitionCtor());
-  const voiceTitle = whisperOn
-    ? 'Voice mode - click to talk. Mic -> Whisper -> same chat -> Fish or browser voice.'
-    : 'Voice mode - click for continuous, or hold to talk';
+  const hasDraft = Boolean(input.trim() || attachments.length);
+  const voiceTitle = voiceOn
+    ? 'Voice is on — tap to stop. Tap while speaking to interrupt.'
+    : 'Start Voice. Stays on until you turn it off.';
 
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-transparent lg:hidden" onClick={onClose} />}
       <aside
         aria-hidden={!open}
-        className={`assistant-panel fixed z-50 flex flex-col bg-white/92 shadow-[-12px_0_40px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'} inset-y-0 right-0 lg:top-3 lg:bottom-3 lg:right-3 lg:rounded-[22px] lg:border lg:border-white/70`}
+        className={`assistant-panel fixed inset-y-0 right-0 z-50 flex flex-col border-l border-zinc-200/80 bg-white/96 shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
         style={{ width }}
       >
         <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize lg:block" onPointerDown={startDrag} />
@@ -305,7 +306,7 @@ export default function GlobalAssistant({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
               <p className="truncate text-[11px] text-zinc-500">
-                {listening ? 'Listening...' : speaking ? 'Speaking...' : recording ? 'Recording audio...' : voiceOn ? (whisperOn ? 'Voice on / Whisper' : 'Voice on') : 'One chat for answers and actions'}
+                {listening ? 'Listening…' : speaking ? 'Speaking…' : voiceOn ? 'Voice on — tap waveform to stop or interrupt' : 'Works from any page'}
               </p>
             </div>
           </div>
@@ -318,8 +319,7 @@ export default function GlobalAssistant({
             >
               <Globe className="h-4 w-4" />
             </button>
-            <button type="button" onClick={onRail} className="hidden rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100 lg:inline-flex" title="Collapse to rail"><PanelRight className="h-4 w-4" /></button>
-            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100" title="Close Arrodes"><X className="h-4 w-4" /></button>
           </div>
         </div>
 
@@ -381,11 +381,11 @@ export default function GlobalAssistant({
           {error && <p className="text-xs text-zinc-500">{error}</p>}
         </div>
 
-        <form className="border-t border-zinc-200/70 p-3 pb-6" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          {(listening || speaking || interim) && (
+        <form className="border-t border-zinc-200/70 p-3 pb-5" onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
+          {(listening || speaking || interim || voiceOn) && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">
-              <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : 'bg-zinc-300'}`} />
-              {listening ? (interim || 'Listening - press the mic to stop') : speaking ? 'Speaking reply' : interim}
+              <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : voiceOn ? 'bg-zinc-400' : 'bg-zinc-300'}`} />
+              {listening ? (interim || 'Listening — keep talking, I wait for a pause') : speaking ? 'Speaking — tap waveform to interrupt' : voiceOn ? 'Voice stays on until you tap the waveform' : interim}
             </div>
           )}
           {attachments.length > 0 && (
@@ -399,40 +399,46 @@ export default function GlobalAssistant({
           )}
           <div className="flex items-end gap-1.5 rounded-2xl bg-zinc-100 px-2 py-2">
             <input ref={fileRef} type="file" accept="image/*,video/*,audio/*" multiple className="hidden" onChange={(e) => { void pickFiles(e.target.files); e.target.value = ''; }} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200" title="Attach image, video or audio">
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200" title="Attach a file">
               <Paperclip className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={() => void toggleRecord()} className={`flex h-8 w-8 items-center justify-center rounded-full ${recording ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-200'}`} title={recording ? 'Stop recording' : 'Record audio'}>
-              {recording ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
-            </button>
-            {voiceReady && (
-              <button
-                type="button"
-                onClick={toggleVoice}
-                onPointerDown={(e) => { if (e.button === 0 && !voiceOn) pressTalkDown(); }}
-                onPointerUp={() => { if (holdRef.current) pressTalkUp(); }}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${voiceOn || listening ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-200'}`}
-                title={voiceTitle}
-              >
-                {voiceOn || listening ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-              </button>
-            )}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (hasDraft) void send(); } }}
               rows={1}
-              placeholder={searchOn ? 'Ask, attach, or search the web...' : 'Ask anything...'}
+              placeholder={voiceOn ? 'Voice on — type to send instead…' : 'Ask anything…'}
               className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
             />
-            <button type="submit" disabled={busy || (!input.trim() && !attachments.length)} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30">
-              <Send className="h-3.5 w-3.5" />
-            </button>
+            {hasDraft ? (
+              <button type="submit" disabled={busy} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30" title="Send">
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white"
+                title={voiceTitle}
+                aria-label={voiceOn ? 'Stop voice' : 'Start Voice'}
+              >
+                {voiceOn || listening || speaking ? <Mic className="h-3.5 w-3.5" /> : <AudioLines className="h-3.5 w-3.5" />}
+              </button>
+            )}
           </div>
         </form>
       </aside>
     </>
   );
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [head, body] = dataUrl.split(',');
+  const mime = /:(.*?);/.exec(head)?.[1] || 'audio/webm';
+  const bin = atob(body || '');
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
 }
 
 function attachmentPromptFallback(attachments: ChatAttachment[]) {

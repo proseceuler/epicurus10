@@ -34,8 +34,9 @@ function systemPrompt(page: PageId, search: boolean) {
   return [
     'You are the epicure study assistant for a Grade 10 student.',
     'Stay on schoolwork and productivity. Do not write or edit app code.',
-    `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
-    'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
+    `The student is currently on ${PAGE_LABEL[page] ?? page}. That is only context — you have global access to every module from any page.`,
+    'Never tell them to open another page. Never say you could not get a reply if you can call a get_* tool.',
+    'Use tools to read their real tasks, notes, grades, habits, timetable, focus stats and spending when the question is about their data.',
     'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
     'If they say "to do list", "todos", "my tasks", or "what is due", call get_todos. Voice arrives as text — never say you cannot hear audio.',
     'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment, add_note, add_flashcard, update_flashcard, delete_flashcard, start_focus_session.',
@@ -68,8 +69,11 @@ export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolea
 function guessReadTools(text: string): Array<{ name: string; args: Record<string, unknown> }> {
   const t = text.toLowerCase();
   const tools: Array<{ name: string; args: Record<string, unknown> }> = [];
-  if (/\b(to\s*do|to-do|todos?|tasks?)\b/.test(t) && !/\b(add|create|make|complete|finish|edit)\b/.test(t)) {
-    tools.push({ name: 'get_todos', args: { only_pending: true } });
+  if (
+    (/\b(to\s*do|to-do|todos?|todo list|task list|tasks?)\b/.test(t) || /\bstats?\b/.test(t))
+    && !/\b(add|create|make|complete|finish|edit)\b/.test(t)
+  ) {
+    tools.push({ name: 'get_todos', args: { only_pending: false } });
   }
   if (/\b(habit|habits|streak)\b/.test(t) && !/\b(add|create|mark|check)\b/.test(t)) {
     tools.push({ name: 'get_habits', args: {} });
@@ -84,7 +88,7 @@ function guessReadTools(text: string): Array<{ name: string; args: Record<string
   if (/\b(flashcard|cards?|deck)\b/.test(t) && !/\b(add|create|delete|edit)\b/.test(t)) {
     tools.push({ name: 'get_flashcards', args: {} });
   }
-  if (/\b(baon|allowance|spent|spending|budget)\b/.test(t) && !/\b(log|set|add)\b/.test(t)) {
+  if (/\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) && !/\b(log|set|add)\b/.test(t)) {
     tools.push({ name: 'get_finance_summary', args: {} });
   }
   if (/\b(timetable|class hub|classhub|today'?s class)\b/.test(t)) {
@@ -92,6 +96,13 @@ function guessReadTools(text: string): Array<{ name: string; args: Record<string
   }
   if (/\b(note|notes|vault)\b/.test(t) && !/\b(add|save|create)\b/.test(t)) {
     tools.push({ name: 'get_notes', args: { query: text } });
+  }
+  if (/\b(kanban|board cards?)\b/.test(t) && !/\b(add|move|create)\b/.test(t)) {
+    tools.push({ name: 'get_kanban', args: {} });
+  }
+  if (/\b(pomodoro|focus|stats?|this week|week)\b/.test(t) && !/\b(start|add)\b/.test(t)) {
+    tools.push({ name: 'get_focus_stats', args: { days: 7 } });
+    tools.push({ name: 'get_habit_stats', args: {} });
   }
   return tools;
 }
@@ -328,7 +339,7 @@ export async function runAssistantTurn(opts: {
   }
 
   return {
-    content: chat.content || (pending ? 'I can save this if you confirm.' : retrieval ? summarizeRetrieval(retrieval) : 'I could not get a reply. Try again, or open the page in the sidebar.'),
+    content: chat.content || (pending ? 'I can save this if you confirm.' : retrieval ? summarizeRetrieval(retrieval) : 'I could not get a reply. Try asking again in a moment.'),
     pending,
     usedLayers,
     sources: sources.length ? sources : undefined,

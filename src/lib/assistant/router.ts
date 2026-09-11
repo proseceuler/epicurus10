@@ -37,9 +37,9 @@ function systemPrompt(page: PageId, search: boolean) {
     `The student is currently on ${PAGE_LABEL[page] ?? page}.`,
     'Use tools to read their real tasks, notes, grades, habits, timetable and spending when the question is about their data.',
     'Call search_epicure for how a page works and for semantic search over notes. Prefer that over guessing.',
-    'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment, add_note, add_flashcard, start_focus_session.',
+    'These writes apply immediately (do not ask to confirm): add_todo, update_todo, mark_habit, add_habit, add_calendar_event, add_kanban_task, move_kanban_task, mark_attendance, update_class_hub, add_class_link, add_assessment, add_note, add_flashcard, update_flashcard, delete_flashcard, start_focus_session.',
     '"I attended math today" -> mark_attendance. "Move lab report to review" -> move_kanban_task. "Log science written work 18/20 term 1" -> add_assessment.',
-    '"Save a note titled titration: used 0.1M HCl" -> add_note. "Add flashcard in Science, front mitochondria, back powerhouse" -> add_flashcard. "Start focus for math" -> start_focus_session.',
+    '"Save a note titled titration: used 0.1M HCl" -> add_note. "Add flashcard in Science, front mitochondria, back powerhouse" -> add_flashcard. "Change the mitochondria card back to energy organelle" -> update_flashcard. "Delete the mitochondria card" -> delete_flashcard. "Add a habit called read 20 pages" -> add_habit. "Start focus for math" -> start_focus_session.',
     'For Friday/tomorrow leave the date in the title or pass YYYY-MM-DD. Chem maps to science.',
     'Money writes still wait for confirm: log_expense, set_allowance, add_savings_goal.',
     '"Set weekly allowance to 500" -> set_allowance. "Savings goal: earphones 1500" -> add_savings_goal.',
@@ -51,7 +51,7 @@ function systemPrompt(page: PageId, search: boolean) {
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
-  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move)\b/.test(t);
+  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move|delete|remove|check)\b/.test(t);
   const actionNoun = /\b(task|todo|to-do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
   const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);

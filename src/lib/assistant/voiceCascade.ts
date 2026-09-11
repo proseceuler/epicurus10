@@ -23,12 +23,14 @@ function rmsFromTimeDomain(buf: Uint8Array) {
 export async function transcribeAudio(blob: Blob): Promise<{ text: string; error?: string }> {
   const key = getGroqKey();
   if (!key) return { text: '', error: 'Add a Groq key in Settings for Whisper.' };
-  const file = new File([blob], 'speech.webm', { type: blob.type || 'audio/webm' });
+  const ext = (blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+  const file = new File([blob], `speech.${ext}`, { type: blob.type || 'audio/webm' });
   const body = new FormData();
   body.append('file', file);
-  body.append('model', 'whisper-large-v3-turbo');
+  body.append('model', 'whisper-large-v3');
   body.append('response_format', 'json');
-  body.append('language', 'en');
+  body.append('temperature', '0');
+  body.append('prompt', 'Student talking to a study assistant. English or Filipino. Tasks, grades, baon, canteen, class hub.');
   const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },
@@ -172,14 +174,23 @@ export function startVoiceLoop(opts: {
     }
   };
 
+  const ensureMic = async () => {
+    if (stream && ctx) return;
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    ctx = new AudioContext();
+    if (ctx.state === 'suspended') await ctx.resume();
+  };
+
   const listenOnce = async () => {
     await waitUntilReady();
     if (stopped || !opts.shouldContinue()) return;
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    ctx = new AudioContext();
+    await ensureMic();
+    if (!stream || !ctx) return;
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
+    analyser.fftSize = 2048;
     source.connect(analyser);
     const samples = new Uint8Array(analyser.fftSize);
 
@@ -195,7 +206,7 @@ export function startVoiceLoop(opts: {
     let silentMs = 0;
     let last = performance.now();
     const startedAt = last;
-    rec.start(200);
+    rec.start(250);
     opts.onListening?.(true);
     opts.onStatus?.('listening');
 
@@ -212,26 +223,22 @@ export function startVoiceLoop(opts: {
         const now = performance.now();
         const dt = now - last;
         last = now;
-        if (level > 0.09) {
+        const gate = heard ? 0.05 : 0.072;
+        if (level > gate) {
           voicedMs += dt;
-          if (voicedMs > 220) {
-            heard = true;
-            silentMs = 0;
-          }
-        } else {
-          voicedMs = 0;
-          if (heard) {
-            silentMs += dt;
-            if (silentMs > 1200) {
-              try { rec.stop(); } catch { /* ignore */ }
-              resolve();
-              return;
-            }
-          } else if (now - startedAt > 12_000) {
+          silentMs = 0;
+          if (voicedMs > 160) heard = true;
+        } else if (heard) {
+          silentMs += dt;
+          if (silentMs > 2000) {
             try { rec.stop(); } catch { /* ignore */ }
             resolve();
             return;
           }
+        } else if (now - startedAt > 20_000) {
+          try { rec.stop(); } catch { /* ignore */ }
+          resolve();
+          return;
         }
         raf = requestAnimationFrame(tick);
       };
@@ -240,14 +247,11 @@ export function startVoiceLoop(opts: {
     });
 
     opts.onListening?.(false);
-    stream.getTracks().forEach((t) => t.stop());
-    try { await ctx.close(); } catch { /* ignore */ }
-    ctx = null;
-    stream = null;
+    try { source.disconnect(); } catch { /* ignore */ }
 
     if (stopped || !chunks.length) return;
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-    if (blob.size < 8000) {
+    if (blob.size < 5000) {
       if (!stopped) void listenOnce();
       return;
     }

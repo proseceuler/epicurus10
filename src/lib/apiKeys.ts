@@ -7,6 +7,12 @@ export const PINECONE_KEY = 'epicure-pinecone-key';
 export const PINECONE_HOST = 'epicure-pinecone-host';
 export const GROQ_KEY = 'epicure-groq-key';
 export const FISH_KEY = 'epicure-fish-key';
+export const KOKORO_URL = 'epicure-kokoro-url';
+export const KOKORO_KEY = 'epicure-kokoro-key';
+export const KOKORO_VOICE = 'epicure-kokoro-voice';
+export const TTS_ENGINE = 'epicure-tts-engine';
+
+export type TtsEngine = 'auto' | 'kokoro' | 'fish' | 'browser';
 
 function read(key: string, fallback = '') {
   if (typeof window === 'undefined') return fallback;
@@ -38,6 +44,20 @@ export const getGroqKey = () =>
 
 export const getFishKey = () =>
   read(FISH_KEY, import.meta.env.VITE_FISH_API_KEY || '');
+
+export const getKokoroUrl = () =>
+  read(KOKORO_URL, import.meta.env.VITE_KOKORO_URL || '');
+
+export const getKokoroKey = () =>
+  read(KOKORO_KEY, import.meta.env.VITE_KOKORO_API_KEY || '');
+
+export const getKokoroVoice = () =>
+  read(KOKORO_VOICE, import.meta.env.VITE_KOKORO_VOICE || 'af_heart') || 'af_heart';
+
+export const getTtsEngine = (): TtsEngine => {
+  const raw = read(TTS_ENGINE, import.meta.env.VITE_TTS_ENGINE || 'auto');
+  return raw === 'kokoro' || raw === 'fish' || raw === 'browser' || raw === 'auto' ? raw : 'auto';
+};
 
 export const getDefaultModel = () => read(MODEL_KEY);
 

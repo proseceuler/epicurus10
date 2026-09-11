@@ -58,6 +58,24 @@ async function speakFish(text: string): Promise<HTMLAudioElement | null> {
 
 let currentAudio: HTMLAudioElement | null = null;
 
+function waitForSpeechEnd(): Promise<void> {
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const tick = () => {
+      if (!window.speechSynthesis?.speaking && !window.speechSynthesis?.pending) {
+        resolve();
+        return;
+      }
+      if (performance.now() - started > 30_000) {
+        resolve();
+        return;
+      }
+      window.setTimeout(tick, 80);
+    };
+    tick();
+  });
+}
+
 export async function speakReply(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
   const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, ' ').trim().slice(0, 600);
   if (!clean) { hooks?.onEnd?.(); return; }
@@ -66,18 +84,32 @@ export async function speakReply(text: string, hooks?: { onStart?: () => void; o
     const audio = await speakFish(clean);
     if (audio) {
       currentAudio = audio;
-      audio.onplay = () => hooks?.onStart?.();
-      audio.onended = () => {
-        hooks?.onEnd?.();
-        currentAudio = null;
-      };
-      await audio.play();
+      await new Promise<void>((resolve) => {
+        audio.onplay = () => hooks?.onStart?.();
+        audio.onended = () => {
+          hooks?.onEnd?.();
+          currentAudio = null;
+          resolve();
+        };
+        audio.onerror = () => {
+          hooks?.onEnd?.();
+          currentAudio = null;
+          resolve();
+        };
+        void audio.play().catch(() => {
+          hooks?.onEnd?.();
+          currentAudio = null;
+          resolve();
+        });
+      });
       return;
     }
   } catch {
     /* fall through */
   }
-  speakBrowser(clean, hooks);
+  hooks?.onStart?.();
+  speakBrowser(clean, { onStart: hooks?.onStart, onEnd: hooks?.onEnd });
+  await waitForSpeechEnd();
 }
 
 export function stopReply() {
@@ -86,14 +118,18 @@ export function stopReply() {
   stopBrowser();
 }
 
+export type VoiceStatus = 'idle' | 'listening' | 'transcribing';
+
 export interface VoiceLoop {
   stop: () => void;
 }
 
 export function startVoiceLoop(opts: {
   onListening?: (on: boolean) => void;
+  onStatus?: (status: VoiceStatus) => void;
   onLevel?: (level: number) => void;
-  onTranscript: (text: string) => void;
+  onCaption?: (text: string) => void;
+  onTranscript: (text: string) => void | Promise<void>;
   onError?: (msg: string) => void;
   shouldContinue: () => boolean;
 }): VoiceLoop {
@@ -106,13 +142,21 @@ export function startVoiceLoop(opts: {
     stopped = true;
     cancelAnimationFrame(raf);
     opts.onListening?.(false);
+    opts.onStatus?.('idle');
     try { ctx?.close(); } catch { /* ignore */ }
     stream?.getTracks().forEach((t) => t.stop());
     ctx = null;
     stream = null;
   };
 
+  const waitUntilReady = async () => {
+    while (!stopped && opts.shouldContinue() === false) {
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  };
+
   const listenOnce = async () => {
+    await waitUntilReady();
     if (stopped || !opts.shouldContinue()) return;
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     ctx = new AudioContext();
@@ -134,6 +178,7 @@ export function startVoiceLoop(opts: {
     let last = performance.now();
     rec.start(200);
     opts.onListening?.(true);
+    opts.onStatus?.('listening');
 
     await new Promise<void>((resolve) => {
       const tick = () => {
@@ -171,16 +216,22 @@ export function startVoiceLoop(opts: {
     ctx = null;
     stream = null;
 
-    if (stopped || !opts.shouldContinue() || !chunks.length) return;
+    if (stopped || !chunks.length) return;
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
     if (blob.size < 2000) {
-      if (opts.shouldContinue() && !stopped) void listenOnce();
+      if (!stopped) void listenOnce();
       return;
     }
+    opts.onStatus?.('transcribing');
+    opts.onCaption?.('Transcribing…');
     const result = await transcribeAudio(blob);
     if (result.error) opts.onError?.(result.error);
-    else if (result.text) opts.onTranscript(result.text);
-    if (opts.shouldContinue() && !stopped) void listenOnce();
+    else if (result.text) {
+      opts.onCaption?.(result.text);
+      await opts.onTranscript(result.text);
+    }
+    opts.onStatus?.('idle');
+    if (!stopped) void listenOnce();
   };
 
   void listenOnce().catch((err) => {

@@ -1,4 +1,4 @@
-/** User gothic silver Arrodes frame (exact attached PNG). Mercury fills the glass hole. */
+/** User gothic silver Arrodes frame. Mercury fills the glass hole. */
 import { ARRODES_FRAME_A } from '@/components/arrodesFrameA';
 import { ARRODES_FRAME_B } from '@/components/arrodesFrameB';
 import { ARRODES_FRAME_C } from '@/components/arrodesFrameC';

@@ -72,3 +72,316 @@ export function stripReasoning(raw: string, fallback = 'Hey — what do you need
   if (!text || LEAK_RE.test(text)) return fallback;
   return text;
 }
+
+export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
+  const t = text.toLowerCase();
+  const layers = new Set<AssistantLayer>(['chat']);
+  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move|delete|remove|check|show|list|open)\b/.test(t);
+  const actionNoun = /\b(task|tasks|todo|todos|to-do|to do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
+  const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
+  const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
+  if (actionVerb && actionNoun) layers.add('execute');
+  if (/\b(attended|skipped|attend|skip)\b/.test(t)) layers.add('execute');
+  if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon|todos?|to-?dos?))\b/.test(t)) layers.add('data');
+  if (guessReadTools(t).length) layers.add('data');
+  if (hasMedia) layers.add('chat');
+  if (live) layers.add('chat');
+  return [...layers];
+}
+
+function guessReadTools(text: string): Array<{ name: string; args: Record<string, unknown> }> {
+  const t = text.toLowerCase();
+  const tools: Array<{ name: string; args: Record<string, unknown> }> = [];
+  if (
+    (/\b(to\s*do|to-do|todos?|todo list|task list|tasks?)\b/.test(t) || /\bstats?\b/.test(t))
+    && !/\b(add|create|make|complete|finish|edit)\b/.test(t)
+  ) {
+    tools.push({ name: 'get_todos', args: { only_pending: false } });
+  }
+  if (/\b(habit|habits|streak)\b/.test(t) && !/\b(add|create|mark|check)\b/.test(t)) {
+    tools.push({ name: 'get_habits', args: {} });
+    tools.push({ name: 'get_habit_stats', args: {} });
+  }
+  if (/\b(grade|grades|score|gpa)\b/.test(t) && !/\b(add|log|record)\b/.test(t)) {
+    tools.push({ name: 'get_grades', args: {} });
+  }
+  if (/\b(calendar|schedule|due|deadline|event)\b/.test(t) && !/\b(add|create|make)\b/.test(t)) {
+    tools.push({ name: 'get_calendar', args: {} });
+  }
+  if (/\b(flashcard|cards?|deck)\b/.test(t) && !/\b(add|create|delete|edit)\b/.test(t)) {
+    tools.push({ name: 'get_flashcards', args: {} });
+  }
+  if (/\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) && !/\b(log|set|add)\b/.test(t)) {
+    tools.push({ name: 'get_finance_summary', args: {} });
+  }
+  if (/\b(timetable|class hub|classhub|today'?s class)\b/.test(t)) {
+    tools.push({ name: 'get_timetable', args: {} });
+  }
+  if (/\b(note|notes|vault)\b/.test(t) && !/\b(add|save|create)\b/.test(t)) {
+    tools.push({ name: 'get_notes', args: { query: text } });
+  }
+  if (/\b(kanban|board cards?)\b/.test(t) && !/\b(add|move|create)\b/.test(t)) {
+    tools.push({ name: 'get_kanban', args: {} });
+  }
+  if (/\b(pomodoro|focus|stats?|this week|week)\b/.test(t) && !/\b(start|add)\b/.test(t)) {
+    tools.push({ name: 'get_focus_stats', args: { days: 7 } });
+    tools.push({ name: 'get_habit_stats', args: {} });
+  }
+  return tools;
+}
+
+interface ORMessage {
+  role: string;
+  content: unknown;
+  tool_calls?: Array<{ id?: string; function: { name: string; arguments: string } }>;
+}
+
+async function complete(opts: {
+  key: string;
+  layer: AssistantLayer;
+  messages: ORMessage[];
+  tools?: ReturnType<typeof listToolDefs>;
+  temperature?: number;
+  preferVision?: boolean;
+  maxTokens?: number;
+}): Promise<{ content: string; tool_calls: Array<{ function: { name: string; arguments: string } }>; model: string }> {
+  const chain = [
+    opts.preferVision ? VISION_MODELS[0] : LAYER_MODELS[opts.layer],
+    ...LAYER_FALLBACKS[opts.layer],
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastErr = 'Assistant request failed.';
+  for (const model of chain) {
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${opts.key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://epicure.app',
+        'X-Title': 'epicure assistant',
+      },
+      body: JSON.stringify({
+        model,
+        messages: opts.messages,
+        tools: opts.tools?.length ? opts.tools : undefined,
+        temperature: opts.temperature ?? 0.35,
+        max_tokens: opts.maxTokens ?? 700,
+        reasoning: { exclude: true },
+      }),
+    });
+    if (!res.ok) {
+      lastErr = `Assistant request failed (${res.status}).`;
+      continue;
+    }
+    const data = await res.json();
+    const choice = data.choices?.[0]?.message;
+    return {
+      content: stripReasoning(String(choice?.content || ''), ''),
+      tool_calls: (choice?.tool_calls || []) as Array<{ function: { name: string; arguments: string } }>,
+      model,
+    };
+  }
+  throw new Error(lastErr);
+}
+
+function toApiMessages(history: ChatTurn[], page: PageId, search: boolean, voice = false): ORMessage[] {
+  const out: ORMessage[] = [{ role: 'system', content: systemPrompt(page, search, voice) }];
+  const keep = history.slice(-24);
+  for (const m of keep) {
+    if (m.role === 'user' && m.attachments?.length) {
+      const images = visionParts(m.attachments);
+      const text = [m.content, attachmentPrompt(m.attachments)].filter(Boolean).join('\n');
+      if (images.length) {
+        out.push({
+          role: 'user',
+          content: [{ type: 'text', text }, ...images],
+        });
+        continue;
+      }
+      out.push({ role: 'user', content: text });
+      continue;
+    }
+    out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+async function runCalls(
+  calls: Array<{ function: { name: string; arguments: string } }>,
+  ctx: ToolContext,
+) {
+  const reads: string[] = [];
+  const writes: PendingWrite[] = [];
+  const sources: { title: string; url: string }[] = [];
+  for (const call of calls) {
+    let args: Record<string, unknown> = {};
+    try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* ignore */ }
+    if (isWriteTool(call.function.name) && !AUTO_APPLY_WRITES.has(call.function.name)) {
+      writes.push({ name: call.function.name, args });
+      continue;
+    }
+    const result = await dispatchTool(call.function.name, args, ctx);
+    reads.push(`${call.function.name}: ${JSON.stringify(result).slice(0, 1600)}`);
+    if (call.function.name === 'web_search' && result && typeof result === 'object') {
+      const rows = (result as { results?: Array<{ title: string; url: string }> }).results || [];
+      sources.push(...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.url })));
+    }
+    if (call.function.name === 'search_epicure' && result && typeof result === 'object') {
+      const rows = (result as { hits?: Array<{ title: string; page?: string }> }).hits || [];
+      sources.push(...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.page ? `/${r.page}` : '/notes' })));
+    }
+  }
+  return { reads, writes, sources };
+}
+
+export async function runAssistantTurn(opts: {
+  key: string;
+  page: PageId;
+  history: ChatTurn[];
+  searchEnabled: boolean;
+  voice?: boolean;
+  ctx: ToolContext;
+}): Promise<RouterReply> {
+  const last = opts.history[opts.history.length - 1];
+  const hasMedia = Boolean(last?.attachments?.length);
+  const voice = Boolean(opts.voice);
+  const layers = classifyIntent(last?.content || '', hasMedia, opts.searchEnabled);
+  if (voice && !layers.includes('execute') && !hasMedia) {
+    layers.length = 0;
+    layers.push('chat');
+  }
+  const usedLayers = [...layers];
+  const apiMessages = toApiMessages(opts.history, opts.page, opts.searchEnabled, voice);
+  const ctx = opts.ctx;
+
+  let retrieval = '';
+  let pending: PendingWrite | undefined;
+  const sources: { title: string; url: string }[] = [];
+
+  const guessed = voice && !layers.includes('execute') ? [] : guessReadTools(last?.content || '');
+  if (guessed.length) {
+    for (const call of guessed) {
+      try {
+        const result = await dispatchTool(call.name, call.args, ctx);
+        retrieval += `${call.name}: ${JSON.stringify(result).slice(0, 1600)}\n`;
+      } catch (err) {
+        retrieval += `${call.name}: ${err instanceof Error ? err.message : 'failed'}\n`;
+      }
+    }
+  }
+
+  if (layers.includes('data')) {
+    const dataTools = listToolDefs({ webSearch: false, writes: false });
+    const data = await complete({
+      key: opts.key,
+      layer: 'data',
+      messages: [
+        ...apiMessages,
+        { role: 'user', content: 'Search epicure help and the student vault for anything relevant. Prefer search_epicure, then summarize the raw facts only.' },
+      ],
+      tools: dataTools,
+      temperature: 0.1,
+    });
+    if (data.tool_calls.length) {
+      const ran = await runCalls(data.tool_calls, ctx);
+      retrieval += ran.reads.join('\n');
+      sources.push(...ran.sources);
+    } else if (data.content) {
+      retrieval += data.content;
+    }
+  }
+
+  if (layers.includes('execute')) {
+    const execTools = listToolDefs({ webSearch: opts.searchEnabled, writes: true });
+    const exec = await complete({
+      key: opts.key,
+      layer: 'execute',
+      messages: [
+        ...apiMessages,
+        ...(retrieval ? [{ role: 'user' as const, content: `Vault facts:\n${retrieval.slice(0, 2500)}` }] : []),
+      ],
+      tools: execTools,
+      temperature: 0.15,
+    });
+    if (exec.tool_calls.length) {
+      const ran = await runCalls(exec.tool_calls, ctx);
+      retrieval += (retrieval ? '\n' : '') + ran.reads.join('\n');
+      sources.push(...ran.sources);
+      pending = ran.writes[0];
+    }
+  }
+
+  const chatTools = listToolDefs({ webSearch: opts.searchEnabled, writes: false });
+  const chatMessages: ORMessage[] = [...apiMessages];
+  if (retrieval) {
+    chatMessages.push({
+      role: 'user',
+      content: `Internal tool results (do not mention model names):\n${retrieval.slice(0, 3500)}\nAnswer the student from this plus the conversation.${pending ? `\nA write is waiting for confirm: ${pending.name}.` : ''}`,
+    });
+  }
+
+  const chat = await complete({
+    key: opts.key,
+    layer: 'chat',
+    messages: chatMessages,
+    tools: voice ? undefined : chatTools,
+    temperature: voice ? 0.62 : 0.4,
+    preferVision: hasMedia,
+    maxTokens: voice ? 220 : 700,
+  });
+
+  if (chat.tool_calls.length) {
+    const ran = await runCalls(chat.tool_calls, ctx);
+    sources.push(...ran.sources);
+    if (ran.writes[0] && !pending) pending = ran.writes[0];
+    if (ran.reads.length) {
+      const follow = await complete({
+        key: opts.key,
+        layer: 'chat',
+        messages: [
+          ...chatMessages,
+          { role: 'assistant', content: chat.content || '' },
+          { role: 'user', content: `More tool results:\n${ran.reads.join('\n')}\nFinish the answer.` },
+        ],
+        temperature: 0.3,
+      });
+      return {
+        content: stripReasoning(follow.content || chat.content || 'Here is what I found.'),
+        pending,
+        usedLayers,
+        sources: sources.length ? sources : undefined,
+      };
+    }
+  }
+
+  if (!chat.content && retrieval) {
+    const follow = await complete({
+      key: opts.key,
+      layer: 'chat',
+      messages: [
+        ...chatMessages,
+        { role: 'user', content: `Tool results:\n${retrieval.slice(0, 3500)}\nAnswer the student in a short list. Do not say you lack an answer.` },
+      ],
+      temperature: 0.2,
+    });
+    return {
+      content: stripReasoning(follow.content || summarizeRetrieval(retrieval)),
+      pending,
+      usedLayers,
+      sources: sources.length ? sources : undefined,
+    };
+  }
+
+  return {
+    content: stripReasoning(chat.content || (pending ? 'I can save this if you confirm.' : retrieval ? summarizeRetrieval(retrieval) : 'I could not get a reply. Try asking again in a moment.')),
+    pending,
+    usedLayers,
+    sources: sources.length ? sources : undefined,
+  };
+}
+
+function summarizeRetrieval(raw: string) {
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (!text) return 'Nothing came back from your vault.';
+  return `Here is what I found:\n\n${text.slice(0, 1200)}`;
+}

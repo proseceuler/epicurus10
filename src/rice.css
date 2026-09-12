@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-12 — Gemini gothic frame PNG embedded + glass clip */
+/* vercel rebuild 2026-09-12 — user gothic PNG frame + hole mask + enlarge */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
@@ -8,9 +8,6 @@
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
-/* Site-wide monochrome. Notes/board/graph lift ONLY the workspace so
-   canvases keep hue. Chrome (sidebar, header, dock, count badges)
-   stays grayscale so Dynamic Badges never flash red/color. */
 .rice-shell.rice-shell--mono {
   filter: grayscale(1);
 }
@@ -58,10 +55,7 @@
   background-size: 180px 180px, 90px 90px, 70px 70px;
 }
 
-.ht-shell {
-  color: #3f3f46;
-}
-
+.ht-shell { color: #3f3f46; }
 .ht-card,
 .ht-sheet {
   background: transparent;
@@ -70,13 +64,7 @@
   box-shadow: none;
   color: #3f3f46;
 }
-
-.ht-flat {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
+.ht-flat { background: transparent; border: 0; box-shadow: none; }
 .ht-label {
   font-size: 11px;
   font-weight: 600;
@@ -84,22 +72,10 @@
   text-transform: uppercase;
   color: #71717a;
 }
-
-.ht-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
+.ht-table { width: 100%; border-collapse: collapse; }
 .ht-table th,
-.ht-table td {
-  border: 1px solid #e4e4e7;
-  vertical-align: middle;
-}
-
-.ht-table thead th {
-  background: #fafafa;
-}
-
+.ht-table td { border: 1px solid #e4e4e7; vertical-align: middle; }
+.ht-table thead th { background: #fafafa; }
 .ht-hscroll {
   display: flex;
   gap: 2.5rem;
@@ -107,41 +83,18 @@
   scroll-snap-type: x mandatory;
   padding-bottom: 1.5rem;
 }
-
-.ht-pane {
-  flex: 0 0 100%;
-  min-width: 100%;
-  scroll-snap-align: start;
-}
-
-.hud-panel {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
+.ht-pane { flex: 0 0 100%; min-width: 100%; scroll-snap-align: start; }
+.hud-panel { background: transparent; border: 0; box-shadow: none; }
 .hud-sigil {
   color: #27272a;
   transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease;
 }
-
-.hud-sigil-frame {
-  width: 100%;
-  min-height: 14rem;
-  display: flex;
-  align-items: center;
-}
-
-.hud-sigil-frame pre {
-  width: 100%;
-  white-space: pre;
-}
-
+.hud-sigil-frame { width: 100%; min-height: 14rem; display: flex; align-items: center; }
+.hud-sigil-frame pre { width: 100%; white-space: pre; }
 .hud-awake .hud-sigil {
   color: #18181b;
   text-shadow: 0 0 24px rgba(24, 24, 27, 0.18);
 }
-
 .rice-sidebar .rice-nav-label {
   opacity: 0;
   width: 0;
@@ -149,45 +102,25 @@
   white-space: nowrap;
   transition: opacity 160ms ease;
 }
-
 .rice-sidebar:hover .rice-nav-label,
-.rice-sidebar.w-56 .rice-nav-label {
-  opacity: 1;
-  width: auto;
-}
-
+.rice-sidebar.w-56 .rice-nav-label { opacity: 1; width: auto; }
 @media (max-width: 1023px) {
-  .rice-sidebar .rice-nav-label {
-    opacity: 1;
-    width: auto;
-  }
+  .rice-sidebar .rice-nav-label { opacity: 1; width: auto; }
 }
-
 @media (min-width: 1024px) {
   .rice-main {
     padding-left: 4.75rem;
     transition: padding-left 280ms ease, padding-right 280ms ease;
   }
-  .rice-sidebar:hover ~ .rice-main {
-    padding-left: 15.5rem;
-  }
-  .rice-shell.assistant-open .rice-main {
-    padding-right: var(--assistant-w, 340px);
-  }
+  .rice-sidebar:hover ~ .rice-main { padding-left: 15.5rem; }
+  .rice-shell.assistant-open .rice-main { padding-right: var(--assistant-w, 340px); }
 }
-
-.rice-palette {
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
-}
-
+.rice-palette { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12); }
 .assistant-panel {
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
-
-.assistant-panel[data-voice='1'] form {
-  border-top: 0 !important;
-}
+.assistant-panel[data-voice='1'] form { border-top: 0 !important; }
 
 .arrodes-stage {
   display: flex;
@@ -195,18 +128,20 @@
   justify-content: center;
   padding: 0.15rem 0 0.4rem;
 }
-
 .arrodes-well {
   position: relative;
-  width: 128px;
+  width: 108px;
   aspect-ratio: 486 / 600;
   animation: arrodes-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
   background: transparent;
   border: 0;
   outline: 0;
+  transform-origin: center bottom;
+  transition: width 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
+.arrodes-stage[data-active='1'] .arrodes-well { width: 156px; }
+.arrodes-stage[data-expanded='1'] .arrodes-well { width: 214px; }
 .arrodes-blob,
 .arrodes-glass,
 .arrodes-frame {
@@ -215,48 +150,48 @@
   width: 100%;
   height: 100%;
 }
-
 .arrodes-blob {
   z-index: 1;
-  clip-path: polygon(42.59% 11.17%, 47.12% 11.83%, 51.65% 13.17%, 56.17% 11.50%, 60.70% 11.83%, 65.23% 12.67%, 69.75% 14.00%, 74.07% 16.50%, 75.51% 20.00%, 79.63% 21.17%, 80.04% 24.83%, 80.04% 28.50%, 79.84% 32.17%, 79.63% 35.83%, 76.75% 39.00%, 75.93% 41.50%, 77.78% 43.50%, 74.69% 42.00%, 70.78% 43.33%, 68.31% 45.50%, 69.96% 48.00%, 68.93% 51.67%, 69.75% 54.67%, 68.31% 57.83%, 72.63% 60.33%, 75.51% 57.83%, 76.54% 59.83%, 74.69% 62.67%, 77.98% 65.83%, 78.19% 69.33%, 78.19% 73.00%, 78.40% 76.67%, 77.16% 80.33%, 72.84% 81.33%, 70.99% 85.00%, 66.46% 86.33%, 61.93% 87.33%, 57.41% 87.83%, 52.88% 87.33%, 48.56% 85.17%, 44.03% 87.33%, 39.51% 87.33%, 34.98% 86.17%, 30.45% 84.50%, 25.93% 82.50%, 24.49% 78.83%, 20.37% 78.00%, 19.34% 74.50%, 19.55% 70.83%, 19.75% 67.17%, 19.96% 63.50%, 23.46% 60.33%, 24.28% 57.17%, 23.25% 54.50%, 25.10% 57.00%, 29.01% 55.83%, 30.25% 52.83%, 28.81% 50.67%, 30.45% 47.00%, 29.42% 44.00%, 31.69% 41.00%, 27.57% 39.17%, 25.10% 40.83%, 22.02% 38.83%, 25.72% 37.17%, 21.81% 34.83%, 20.58% 31.33%, 20.37% 27.67%, 20.37% 24.00%, 20.99% 20.33%, 25.51% 19.17%, 27.16% 15.50%, 31.69% 13.67%, 36.21% 12.33%, 40.74% 11.50%);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
-
 .arrodes-glass {
   z-index: 2;
   pointer-events: none;
-  clip-path: polygon(42.59% 11.17%, 47.12% 11.83%, 51.65% 13.17%, 56.17% 11.50%, 60.70% 11.83%, 65.23% 12.67%, 69.75% 14.00%, 74.07% 16.50%, 75.51% 20.00%, 79.63% 21.17%, 80.04% 24.83%, 80.04% 28.50%, 79.84% 32.17%, 79.63% 35.83%, 76.75% 39.00%, 75.93% 41.50%, 77.78% 43.50%, 74.69% 42.00%, 70.78% 43.33%, 68.31% 45.50%, 69.96% 48.00%, 68.93% 51.67%, 69.75% 54.67%, 68.31% 57.83%, 72.63% 60.33%, 75.51% 57.83%, 76.54% 59.83%, 74.69% 62.67%, 77.98% 65.83%, 78.19% 69.33%, 78.19% 73.00%, 78.40% 76.67%, 77.16% 80.33%, 72.84% 81.33%, 70.99% 85.00%, 66.46% 86.33%, 61.93% 87.33%, 57.41% 87.83%, 52.88% 87.33%, 48.56% 85.17%, 44.03% 87.33%, 39.51% 87.33%, 34.98% 86.17%, 30.45% 84.50%, 25.93% 82.50%, 24.49% 78.83%, 20.37% 78.00%, 19.34% 74.50%, 19.55% 70.83%, 19.75% 67.17%, 19.96% 63.50%, 23.46% 60.33%, 24.28% 57.17%, 23.25% 54.50%, 25.10% 57.00%, 29.01% 55.83%, 30.25% 52.83%, 28.81% 50.67%, 30.45% 47.00%, 29.42% 44.00%, 31.69% 41.00%, 27.57% 39.17%, 25.10% 40.83%, 22.02% 38.83%, 25.72% 37.17%, 21.81% 34.83%, 20.58% 31.33%, 20.37% 27.67%, 20.37% 24.00%, 20.99% 20.33%, 25.51% 19.17%, 27.16% 15.50%, 31.69% 13.67%, 36.21% 12.33%, 40.74% 11.50%);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
   background:
-    radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.18) 0%, rgba(36, 37, 42, 0.0) 55%),
-    linear-gradient(180deg, rgba(47, 49, 54, 0.22) 0%, rgba(32, 33, 38, 0.32) 100%);
+    radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.16) 0%, rgba(36, 37, 42, 0.0) 55%),
+    linear-gradient(180deg, rgba(47, 49, 54, 0.14) 0%, rgba(32, 33, 38, 0.22) 100%);
 }
-
 .arrodes-frame {
   z-index: 3;
   pointer-events: none;
   object-fit: contain;
   object-position: center;
 }
-
 @keyframes arrodes-float {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }
   50% { transform: translateY(-7px) rotate(0.8deg); }
 }
-
 .rice-shell [data-global-dock] {
   transition: right 280ms ease, left 280ms ease, bottom 280ms ease;
 }
-
 .rice-shell.assistant-open [data-global-dock] {
   right: calc(var(--assistant-w, 340px) + 1.5rem);
   left: auto;
   bottom: 1rem;
   transform: none;
 }
-
-.rice-main {
-  color: #27272a;
-}
-
+.rice-main { color: #27272a; }
 @media (min-width: 1024px) {
   .rice-shell.assistant-open [data-global-dock] {
     right: calc(var(--assistant-w, 340px) + 1.75rem);

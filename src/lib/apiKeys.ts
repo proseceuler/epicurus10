@@ -11,6 +11,7 @@ export const KOKORO_URL = 'epicure-kokoro-url';
 export const KOKORO_KEY = 'epicure-kokoro-key';
 export const KOKORO_VOICE = 'epicure-kokoro-voice';
 export const TTS_ENGINE = 'epicure-tts-engine';
+export const ARRODES_FRAME_PNG = 'epicure-arrodes-frame-png';
 
 export type TtsEngine = 'auto' | 'kokoro' | 'fish' | 'browser';
 
@@ -61,8 +62,11 @@ export const getTtsEngine = (): TtsEngine => {
 
 export const getDefaultModel = () => read(MODEL_KEY);
 
+export const getArrodesFramePng = () => read(ARRODES_FRAME_PNG);
+
 export function saveKey(key: string, value: string) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(key, value);
-  window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }));
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
+  window.dispatchEvent(new StorageEvent('storage', { key, newValue: value || null }));
 }

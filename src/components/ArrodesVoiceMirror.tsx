@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ARRODES_FRAME, ARRODES_HOLE_MASK } from '@/components/arrodesFrame';
 import { compile, draw, listenMic, EMPTY, VERT, type Bands } from '@/components/arrodesMirrorGL';
 import { FRAG } from '@/components/arrodesMirrorFrag';
+import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
 
 export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type ArrodesVariant = 'dock' | 'home' | 'track';
@@ -12,6 +13,19 @@ const holeMask = {
   WebkitMaskMode: 'luminance' as const,
   maskMode: 'luminance' as const,
 };
+
+function useFrameSrc() {
+  const [src, setSrc] = useState(() => getArrodesFramePng() || ARRODES_FRAME);
+  useEffect(() => {
+    const read = () => setSrc(getArrodesFramePng() || ARRODES_FRAME);
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === ARRODES_FRAME_PNG) read();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  return src;
+}
 
 export default function ArrodesVoiceMirror({
   mode = 'idle',
@@ -28,7 +42,6 @@ export default function ArrodesVoiceMirror({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const glitterRef = useRef<HTMLCanvasElement>(null);
   const bandsRef = useRef<Bands>(EMPTY);
   const modeRef = useRef(mode);
   const hoverGoalRef = useRef(0);
@@ -38,6 +51,7 @@ export default function ArrodesVoiceMirror({
   const splashRef = useRef({ t: -99, x: 0.5, y: 0.5 });
   const rafRef = useRef(0);
   const startRef = useRef(0);
+  const frameSrc = useFrameSrc();
   modeRef.current = mode;
 
   useEffect(() => {
@@ -96,48 +110,6 @@ export default function ArrodesVoiceMirror({
 
   useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);
 
-  useEffect(() => {
-    if (!exiting) return;
-    const canvas = glitterRef.current;
-    if (!canvas) return;
-    const parent = canvas.parentElement;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.floor((parent?.clientWidth || 160) * dpr));
-    const h = Math.max(1, Math.floor((parent?.clientHeight || 200) * dpr));
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const sparks = Array.from({ length: 46 }, () => ({
-      x: w * (0.28 + Math.random() * 0.44),
-      y: h * (0.22 + Math.random() * 0.56),
-      vx: (Math.random() - 0.5) * 1.8 * dpr,
-      vy: (-0.4 - Math.random() * 1.6) * dpr,
-      r: (0.6 + Math.random() * 1.5) * dpr,
-      life: 0.55 + Math.random() * 0.45,
-    }));
-    let frame = 0;
-    let raf = 0;
-    const tick = () => {
-      raf = requestAnimationFrame(tick);
-      frame += 1;
-      ctx.clearRect(0, 0, w, h);
-      const fade = Math.max(0, 1 - frame / 52);
-      for (const s of sparks) {
-        s.x += s.vx;
-        s.y += s.vy;
-        s.vy += 0.012 * dpr;
-        s.life *= 0.97;
-        ctx.fillStyle = `rgba(210,212,216,${0.55 * s.life * fade})`;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [exiting]);
-
   const pointInWell = (e: React.PointerEvent) => {
     const el = wrapRef.current;
     if (!el) return { x: 0.5, y: 0.5 };
@@ -171,13 +143,7 @@ export default function ArrodesVoiceMirror({
       >
         <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
         <div className="arrodes-glass" aria-hidden style={holeMask} />
-        <img className="arrodes-frame" src={ARRODES_FRAME} alt="" draggable={false} />
-        {exiting ? (
-          <>
-            <div className="arrodes-fog" aria-hidden />
-            <canvas ref={glitterRef} className="arrodes-glitter" aria-hidden />
-          </>
-        ) : null}
+        <img className="arrodes-frame" src={frameSrc} alt="" draggable={false} />
       </div>
     </div>
   );

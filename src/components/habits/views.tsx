@@ -95,10 +95,10 @@ export function HomeView({
   };
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-visible">
+    <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center justify-center gap-6 px-3 lg:gap-10">
-        <div className="flex w-[min(72vw,340px)] shrink-0 items-center justify-center overflow-visible">
-          <BlackHole variant="home" className="aspect-square w-full max-w-[340px] bg-transparent" />
+        <div className="w-[300px] shrink-0 sm:w-[360px] lg:w-[440px] xl:w-[520px]">
+          <BlackHole variant="home" className="aspect-square w-full bg-transparent" />
         </div>
         <div className="min-w-0 max-w-[860px] flex-1">
           <div className="grid grid-cols-3 items-start gap-x-6 gap-y-5 lg:gap-x-8 lg:gap-y-6">

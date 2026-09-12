@@ -131,7 +131,7 @@
 .arrodes-well {
   position: relative;
   width: 108px;
-  aspect-ratio: 360 / 444;
+  aspect-ratio: 420 / 520;
   animation: arrodes-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
   background: transparent;

@@ -121,3 +121,53 @@ select.glass-input,
     transform: none;
   }
 }
+
+/* Charts draw in when a page mounts */
+.ht-chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: htChartDraw 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ht-chart-fill {
+  opacity: 0;
+  animation: htChartFill 560ms ease-out 120ms both;
+}
+.ht-chart-bar {
+  transform-origin: center bottom;
+  animation: htBarIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ht-chart-bar-x {
+  transform-origin: left center;
+  animation: htBarXIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ht-chart-ring {
+  stroke-dashoffset: var(--ring-c);
+  animation: htRingIn 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ht-chart-dot {
+  opacity: 0;
+  animation: htDotIn 360ms ease-out both;
+}
+@keyframes htChartDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes htChartFill {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes htBarIn {
+  from { transform: scaleY(0); opacity: 0.35; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+@keyframes htBarXIn {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes htRingIn {
+  from { stroke-dashoffset: var(--ring-c); }
+  to { stroke-dashoffset: var(--ring-off); }
+}
+@keyframes htDotIn {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 0.8; transform: scale(1); }
+}

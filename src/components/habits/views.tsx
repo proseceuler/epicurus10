@@ -97,8 +97,8 @@ export function HomeView({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center justify-center gap-6 px-3 lg:gap-10">
-        <div className="w-[260px] shrink-0 sm:w-[320px] lg:w-[380px] xl:w-[420px]">
-          <BlackHole className="aspect-square w-full bg-transparent" />
+        <div className="w-[300px] shrink-0 sm:w-[360px] lg:w-[440px] xl:w-[520px]">
+          <BlackHole variant="home" className="aspect-square w-full bg-transparent" />
         </div>
         <div className="min-w-0 max-w-[860px] flex-1">
           <div className="grid grid-cols-3 items-start gap-x-6 gap-y-5 lg:gap-x-8 lg:gap-y-6">
@@ -288,7 +288,7 @@ export function TrackView({
         <div style={grid} className="items-start">
           <div className="px-2 pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Lifetime Progress</p>
-            <div className="mx-auto mt-1 w-[176px]"><BlackHole className="aspect-square w-full bg-transparent" /></div>
+            <div className="mx-auto mt-1 w-[176px] overflow-visible"><BlackHole variant="track" className="aspect-square w-full bg-transparent" /></div>
             <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800">{life.toFixed(2)}%</p>
             <div className="mx-auto mt-1 flex h-8 w-[176px] items-end gap-px">
               {lifeSeries.map((v, i) => (

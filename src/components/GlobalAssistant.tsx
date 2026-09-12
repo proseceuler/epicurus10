@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
+import { Mirror, X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
 import { getOpenRouterKey } from '@/lib/apiKeys';
 import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
@@ -8,6 +8,7 @@ import { fileToAttachment, isAudioFile, type ChatAttachment } from '@/lib/assist
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
 import { groqConfigured, startVoiceLoop, speakReply, stopReply, transcribeAudio, type VoiceLoop } from '@/lib/assistant/voiceCascade';
 import { runAssistantTurn, type ChatTurn, type PendingWrite } from '@/lib/assistant/router';
+import { harvestMemory } from '@/lib/assistant/memory';
 import { dispatchTool, writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import { undoLastWrite } from '@/lib/assistant/undo';
 import { usePomodoro } from '@/context/PomodoroContext';
@@ -21,8 +22,13 @@ const SUGGESTS = [
 ];
 
 interface Msg extends ChatTurn {
+  id?: string;
   pending?: PendingWrite;
   sources?: { title: string; url: string }[];
+}
+
+function newId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export default function GlobalAssistant({
@@ -43,6 +49,7 @@ export default function GlobalAssistant({
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState('');
+  const [mirrorExpanded, setMirrorExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPos = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -141,6 +148,7 @@ export default function GlobalAssistant({
       stopReply();
       setVoiceOn(false);
       setSpeaking(false);
+      setMirrorExpanded(false);
       setInterim('');
       return;
     }
@@ -151,6 +159,7 @@ export default function GlobalAssistant({
     }
     setVoiceOn(true);
     voiceOnRef.current = true;
+    setMirrorExpanded(true);
     setError('');
     if (groqConfigured()) startCascade();
     else startListen(true);
@@ -197,6 +206,7 @@ export default function GlobalAssistant({
     stopReply();
     setError(''); setInput('');
     const user: Msg = {
+      id: newId(),
       role: 'user',
       content: content || attachmentPromptFallback(pendingAtt),
       attachments: pendingAtt.length ? pendingAtt : undefined,
@@ -212,6 +222,7 @@ export default function GlobalAssistant({
         page,
         history: next,
         searchEnabled: searchOn,
+        voice: voiceOnRef.current,
         ctx: { startFocus: (subject) => {
           pomodoro.setSessionContext((subject as SubjectKey) ?? null, null);
           pomodoro.switchType('focus');
@@ -219,7 +230,8 @@ export default function GlobalAssistant({
           navigate?.('pomodoro');
         } },
       });
-      const assistant: Msg = { role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
+      const assistant: Msg = { id: newId(), role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
+      harvestMemory(user.content, reply.content);
       setMessages([...next, assistant]);
       if (voiceOnRef.current && reply.content) await speak(reply.content);
     } catch (err) {
@@ -310,13 +322,10 @@ export default function GlobalAssistant({
         <div className="assistant-chrome flex items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white ${listening || speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>
-              <Bot className="h-3.5 w-3.5" />
+              <Mirror className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
-              <p className="truncate text-[11px] text-zinc-500">
-                {listening ? 'Listening…' : speaking ? 'Speaking…' : busy && voiceOn ? 'Thinking…' : voiceOn ? 'Voice on — tap waveform to stop or interrupt' : 'Works from any page'}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -344,8 +353,8 @@ export default function GlobalAssistant({
             </div>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-2'}>
-              {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><Bot className="h-3 w-3" /></div>)}
+            <div key={m.id || i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-2'}>
+              {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><Mirror className="h-3 w-3" /></div>)}
               <div className={m.role === 'user' ? 'max-w-[85%] rounded-2xl bg-zinc-900 px-3 py-2 text-sm text-white' : 'max-w-[90%] text-sm leading-relaxed text-zinc-800'}>
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -390,15 +399,16 @@ export default function GlobalAssistant({
           {error && <p className="text-xs text-zinc-500">{error}</p>}
         </div>
 
-        <form className="border-t border-zinc-200/70 p-3 pb-5" onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
+        <form className={`p-3 pb-5 ${voiceOn ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
           {voiceOn && (
             <ArrodesVoiceMirror
               active={voiceOn}
               mode={voiceMode}
-              caption={interim || (speaking ? 'Speaking' : busy ? 'Thinking' : listening ? 'Listening' : '')}
+              expanded={mirrorExpanded}
+              onToggleExpand={() => setMirrorExpanded((v) => !v)}
             />
           )}
-          {(listening || speaking || interim) && !voiceOn && (
+          {(listening || speaking || interim || (voiceOn && !interim)) && !voiceOn && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">
               <span className={`inline-flex h-2 w-2 rounded-full ${listening ? 'animate-pulse bg-zinc-900' : speaking ? 'bg-zinc-500' : 'bg-zinc-300'}`} />
               {listening ? (interim || 'Listening — keep talking, I wait for a pause') : speaking ? 'Speaking — tap waveform to interrupt' : interim}

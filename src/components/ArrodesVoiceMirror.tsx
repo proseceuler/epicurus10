@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ARRODES_FRAME } from '@/components/arrodesFrame';
+import { ARRODES_FRAME, ARRODES_HOLE_MASK } from '@/components/arrodesFrame';
 
 export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 
@@ -15,9 +15,13 @@ const EMPTY: Bands = { amp: 0, bass: 0, mid: 0, treble: 0 };
 export default function ArrodesVoiceMirror({
   mode,
   active,
+  expanded,
+  onToggleExpand,
 }: {
   mode: ArrodesVoiceMode;
   active: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,10 +85,31 @@ export default function ArrodesVoiceMirror({
   useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);
 
   return (
-    <div className="arrodes-stage" data-mode={mode} data-active={active ? '1' : '0'}>
-      <div ref={wrapRef} className="arrodes-well">
-        <canvas ref={canvasRef} className="arrodes-blob" />
-        <div className="arrodes-glass" aria-hidden />
+    <div
+      className="arrodes-stage"
+      data-mode={mode}
+      data-active={active ? '1' : '0'}
+      data-expanded={expanded ? '1' : '0'}
+    >
+      <div
+        ref={wrapRef}
+        className="arrodes-well"
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpand}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleExpand?.(); }}
+        title={expanded ? 'Shrink mirror' : 'Enlarge mirror'}
+      >
+        <canvas
+          ref={canvasRef}
+          className="arrodes-blob"
+          style={{ WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`, maskImage: `url("${ARRODES_HOLE_MASK}")` }}
+        />
+        <div
+          className="arrodes-glass"
+          aria-hidden
+          style={{ WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`, maskImage: `url("${ARRODES_HOLE_MASK}")` }}
+        />
         <img className="arrodes-frame" src={ARRODES_FRAME} alt="" draggable={false} />
       </div>
     </div>

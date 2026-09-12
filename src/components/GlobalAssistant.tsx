@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mirror, X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
+import { X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
 import { getOpenRouterKey } from '@/lib/apiKeys';
 import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
@@ -296,7 +296,6 @@ export default function GlobalAssistant({
   };
 
   if (rail && !open) return null;
-  const whisperOn = groqConfigured();
   const hasDraft = Boolean(input.trim() || attachments.length);
   const voiceTitle = voiceOn
     ? 'Voice is on — tap to stop. Tap while speaking to interrupt.'
@@ -322,7 +321,7 @@ export default function GlobalAssistant({
         <div className="assistant-chrome flex items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white ${listening || speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>
-              <Mirror className="h-3.5 w-3.5" />
+              <MirrorIcon className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
@@ -354,7 +353,7 @@ export default function GlobalAssistant({
           )}
           {messages.map((m, i) => (
             <div key={m.id || i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-2'}>
-              {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><Mirror className="h-3 w-3" /></div>)}
+              {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><MirrorIcon className="h-3 w-3" /></div>)}
               <div className={m.role === 'user' ? 'max-w-[85%] rounded-2xl bg-zinc-900 px-3 py-2 text-sm text-white' : 'max-w-[90%] text-sm leading-relaxed text-zinc-800'}>
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -471,6 +470,25 @@ function attachmentPromptFallback(attachments: ChatAttachment[]) {
   if (!attachments.length) return 'Please look at this attachment.';
   const kinds = attachments.map((a) => a.kind).join(', ');
   return `Please look at this ${kinds}.`;
+}
+
+function MirrorIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="6.5" y="2.5" width="11" height="16" rx="5.5" />
+      <path d="M9 21h6" />
+      <path d="M12 18.5V21" />
+    </svg>
+  );
 }
 
 function AttachmentChip({ att, inverted }: { att: ChatAttachment; inverted?: boolean }) {

@@ -53,32 +53,70 @@ export function createRecognizer(opts: {
   return rec;
 }
 
-function pickVoice(preferred = ['Google UK English Male']) {
+function pickVoice() {
   const voices = window.speechSynthesis.getVoices();
-  for (const name of preferred) {
+  const prefer = [
+    'Google UK English Male',
+    'Google US English',
+    'Samantha',
+    'Daniel',
+    'Alex',
+    'Microsoft David',
+  ];
+  for (const name of prefer) {
     const match = voices.find((v) => v.name.includes(name));
     if (match) return match;
   }
   return (
-    voices.find((v) => v.lang.startsWith('en') && /male/i.test(v.name)) ||
+    voices.find((v) => v.lang.startsWith('en') && /male|daniel|alex|david/i.test(v.name)) ||
     voices.find((v) => v.lang.startsWith('en')) ||
     voices[0] ||
     null
   );
 }
 
+export function splitSpokenChunks(text: string): string[] {
+  const clean = text
+    .replace(/[#*_`>~]/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) return [];
+  const parts = clean.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  return parts.length ? parts : [clean];
+}
+
 export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
-  if (!window.speechSynthesis) return;
+  if (!window.speechSynthesis) { hooks?.onEnd?.(); return; }
   window.speechSynthesis.cancel();
-  const clean = text.replace(/[#*_`>~]/g, ' ').replace(/https?:\/\/\S+/g, ' ').trim().slice(0, 800);
-  if (!clean) { hooks?.onEnd?.(); return; }
-  const u = new SpeechSynthesisUtterance(clean);
-  u.rate = 0.92;           // slowed down, calmer pacing
-  u.pitch = 0.9;           // slightly lower, more reserved tone
-  u.voice = pickVoice();   // calm/reserved male voice, falls back gracefully
-  u.onstart = () => hooks?.onStart?.();
-  u.onend = () => hooks?.onEnd?.();
-  window.speechSynthesis.speak(u);
+  const chunks = splitSpokenChunks(text).slice(0, 8);
+  if (!chunks.length) { hooks?.onEnd?.(); return; }
+  const voice = pickVoice();
+  let i = 0;
+  let started = false;
+  const next = () => {
+    if (i >= chunks.length) { hooks?.onEnd?.(); return; }
+    const u = new SpeechSynthesisUtterance(chunks[i]);
+    const wave = (i % 3) - 1;
+    u.rate = 1.02 + wave * 0.04;
+    u.pitch = 0.96 + wave * 0.05;
+    u.voice = voice;
+    if (i === 0) {
+      u.onstart = () => {
+        started = true;
+        hooks?.onStart?.();
+      };
+    }
+    u.onend = () => {
+      i += 1;
+      if (i < chunks.length) window.setTimeout(next, 90 + (i % 2) * 70);
+      else hooks?.onEnd?.();
+    };
+    u.onerror = () => hooks?.onEnd?.();
+    window.speechSynthesis.speak(u);
+  };
+  next();
+  window.setTimeout(() => { if (!started) hooks?.onStart?.(); }, 80);
 }
 
 export function stopSpeech() {

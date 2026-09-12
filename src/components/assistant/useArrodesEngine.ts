@@ -52,10 +52,6 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   useEffect(() => {
     if (!busy) return;
     setThinkWord(THINK_WORDS[Math.floor(Math.random() * THINK_WORDS.length)]);
-    const id = window.setInterval(() => {
-      setThinkWord(THINK_WORDS[Math.floor(Math.random() * THINK_WORDS.length)]);
-    }, 900);
-    return () => window.clearInterval(id);
   }, [busy]);
 
   const focus = (subject: string | null) => {

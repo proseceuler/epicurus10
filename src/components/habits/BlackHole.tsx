@@ -36,11 +36,12 @@ function AccretionDisc({ tight = false }: { tight?: boolean }) {
     const pointer = { x: 0.5, y: 0.5, on: 0 };
     const orbit = host.parentElement;
 
-    const rings = tight ? [0.16, 0.21, 0.26, 0.31] : [0.18, 0.24, 0.30, 0.36];
-    const dots = Array.from({ length: tight ? 520 : 720 }, (_, i) => {
+    // Restored wider rings. Side fade (not clip) hides dots before they hit the box edge.
+    const rings = tight ? [0.20, 0.27, 0.34, 0.41] : [0.22, 0.30, 0.38, 0.46];
+    const dots = Array.from({ length: tight ? 560 : 820 }, (_, i) => {
       const ring = rings[i % rings.length];
       return {
-        r: ring + (Math.random() - 0.5) * 0.028,
+        r: ring + (Math.random() - 0.5) * 0.032,
         a: Math.random() * Math.PI * 2,
         speed: 0.0018 + Math.random() * 0.0032,
         s: 0.45 + Math.random() * 0.9,
@@ -75,7 +76,11 @@ function AccretionDisc({ tight = false }: { tight?: boolean }) {
       for (const d of dots) {
         const frontDot = Math.sin(d.a) > 0;
         if (pass === 'front' ? !frontDot : frontDot) continue;
-        let x = cx + Math.cos(d.a) * d.r * px;
+        const nx = Math.cos(d.a);
+        // Dissolve as the dot reaches the left/right limb so it never punches through the side.
+        const side = Math.max(0, Math.min(1, (0.86 - Math.abs(nx)) / 0.28));
+        if (side <= 0.02) continue;
+        let x = cx + nx * d.r * px;
         let y = cy + Math.sin(d.a) * d.r * px * 0.40;
         if (pointer.on) {
           const hx = pointer.x * px;
@@ -91,7 +96,7 @@ function AccretionDisc({ tight = false }: { tight?: boolean }) {
           }
         }
         const edge = Math.max(0, Math.min(1, (maxR + 0.03 - d.r) / 0.08));
-        const a = ((frontDot ? 0.36 : 0.18) + d.s * 0.34) * (0.35 + edge * 0.65);
+        const a = ((frontDot ? 0.36 : 0.18) + d.s * 0.34) * (0.35 + edge * 0.65) * side;
         const g = Math.floor(22 + d.shade * 78);
         ctx.fillStyle = `rgba(${g},${g},${g + 2},${a})`;
         ctx.beginPath();

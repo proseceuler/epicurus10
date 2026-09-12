@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-12 — user gothic PNG frame + hole mask + enlarge */
+/* vercel rebuild 2026-09-12 — user gothic PNG frame (eyes) + hole mask */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
@@ -131,7 +131,7 @@
 .arrodes-well {
   position: relative;
   width: 108px;
-  aspect-ratio: 486 / 600;
+  aspect-ratio: 360 / 444;
   animation: arrodes-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
   background: transparent;

@@ -49,7 +49,6 @@ export default function GlobalAssistant({
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState('');
-  const [mirrorExpanded, setMirrorExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPos = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -148,7 +147,6 @@ export default function GlobalAssistant({
       stopReply();
       setVoiceOn(false);
       setSpeaking(false);
-      setMirrorExpanded(false);
       setInterim('');
       return;
     }
@@ -159,7 +157,6 @@ export default function GlobalAssistant({
     }
     setVoiceOn(true);
     voiceOnRef.current = true;
-    setMirrorExpanded(true);
     setError('');
     if (groqConfigured()) startCascade();
     else startListen(true);
@@ -400,12 +397,7 @@ export default function GlobalAssistant({
 
         <form className={`p-3 pb-5 ${voiceOn ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(e) => { e.preventDefault(); if (hasDraft) void send(); }}>
           {voiceOn && (
-            <ArrodesVoiceMirror
-              active={voiceOn}
-              mode={voiceMode}
-              expanded={mirrorExpanded}
-              onToggleExpand={() => setMirrorExpanded((v) => !v)}
-            />
+            <ArrodesVoiceMirror active={voiceOn} mode={voiceMode} />
           )}
           {(listening || speaking || interim || (voiceOn && !interim)) && !voiceOn && (
             <div className="mb-2 flex items-center gap-2 text-xs text-zinc-600">

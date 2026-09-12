@@ -55,7 +55,8 @@ void main() {
   h += wave * 0.42 + ring2 * 0.22;
   vec2 ho = uHoverOrigin;
   float dHover = distance(uv, ho);
-  float gleamBand = exp(-dHover * 6.2) * hover * 0.22;
+  float gleamBand = exp(-dHover * 6.2) * hover * 0.18;
+  float gleamSweep = exp(-abs(uv.x - mix(0.22, ho.x, hover)) * 8.5) * hover * 0.14;
   vec3 slate = vec3(0.27, 0.28, 0.30);
   vec3 steel = vec3(0.50, 0.52, 0.54);
   vec3 mercury = vec3(0.66, 0.68, 0.70);
@@ -69,7 +70,7 @@ void main() {
   spec += pow(max(0.0, sin(uv.x * 7.0 + n * 5.0 - t * 0.9) * 0.5 + 0.5), 14.0) * 0.22;
   spec += hover * pow(max(0.0, 1.0 - abs(uv.x - ho.x)), 8.0) * 0.12;
   pane += gleam * spec * (0.16 + speak * 0.12 + listen * 0.06 + hover * 0.08);
-  pane += gleam * gleamBand;
+  pane += gleam * (gleamBand + gleamSweep);
   pane += gleam * abs(wave) * 0.55;
   float radius = 0.34 + 0.05 * listen + 0.04 * think + 0.07 * speak + uAmp * 0.09 + uBass * 0.035;
   radius += splash * 0.22 * exp(-age * 1.15);

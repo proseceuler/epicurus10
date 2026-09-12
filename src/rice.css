@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-12 21:15 — compact mirror, hole fill, habit placement */
+/* vercel rebuild 2026-09-12 22:30 — hover lerp, tilted disc, voice-off dissolve */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
@@ -64,6 +64,7 @@
 .assistant-panel { backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%); }
 .assistant-panel[data-voice='1'] form { border-top: 0 !important; }
 
+/* Arrodes mirror */
 .arrodes-stage {
   display: flex;
   align-items: center;
@@ -82,21 +83,41 @@
   outline: 0;
   cursor: pointer;
   transform-origin: center bottom;
-  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1), filter 320ms ease;
+  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1), filter 480ms ease;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
 .assistant-panel[data-voice='1'] .arrodes-stage[data-variant='dock'] .arrodes-well,
 .assistant-panel[data-voice='1'] .arrodes-well {
   animation: arrodes-grow 1100ms cubic-bezier(0.22, 1, 0.36, 1) both, arrodes-float 4.8s ease-in-out 1100ms infinite;
 }
-.arrodes-stage[data-variant='home'] {
+.arrodes-orbit {
+  perspective: 820px;
+}
+.arrodes-orbit .arrodes-tilt {
+  position: relative;
+  z-index: 2;
+  transform: rotateX(16deg) rotateZ(-8deg);
+  transform-style: preserve-3d;
+  pointer-events: auto;
+}
+.arrodes-orbit[data-variant='home'] .arrodes-tilt { transform: rotateX(18deg) rotateZ(-9deg); }
+.arrodes-orbit[data-variant='track'] .arrodes-tilt { transform: rotateX(16deg) rotateZ(-8deg); }
+.arrodes-disc {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-width: 200px;
-  margin: 0 auto;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+.arrodes-stage[data-variant='home'] {
+  width: auto;
+  max-width: none;
+  margin: 0;
 }
 .arrodes-stage[data-variant='home'] .arrodes-well {
-  width: 100%;
-  max-width: 200px;
+  width: min(72vw, 280px);
+  max-width: 280px;
   animation-duration: 6.4s;
 }
 .arrodes-stage[data-variant='track'] .arrodes-well {
@@ -104,12 +125,13 @@
   animation-duration: 5.6s;
 }
 .arrodes-well:hover {
-  animation-play-state: paused;
-  filter: drop-shadow(0 10px 16px rgba(24, 24, 27, 0.16));
+  filter: drop-shadow(0 11px 18px rgba(24, 24, 27, 0.18));
 }
 .arrodes-blob,
 .arrodes-glass,
-.arrodes-frame {
+.arrodes-frame,
+.arrodes-fog,
+.arrodes-glitter {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -133,17 +155,40 @@
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
-  background: radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.10) 0%, rgba(36, 37, 42, 0.0) 55%), linear-gradient(180deg, rgba(47, 49, 54, 0.12) 0%, rgba(32, 33, 38, 0.18) 100%);
-  transition: background 280ms ease;
+  background:
+    radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.10) 0%, rgba(36, 37, 42, 0.0) 55%),
+    linear-gradient(180deg, rgba(47, 49, 54, 0.12) 0%, rgba(32, 33, 38, 0.18) 100%);
+  transition: background 520ms ease, opacity 520ms ease;
 }
 .arrodes-well:hover .arrodes-glass {
-  background: radial-gradient(ellipse at 34% 20%, rgba(210, 214, 220, 0.08) 0%, rgba(36, 37, 42, 0.0) 52%), linear-gradient(180deg, rgba(56, 58, 64, 0.08) 0%, rgba(32, 33, 38, 0.14) 100%);
+  background:
+    radial-gradient(ellipse at 32% 18%, rgba(210, 214, 220, 0.11) 0%, rgba(36, 37, 42, 0.0) 58%),
+    linear-gradient(165deg, rgba(70, 74, 80, 0.08) 0%, rgba(32, 33, 38, 0.14) 100%);
 }
 .arrodes-frame {
   z-index: 3;
   pointer-events: none;
   object-fit: contain;
   object-position: center;
+}
+.arrodes-fog {
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(148, 148, 152, 0.28) 0%, rgba(180, 180, 184, 0.12) 42%, rgba(244, 244, 245, 0) 72%);
+  filter: blur(8px);
+}
+.arrodes-glitter {
+  z-index: 5;
+  pointer-events: none;
+}
+.arrodes-stage[data-exit='1'] { pointer-events: none; }
+.arrodes-stage[data-exit='1'] .arrodes-well {
+  animation: arrodes-dissolve 820ms cubic-bezier(0.22, 0.08, 0.25, 1) forwards;
+}
+.arrodes-stage[data-exit='1'] .arrodes-fog {
+  animation: arrodes-fog-rise 820ms ease forwards;
 }
 @keyframes arrodes-float {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }
@@ -152,6 +197,16 @@
 @keyframes arrodes-grow {
   0% { width: 88px; }
   100% { width: 156px; }
+}
+@keyframes arrodes-dissolve {
+  0% { transform: translateY(0) scale(1); opacity: 1; filter: drop-shadow(0 8px 14px rgba(24,24,27,0.14)); }
+  42% { transform: translateY(10px) scale(0.58) rotate(-4deg); opacity: 0.5; filter: blur(1.4px) drop-shadow(0 4px 10px rgba(24,24,27,0.08)); }
+  100% { transform: translateY(22px) scale(0.06); opacity: 0; filter: blur(8px); }
+}
+@keyframes arrodes-fog-rise {
+  0% { opacity: 0; transform: scale(0.7); }
+  35% { opacity: 0.55; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.35); }
 }
 .rice-shell [data-global-dock] { transition: right 280ms ease, left 280ms ease, bottom 280ms ease; }
 .rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.5rem); left: auto; bottom: 1rem; transform: none; }

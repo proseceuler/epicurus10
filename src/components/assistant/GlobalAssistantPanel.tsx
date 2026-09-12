@@ -4,7 +4,7 @@ import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
 import { writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import ArrodesVoiceMirror from '@/components/ArrodesVoiceMirror';
-import { SUGGESTS, MirrorIcon, AttachmentChip } from '@/components/assistant/arrodesBits';
+import { SUGGESTS, MirrorIcon, ArrodesMark, AttachmentChip } from '@/components/assistant/arrodesBits';
 import { useArrodesEngine } from '@/components/assistant/useArrodesEngine';
 
 export default function GlobalAssistant({
@@ -117,18 +117,14 @@ export default function GlobalAssistant({
           ))}
           {e.busy && !e.voiceOn && (
             <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <span className="flex gap-1">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:120ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:240ms]" />
-              </span>
-              Thinking
+              <ArrodesMark className="h-4 w-4 shrink-0 animate-pulse" />
+              <span className="italic tracking-wide">{e.thinkWord}…</span>
             </div>
           )}
           {e.error && <p className="text-xs text-zinc-500">{e.error}</p>}
         </div>
 
-        <form className={`p-3 pb-5 ${voiceChrome ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(ev) => { ev.preventDefault(); if (e.hasDraft) void e.send(); }}>
+        <form className={`p-3 pb-5 ${voiceChrome ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(ev) => { ev.preventDefault(); if (!e.busy && e.hasDraft) void e.send(); }}>
           {voiceChrome && (
             <ArrodesVoiceMirror active={e.voiceOn} mode={e.voiceMode} variant="dock" exiting={e.voiceLeaving} />
           )}
@@ -149,13 +145,17 @@ export default function GlobalAssistant({
             <textarea
               value={e.input}
               onChange={(ev) => e.setInput(ev.target.value)}
-              onKeyDown={(ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); if (e.hasDraft) void e.send(); } }}
+              onKeyDown={(ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); if (!e.busy && e.hasDraft) void e.send(); } }}
               rows={1}
-              placeholder={e.voiceOn ? 'Voice on — type to send instead…' : 'Ask anything…'}
+              placeholder={e.busy ? `${e.thinkWord}…` : e.voiceOn ? 'Voice on — type to send instead…' : 'Ask anything…'}
               className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
             />
-            {e.hasDraft ? (
-              <button type="submit" disabled={e.busy} className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-30" title="Send">
+            {e.busy ? (
+              <button type="button" onClick={e.stopGenerate} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full" title="Stop generating" aria-label="Stop generating">
+                <ArrodesMark className="h-8 w-8" />
+              </button>
+            ) : e.hasDraft ? (
+              <button type="submit" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white" title="Send">
                 <Send className="h-3.5 w-3.5" />
               </button>
             ) : (

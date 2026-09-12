@@ -37,13 +37,15 @@ export default function GlobalAssistant({
   };
 
   if (rail && !open) return null;
+  const voiceChrome = e.voiceOn || e.voiceLeaving;
 
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-transparent lg:hidden" onClick={onClose} />}
       <aside
         aria-hidden={!open}
-        data-voice={e.voiceOn ? '1' : '0'}
+        data-voice={voiceChrome ? '1' : '0'}
+        data-leaving={e.voiceLeaving ? '1' : '0'}
         className={`assistant-panel fixed inset-y-0 right-0 z-50 flex flex-col border-l border-zinc-200/80 bg-white/96 shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
         style={{ width }}
       >
@@ -126,8 +128,8 @@ export default function GlobalAssistant({
           {e.error && <p className="text-xs text-zinc-500">{e.error}</p>}
         </div>
 
-        <form className={`p-3 pb-5 ${e.voiceOn ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(ev) => { ev.preventDefault(); if (e.hasDraft) void e.send(); }}>
-          {(e.voiceOn || e.voiceLeaving) && (
+        <form className={`p-3 pb-5 ${voiceChrome ? '' : 'border-t border-zinc-200/70'}`} onSubmit={(ev) => { ev.preventDefault(); if (e.hasDraft) void e.send(); }}>
+          {voiceChrome && (
             <ArrodesVoiceMirror active={e.voiceOn} mode={e.voiceMode} variant="dock" exiting={e.voiceLeaving} />
           )}
           {e.attachments.length > 0 && (

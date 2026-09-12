@@ -31,6 +31,7 @@ function AccretionDisc() {
     const back = backRef.current;
     const front = frontRef.current;
     if (!host || !back || !front) return;
+    const orbit = host.parentElement ?? host;
     let raf = 0;
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
@@ -45,19 +46,18 @@ function AccretionDisc() {
         speed: 0.0018 + Math.random() * 0.0032,
         s: 0.5 + Math.random() * 1.05,
         shade: Math.random(),
-        scatter: Math.random() * 0.08,
       };
     });
 
     const onMove = (e: PointerEvent) => {
-      const r = host.getBoundingClientRect();
+      const r = orbit.getBoundingClientRect();
       pointer.x = (e.clientX - r.left) / Math.max(1, r.width);
       pointer.y = (e.clientY - r.top) / Math.max(1, r.height);
       pointer.on = 1;
     };
     const onLeave = () => { pointer.on = 0; };
-    host.addEventListener('pointermove', onMove);
-    host.addEventListener('pointerleave', onLeave);
+    orbit.addEventListener('pointermove', onMove);
+    orbit.addEventListener('pointerleave', onLeave);
 
     const paint = (canvas: HTMLCanvasElement, pass: 'back' | 'front') => {
       const size = Math.max(host.clientWidth || 160, host.clientHeight || 160);
@@ -110,8 +110,8 @@ function AccretionDisc() {
     return () => {
       stop = true;
       cancelAnimationFrame(raf);
-      host.removeEventListener('pointermove', onMove);
-      host.removeEventListener('pointerleave', onLeave);
+      orbit.removeEventListener('pointermove', onMove);
+      orbit.removeEventListener('pointerleave', onLeave);
     };
   }, []);
 

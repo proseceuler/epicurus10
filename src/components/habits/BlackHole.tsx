@@ -36,7 +36,7 @@ function AccretionDisc({ tight = false }: { tight?: boolean }) {
     const pointer = { x: 0.5, y: 0.5, on: 0 };
     const orbit = host.parentElement;
 
-    const rings = tight ? [0.18, 0.24, 0.30, 0.36] : [0.20, 0.27, 0.34, 0.41];
+    const rings = tight ? [0.16, 0.21, 0.26, 0.31] : [0.18, 0.24, 0.30, 0.36];
     const dots = Array.from({ length: tight ? 520 : 720 }, (_, i) => {
       const ring = rings[i % rings.length];
       return {

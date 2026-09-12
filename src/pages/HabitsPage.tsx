@@ -108,7 +108,7 @@ export default function HabitsPage() {
     await supabase.from('habit_completions').delete().eq('habit_id', id);
     await supabase.from('habits').delete().eq('id', id);
     setHabits((cur) => cur.filter((h) => h.id !== id));
-    setCompletions((cur) => cur.filter((c) => c.habit_id !== id));
+    setCompletions((cur) => cur.filter((c) => c.id !== id));
   };
 
   const life = lifetimePct(habits, completions);
@@ -124,7 +124,7 @@ export default function HabitsPage() {
   }
 
   return (
-    <div className={`ht-shell ${view === 'home' ? 'flex h-[calc(100vh-8.25rem)] max-h-[calc(100vh-8.25rem)] flex-col overflow-hidden' : 'min-h-[calc(100vh-5.5rem)] pb-16'}`}>
+    <div className={`ht-shell ${view === 'home' ? 'flex h-[calc(100vh-8.25rem)] max-h-[calc(100vh-8.25rem)] flex-col overflow-visible' : 'min-h-[calc(100vh-5.5rem)] pb-16'}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
@@ -135,7 +135,7 @@ export default function HabitsPage() {
           <Select className="w-[4.5rem]" value={String(year)} onChange={(v) => setYear(Number(v))} options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
       </div>
-      <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden' : ''}>
+      <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center overflow-visible' : ''}>
       <MotionSwap id={view}>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}

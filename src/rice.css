@@ -1,5 +1,5 @@
 /* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-12 22:30 — hover lerp, tilted disc, voice-off dissolve */
+/* vercel rebuild 2026-09-13 02:20 — custom frame, front/back disc, reverse grow */
 
 .rice-shell {
   --rice-bg: #f5f5f7;
@@ -86,9 +86,13 @@
   transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1), filter 480ms ease;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
-.assistant-panel[data-voice='1'] .arrodes-stage[data-variant='dock'] .arrodes-well,
-.assistant-panel[data-voice='1'] .arrodes-well {
+.assistant-panel[data-voice='1']:not([data-leaving='1']) .arrodes-stage[data-variant='dock'] .arrodes-well,
+.assistant-panel[data-voice='1']:not([data-leaving='1']) .arrodes-well {
   animation: arrodes-grow 1100ms cubic-bezier(0.22, 1, 0.36, 1) both, arrodes-float 4.8s ease-in-out 1100ms infinite;
+}
+.assistant-panel[data-leaving='1'] .arrodes-stage[data-variant='dock'] .arrodes-well,
+.arrodes-stage[data-variant='dock'][data-exit='1'] .arrodes-well {
+  animation: arrodes-shrink 1100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .arrodes-orbit {
   perspective: 820px;
@@ -96,32 +100,48 @@
 .arrodes-orbit .arrodes-tilt {
   position: relative;
   z-index: 2;
-  transform: rotateX(16deg) rotateZ(-8deg);
+  transform: rotateX(18deg) rotateZ(-9deg);
   transform-style: preserve-3d;
   pointer-events: auto;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-tilt { transform: rotateX(18deg) rotateZ(-9deg); }
 .arrodes-orbit[data-variant='track'] .arrodes-tilt { transform: rotateX(16deg) rotateZ(-8deg); }
+.arrodes-disc-stack {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  pointer-events: none;
+}
 .arrodes-disc {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
   pointer-events: none;
 }
+.arrodes-disc--back { z-index: 1; }
+.arrodes-disc--front { z-index: 4; }
 .arrodes-stage[data-variant='home'] {
   width: auto;
   max-width: none;
   margin: 0;
 }
 .arrodes-stage[data-variant='home'] .arrodes-well {
-  width: min(72vw, 280px);
-  max-width: 280px;
+  width: min(68vw, 340px);
+  max-width: 340px;
   animation-duration: 6.4s;
 }
+.arrodes-orbit[data-variant='track'] {
+  width: 176px;
+  height: 176px;
+}
+.arrodes-stage[data-variant='track'] {
+  width: auto;
+}
 .arrodes-stage[data-variant='track'] .arrodes-well {
-  width: 108px;
+  width: 78px;
+  max-width: 78px;
   animation-duration: 5.6s;
 }
 .arrodes-well:hover {
@@ -129,9 +149,7 @@
 }
 .arrodes-blob,
 .arrodes-glass,
-.arrodes-frame,
-.arrodes-fog,
-.arrodes-glitter {
+.arrodes-frame {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -171,42 +189,18 @@
   object-fit: contain;
   object-position: center;
 }
-.arrodes-fog {
-  z-index: 4;
-  pointer-events: none;
-  opacity: 0;
-  background:
-    radial-gradient(ellipse at 50% 58%, rgba(148, 148, 152, 0.28) 0%, rgba(180, 180, 184, 0.12) 42%, rgba(244, 244, 245, 0) 72%);
-  filter: blur(8px);
-}
-.arrodes-glitter {
-  z-index: 5;
-  pointer-events: none;
-}
 .arrodes-stage[data-exit='1'] { pointer-events: none; }
-.arrodes-stage[data-exit='1'] .arrodes-well {
-  animation: arrodes-dissolve 820ms cubic-bezier(0.22, 0.08, 0.25, 1) forwards;
-}
-.arrodes-stage[data-exit='1'] .arrodes-fog {
-  animation: arrodes-fog-rise 820ms ease forwards;
-}
 @keyframes arrodes-float {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }
   50% { transform: translateY(-6px) rotate(0.8deg); }
 }
 @keyframes arrodes-grow {
-  0% { width: 88px; }
-  100% { width: 156px; }
+  0% { width: 88px; opacity: 1; }
+  100% { width: 156px; opacity: 1; }
 }
-@keyframes arrodes-dissolve {
-  0% { transform: translateY(0) scale(1); opacity: 1; filter: drop-shadow(0 8px 14px rgba(24,24,27,0.14)); }
-  42% { transform: translateY(10px) scale(0.58) rotate(-4deg); opacity: 0.5; filter: blur(1.4px) drop-shadow(0 4px 10px rgba(24,24,27,0.08)); }
-  100% { transform: translateY(22px) scale(0.06); opacity: 0; filter: blur(8px); }
-}
-@keyframes arrodes-fog-rise {
-  0% { opacity: 0; transform: scale(0.7); }
-  35% { opacity: 0.55; transform: scale(1.05); }
-  100% { opacity: 0; transform: scale(1.35); }
+@keyframes arrodes-shrink {
+  0% { width: 156px; opacity: 1; }
+  100% { width: 88px; opacity: 0; }
 }
 .rice-shell [data-global-dock] { transition: right 280ms ease, left 280ms ease, bottom 280ms ease; }
 .rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.5rem); left: auto; bottom: 1rem; transform: none; }

@@ -22,30 +22,45 @@ export default function BlackHole({
 }
 
 function AccretionDisc() {
-  const ref = useRef<HTMLCanvasElement>(null);
+  const backRef = useRef<HTMLCanvasElement>(null);
+  const frontRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const host = canvas.parentElement;
+    const host = hostRef.current;
+    const back = backRef.current;
+    const front = frontRef.current;
+    if (!host || !back || !front) return;
     let raf = 0;
     let stop = false;
+    const pointer = { x: 0.5, y: 0.5, on: 0 };
 
-    const dots = Array.from({ length: 520 }, () => {
-      const t = Math.pow(Math.random(), 0.68);
+    const rings = [0.34, 0.46, 0.58, 0.72];
+    const dots = Array.from({ length: 760 }, (_, i) => {
+      const ring = rings[i % rings.length];
+      const t = Math.pow(Math.random(), 0.7);
       return {
-        r: 0.18 + t * 0.46,
+        r: ring + (Math.random() - 0.5) * 0.05 + t * 0.02,
         a: Math.random() * Math.PI * 2,
-        speed: 0.0022 + Math.random() * 0.0034,
-        s: 0.55 + Math.random() * 0.95,
+        speed: 0.0018 + Math.random() * 0.0032,
+        s: 0.5 + Math.random() * 1.05,
         shade: Math.random(),
+        scatter: Math.random() * 0.08,
       };
     });
 
-    const tick = () => {
-      if (stop) return;
-      raf = requestAnimationFrame(tick);
-      const size = Math.max(host?.clientWidth || 160, host?.clientHeight || 160);
+    const onMove = (e: PointerEvent) => {
+      const r = host.getBoundingClientRect();
+      pointer.x = (e.clientX - r.left) / Math.max(1, r.width);
+      pointer.y = (e.clientY - r.top) / Math.max(1, r.height);
+      pointer.on = 1;
+    };
+    const onLeave = () => { pointer.on = 0; };
+    host.addEventListener('pointermove', onMove);
+    host.addEventListener('pointerleave', onLeave);
+
+    const paint = (canvas: HTMLCanvasElement, pass: 'back' | 'front') => {
+      const size = Math.max(host.clientWidth || 160, host.clientHeight || 160);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const px = Math.max(1, Math.floor(size * dpr));
       if (canvas.width !== px || canvas.height !== px) {
@@ -56,22 +71,54 @@ function AccretionDisc() {
       if (!ctx) return;
       ctx.clearRect(0, 0, px, px);
       const cx = px / 2;
-      const cy = px / 2 + px * 0.04;
+      const cy = px / 2 + px * 0.03;
       for (const d of dots) {
-        d.a += d.speed;
-        const x = cx + Math.cos(d.a) * d.r * px;
-        const y = cy + Math.sin(d.a) * d.r * px * 0.38;
-        const a = 0.18 + d.s * 0.42;
-        const g = Math.floor(24 + d.shade * 70);
+        const frontDot = Math.sin(d.a) > 0;
+        if (pass === 'front' ? !frontDot : frontDot) continue;
+        let x = cx + Math.cos(d.a) * d.r * px;
+        let y = cy + Math.sin(d.a) * d.r * px * 0.42;
+        if (pointer.on) {
+          const hx = pointer.x * px;
+          const hy = pointer.y * px;
+          const dx = x - hx;
+          const dy = y - hy;
+          const dist = Math.hypot(dx, dy) || 1;
+          const reach = px * 0.22;
+          if (dist < reach) {
+            const f = (1 - dist / reach) * 18 * dpr;
+            x += (dx / dist) * f;
+            y += (dy / dist) * f;
+          }
+        }
+        const a = (frontDot ? 0.34 : 0.16) + d.s * 0.38;
+        const g = Math.floor(22 + d.shade * 78);
         ctx.fillStyle = `rgba(${g},${g},${g + 2},${a})`;
         ctx.beginPath();
         ctx.arc(x, y, d.s * dpr, 0, Math.PI * 2);
         ctx.fill();
       }
     };
+
+    const tick = () => {
+      if (stop) return;
+      raf = requestAnimationFrame(tick);
+      for (const d of dots) d.a += d.speed;
+      paint(back, 'back');
+      paint(front, 'front');
+    };
     tick();
-    return () => { stop = true; cancelAnimationFrame(raf); };
+    return () => {
+      stop = true;
+      cancelAnimationFrame(raf);
+      host.removeEventListener('pointermove', onMove);
+      host.removeEventListener('pointerleave', onLeave);
+    };
   }, []);
 
-  return <canvas ref={ref} className="arrodes-disc" aria-hidden />;
+  return (
+    <div ref={hostRef} className="arrodes-disc-stack" aria-hidden>
+      <canvas ref={backRef} className="arrodes-disc arrodes-disc--back" />
+      <canvas ref={frontRef} className="arrodes-disc arrodes-disc--front" />
+    </div>
+  );
 }

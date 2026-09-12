@@ -13,7 +13,7 @@ export default function BlackHole({
   const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
     <div className={`arrodes-orbit relative flex items-center justify-center overflow-visible bg-transparent ${className}`} data-variant={track ? 'track' : 'home'}>
-      <AccretionDisc />
+      <AccretionDisc tight={track} />
       <div className="arrodes-tilt">
         <ArrodesVoiceMirror variant={track ? 'track' : 'home'} mode="idle" active />
       </div>
@@ -21,7 +21,7 @@ export default function BlackHole({
   );
 }
 
-function AccretionDisc() {
+function AccretionDisc({ tight = false }: { tight?: boolean }) {
   const backRef = useRef<HTMLCanvasElement>(null);
   const frontRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -31,33 +31,32 @@ function AccretionDisc() {
     const back = backRef.current;
     const front = frontRef.current;
     if (!host || !back || !front) return;
-    const orbit = host.parentElement ?? host;
     let raf = 0;
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
+    const orbit = host.parentElement;
 
-    const rings = [0.34, 0.46, 0.58, 0.72];
-    const dots = Array.from({ length: 760 }, (_, i) => {
+    const rings = tight ? [0.18, 0.24, 0.30, 0.36] : [0.20, 0.27, 0.34, 0.41];
+    const dots = Array.from({ length: tight ? 520 : 720 }, (_, i) => {
       const ring = rings[i % rings.length];
-      const t = Math.pow(Math.random(), 0.7);
       return {
-        r: ring + (Math.random() - 0.5) * 0.05 + t * 0.02,
+        r: ring + (Math.random() - 0.5) * 0.028,
         a: Math.random() * Math.PI * 2,
         speed: 0.0018 + Math.random() * 0.0032,
-        s: 0.5 + Math.random() * 1.05,
+        s: 0.45 + Math.random() * 0.9,
         shade: Math.random(),
       };
     });
 
     const onMove = (e: PointerEvent) => {
-      const r = orbit.getBoundingClientRect();
-      pointer.x = (e.clientX - r.left) / Math.max(1, r.width);
-      pointer.y = (e.clientY - r.top) / Math.max(1, r.height);
+      const box = (orbit || host).getBoundingClientRect();
+      pointer.x = (e.clientX - box.left) / Math.max(1, box.width);
+      pointer.y = (e.clientY - box.top) / Math.max(1, box.height);
       pointer.on = 1;
     };
     const onLeave = () => { pointer.on = 0; };
-    orbit.addEventListener('pointermove', onMove);
-    orbit.addEventListener('pointerleave', onLeave);
+    (orbit || host).addEventListener('pointermove', onMove);
+    (orbit || host).addEventListener('pointerleave', onLeave);
 
     const paint = (canvas: HTMLCanvasElement, pass: 'back' | 'front') => {
       const size = Math.max(host.clientWidth || 160, host.clientHeight || 160);
@@ -71,26 +70,28 @@ function AccretionDisc() {
       if (!ctx) return;
       ctx.clearRect(0, 0, px, px);
       const cx = px / 2;
-      const cy = px / 2 + px * 0.03;
+      const cy = px / 2 + px * 0.02;
+      const maxR = rings[rings.length - 1] + 0.02;
       for (const d of dots) {
         const frontDot = Math.sin(d.a) > 0;
         if (pass === 'front' ? !frontDot : frontDot) continue;
         let x = cx + Math.cos(d.a) * d.r * px;
-        let y = cy + Math.sin(d.a) * d.r * px * 0.42;
+        let y = cy + Math.sin(d.a) * d.r * px * 0.40;
         if (pointer.on) {
           const hx = pointer.x * px;
           const hy = pointer.y * px;
           const dx = x - hx;
           const dy = y - hy;
           const dist = Math.hypot(dx, dy) || 1;
-          const reach = px * 0.22;
+          const reach = px * 0.18;
           if (dist < reach) {
-            const f = (1 - dist / reach) * 18 * dpr;
+            const f = (1 - dist / reach) * 14 * dpr;
             x += (dx / dist) * f;
             y += (dy / dist) * f;
           }
         }
-        const a = (frontDot ? 0.34 : 0.16) + d.s * 0.38;
+        const edge = Math.max(0, Math.min(1, (maxR + 0.03 - d.r) / 0.08));
+        const a = ((frontDot ? 0.36 : 0.18) + d.s * 0.34) * (0.35 + edge * 0.65);
         const g = Math.floor(22 + d.shade * 78);
         ctx.fillStyle = `rgba(${g},${g},${g + 2},${a})`;
         ctx.beginPath();
@@ -110,10 +111,10 @@ function AccretionDisc() {
     return () => {
       stop = true;
       cancelAnimationFrame(raf);
-      orbit.removeEventListener('pointermove', onMove);
-      orbit.removeEventListener('pointerleave', onLeave);
+      (orbit || host).removeEventListener('pointermove', onMove);
+      (orbit || host).removeEventListener('pointerleave', onLeave);
     };
-  }, []);
+  }, [tight]);
 
   return (
     <div ref={hostRef} className="arrodes-disc-stack" aria-hidden>

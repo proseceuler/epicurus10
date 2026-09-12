@@ -4,13 +4,13 @@ import ArrodesVoiceMirror from '@/components/ArrodesVoiceMirror';
 /** Habit Home + Tracker interactable — tilted mercury mirror in a spinning disc. */
 export default function BlackHole({
   className = '',
-  variant = 'home',
+  variant,
 }: {
   className?: string;
   percent?: number;
   variant?: 'home' | 'track';
 }) {
-  const track = variant === 'track';
+  const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
     <div className={`arrodes-orbit relative flex items-center justify-center overflow-visible bg-transparent ${className}`} data-variant={track ? 'track' : 'home'}>
       <AccretionDisc />

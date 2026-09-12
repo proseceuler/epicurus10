@@ -55,6 +55,7 @@ export default function WeeklyRecapSlideshow({
   onClose: () => void;
 }) {
   const [i, setI] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   const xp = getXP();
 
   const slides = useMemo(
@@ -62,9 +63,9 @@ export default function WeeklyRecapSlideshow({
       { title: 'Week in review', body: 'A quick look at how you showed up this week.', metric: null as string | null },
       { title: 'Focus time', body: 'Deep work logged across the last 7 days.', metric: stats.focusLabel },
       { title: 'Habit streak', body: 'Consecutive days with habits completed.', metric: `${stats.streak}d` },
-      { title: 'Habits today', body: 'Check-ins on the board right now.', metric: stats.habitsTotal ? `${stats.habitsToday}/${stats.habitsTotal}` : '—' },
+      { title: 'Habits today', body: 'Check-ins on the board right now.', metric: stats.habitsTotal ? `${stats.habitsToday}/${stats.habitsTotal}` : '\u2014' },
       { title: 'Open work', body: 'Tasks still waiting on you.', metric: String(stats.openTasks) },
-      { title: 'Level progress', body: 'XP from habits, tasks, and reviews.', metric: `Lv ${xp.level} · ${xp.xp} XP` },
+      { title: 'Level progress', body: 'XP from habits, tasks, and reviews.', metric: `Lv ${xp.level} \u00b7 ${xp.xp} XP` },
     ],
     [stats, xp.level, xp.xp],
   );
@@ -72,13 +73,15 @@ export default function WeeklyRecapSlideshow({
   const slide = slides[i];
 
   const close = () => {
+    if (leaving) return;
     markSundayRecapSeen();
-    onClose();
+    setLeaving(true);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
+      if (leaving) return;
       if (e.key === 'ArrowRight') setI((v) => Math.min(slides.length - 1, v + 1));
       if (e.key === 'ArrowLeft') setI((v) => Math.max(0, v - 1));
     };
@@ -90,14 +93,15 @@ export default function WeeklyRecapSlideshow({
     <motion.div
       className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{ opacity: leaving ? 0 : 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      onAnimationComplete={() => { if (leaving) onClose(); }}
     >
       <motion.div
         className="glass relative w-full max-w-md overflow-hidden rounded-3xl p-6 shadow-2xl"
         initial={{ opacity: 0, y: 18, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+        animate={leaving ? { opacity: 0, y: 18, scale: 0.96 } : { opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
       >
         <motion.button
           type="button"
@@ -136,7 +140,7 @@ export default function WeeklyRecapSlideshow({
         <div className="mt-10 flex items-center justify-between">
           <motion.button
             type="button"
-            disabled={i === 0}
+            disabled={i === 0 || leaving}
             onClick={() => setI((v) => v - 1)}
             whileTap={{ scale: 0.96 }}
             className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"

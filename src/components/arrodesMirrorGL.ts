@@ -1,4 +1,4 @@
-import type { ArrodesVoiceMode } from '@/components/ArrodesVoiceMirror';
+export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 export interface Bands { amp: number; bass: number; mid: number; treble: number; }
 export const EMPTY: Bands = { amp: 0, bass: 0, mid: 0, treble: 0 };

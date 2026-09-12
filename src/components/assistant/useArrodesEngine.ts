@@ -12,7 +12,7 @@ import { undoLastWrite } from '@/lib/assistant/undo';
 import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
 import type { ArrodesVoiceMode } from '@/components/ArrodesVoiceMirror';
-import { attachmentPromptFallback, dataUrlToBlob, newId, type Msg } from '@/components/assistant/arrodesBits';
+import { attachmentPromptFallback, dataUrlToBlob, newId, THINK_WORDS, type Msg } from '@/components/assistant/arrodesBits';
 
 export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   const pomodoro = usePomodoro();
@@ -28,11 +28,13 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState('');
+  const [thinkWord, setThinkWord] = useState(THINK_WORDS[0]);
   const recognitionRef = useRef<ReturnType<typeof createRecognizer>>(null);
   const voiceOnRef = useRef(false);
   const loopRef = useRef<VoiceLoop | null>(null);
   const busyRef = useRef(false);
   const speakingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const slim = messages.map((m, i) => {
@@ -45,7 +47,16 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
   useEffect(() => { busyRef.current = busy; }, [busy]);
   useEffect(() => { speakingRef.current = speaking; }, [speaking]);
-  useEffect(() => () => { loopRef.current?.stop(); stopReply(); window.clearTimeout(voiceLeaveTimer.current); }, []);
+  useEffect(() => () => { loopRef.current?.stop(); stopReply(); abortRef.current?.abort(); window.clearTimeout(voiceLeaveTimer.current); }, []);
+
+  useEffect(() => {
+    if (!busy) return;
+    setThinkWord(THINK_WORDS[Math.floor(Math.random() * THINK_WORDS.length)]);
+    const id = window.setInterval(() => {
+      setThinkWord(THINK_WORDS[Math.floor(Math.random() * THINK_WORDS.length)]);
+    }, 900);
+    return () => window.clearInterval(id);
+  }, [busy]);
 
   const focus = (subject: string | null) => {
     pomodoro.setSessionContext((subject as SubjectKey) ?? null, null);
@@ -152,6 +163,15 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     setAttachments((cur) => [...cur, ...next].slice(0, 6));
   };
 
+  const stopGenerate = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    stopReply();
+    busyRef.current = false;
+    setBusy(false);
+    setInterim('');
+  };
+
   const send = async (text?: string) => {
     let content = (text ?? input).trim();
     const audioAtt = attachments.filter((a) => a.kind === 'audio' || isAudioFile(a));
@@ -191,20 +211,27 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     setAttachments([]);
     const next = [...messages, user];
     setMessages(next);
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     busyRef.current = true;
     setBusy(true);
     try {
       const reply = await runAssistantTurn({
         key, page, history: next, searchEnabled: searchOn, voice: voiceOnRef.current,
         ctx: { startFocus: focus },
+        signal: ac.signal,
       });
+      if (ac.signal.aborted) return;
       const assistant: Msg = { id: newId(), role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
       harvestMemory(user.content, reply.content);
       setMessages([...next, assistant]);
       if (voiceOnRef.current && reply.content) await speak(reply.content);
     } catch (err) {
+      if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
+      if (abortRef.current === ac) abortRef.current = null;
       busyRef.current = false;
       setBusy(false);
     }
@@ -259,7 +286,7 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
 
   return {
     messages, input, setInput, busy, error, searchOn, toggleSearch, attachments, setAttachments,
-    voiceOn, voiceLeaving, listening, speaking, interim, voiceMode, hasDraft, voiceTitle,
-    send, confirmWrite, revertWrite, toggleVoice, pickFiles,
+    voiceOn, voiceLeaving, listening, speaking, interim, voiceMode, hasDraft, voiceTitle, thinkWord,
+    send, confirmWrite, revertWrite, toggleVoice, pickFiles, stopGenerate,
   };
 }

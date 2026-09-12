@@ -12,7 +12,10 @@ export default function BlackHole({
 }) {
   const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
-    <div className={`arrodes-orbit relative flex items-center justify-center overflow-hidden bg-transparent ${className}`} data-variant={track ? 'track' : 'home'}>
+    <div
+      className={`arrodes-orbit relative flex items-center justify-center bg-transparent ${track ? 'overflow-hidden' : 'overflow-visible'} ${className}`}
+      data-variant={track ? 'track' : 'home'}
+    >
       <AccretionDisc compact={track} />
       <div className="arrodes-tilt">
         <ArrodesVoiceMirror variant={track ? 'track' : 'home'} mode="idle" active />
@@ -36,10 +39,8 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
 
-    // e696b76 rings [0.34, 0.46, 0.58, 0.72] — shrink a little so the
-    // outer band stays inside the existing 340px / 176px well. Do not
-    // retarget the six Home cards; clip leftover spray at the well edge.
-    const scale = compact ? 0.86 : 0.88;
+    // Home = e696b76 rings, unscaled. Tracker keeps the compact hug-mirror.
+    const scale = compact ? 0.58 : 1;
     const rings = [0.34, 0.46, 0.58, 0.72].map((r) => r * scale);
     const dots = Array.from({ length: compact ? 560 : 760 }, (_, i) => {
       const ring = rings[i % rings.length];
@@ -76,16 +77,17 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
       ctx.clearRect(0, 0, px, px);
       const cx = px / 2;
       const cy = px / 2 + px * 0.03;
-      const edge = px * 0.48;
       for (const d of dots) {
         const frontDot = Math.sin(d.a) > 0;
         if (pass === 'front' ? !frontDot : frontDot) continue;
-        let x = cx + Math.cos(d.a) * d.r * px;
+        const nx = Math.cos(d.a);
+        let side = 1;
+        if (compact) {
+          side = Math.max(0, Math.min(1, (0.88 - Math.abs(nx)) / 0.26));
+          if (side <= 0.02) continue;
+        }
+        let x = cx + nx * d.r * px;
         let y = cy + Math.sin(d.a) * d.r * px * 0.42;
-        const rad = Math.hypot(x - cx, (y - cy) / 0.42);
-        if (rad > px * 0.52) continue;
-        const edgeFade = rad > edge ? Math.max(0, (px * 0.52 - rad) / (px * 0.04)) : 1;
-        if (edgeFade <= 0.02) continue;
         if (pointer.on) {
           const hx = pointer.x * px;
           const hy = pointer.y * px;
@@ -99,7 +101,7 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
             y += (dy / dist) * f;
           }
         }
-        const a = ((frontDot ? 0.34 : 0.16) + d.s * 0.38) * edgeFade;
+        const a = ((frontDot ? 0.34 : 0.16) + d.s * 0.38) * side;
         const g = Math.floor(22 + d.shade * 78);
         ctx.fillStyle = `rgba(${g},${g},${g + 2},${a})`;
         ctx.beginPath();

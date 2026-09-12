@@ -7,6 +7,28 @@ export const SUGGESTS = [
   { label: 'Add a task', text: 'Help me add a task for tomorrow.' },
 ];
 
+export const THINK_WORDS = [
+  'Deciphering',
+  'Cogitating',
+  'Cerebrating',
+  'Pondering',
+  'Contemplating',
+  'Considering',
+  'Deliberating',
+  'Inferring',
+  'Musing',
+  'Philosophising',
+  'Puzzling',
+  'Elucidating',
+  'Coalescing',
+  'Perusing',
+  'Proofing',
+  'Reticulating',
+  'Envisioning',
+  'Precipitating',
+  'Ionizing',
+];
+
 export interface Msg extends ChatTurn {
   id?: string;
   pending?: PendingWrite;
@@ -37,6 +59,18 @@ export function MirrorIcon({ className }: { className?: string }) {
       <rect x="6.5" y="2.5" width="11" height="16" rx="5.5" />
       <path d="M9 21h6" />
       <path d="M12 18.5V21" />
+    </svg>
+  );
+}
+
+/** Stop / thinking mark — black disc, pale ring, amber core. */
+export function ArrodesMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <circle cx="16" cy="16" r="16" fill="#111113" />
+      <circle cx="16" cy="16" r="7.4" fill="none" stroke="#f4f1ea" strokeWidth="2.15" />
+      <circle cx="16" cy="16" r="3.55" fill="#e8a85a" />
+      <circle cx="16" cy="16" r="1.55" fill="#fff4e4" />
     </svg>
   );
 }

@@ -63,14 +63,14 @@ export function MirrorIcon({ className }: { className?: string }) {
   );
 }
 
-/** Stop / thinking mark — black disc, pale ring, amber core. */
+/** Stop / thinking mark — black disc, pale ring, amber rounded-square core. */
 export function ArrodesMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <circle cx="16" cy="16" r="16" fill="#111113" />
-      <circle cx="16" cy="16" r="7.4" fill="none" stroke="#f4f1ea" strokeWidth="2.15" />
-      <circle cx="16" cy="16" r="3.55" fill="#e8a85a" />
-      <circle cx="16" cy="16" r="1.55" fill="#fff4e4" />
+      <circle cx="16" cy="16" r="16" fill="#0c0c0e" />
+      <circle cx="16" cy="16" r="7.15" fill="none" stroke="#f3efe6" strokeWidth="2.35" />
+      <rect x="12.15" y="12.15" width="7.7" height="7.7" rx="1.85" fill="#e59a3a" />
+      <rect x="13.55" y="13.55" width="4.9" height="4.9" rx="1.15" fill="#f4c37a" />
     </svg>
   );
 }

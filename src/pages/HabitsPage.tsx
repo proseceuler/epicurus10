@@ -3,7 +3,9 @@ import { MotionSwap } from '@/components/MotionUI';
 import { Select } from '@/components/kit';
 import { supabase } from '@/lib/supabase';
 import type { Habit, HabitCompletion } from '@/lib/types';
-import { HomeView, TrackView, DashView, InsightsView, type View } from '@/components/habits/views';
+import { HomeView, type View } from '@/components/habits/views';
+import { TrackView } from '@/components/habits/views-track';
+import { DashView, InsightsView } from '@/components/habits/views-rest';
 import {
   MONTHS, monthDays, doneSet, isDone, todayIso, lastNDays, lifetimePct,
 } from '@/lib/habit-stats';

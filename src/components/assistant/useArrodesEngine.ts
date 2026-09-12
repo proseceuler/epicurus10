@@ -125,7 +125,7 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
       setVoiceLeaving(true);
       setVoiceOn(false);
       window.clearTimeout(voiceLeaveTimer.current);
-      voiceLeaveTimer.current = window.setTimeout(() => setVoiceLeaving(false), 860);
+      voiceLeaveTimer.current = window.setTimeout(() => setVoiceLeaving(false), 1120);
       return;
     }
     if (!groqConfigured() && !speechRecognitionCtor()) {

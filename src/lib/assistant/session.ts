@@ -1,8 +1,10 @@
-/** Session-local assistant state. Swap `getAssistantOwner()` later for a signed-in user id. */
+/** Session-local assistant state. Survives reloads; never drop message text to save space. */
 
 export const OWNER_KEY = 'epicure-assistant-user';
 export const SEARCH_KEY = 'epicure-assistant-web-search';
 export const HISTORY_PREFIX = 'epicure-assistant-history:';
+
+let cache: unknown[] | null = null;
 
 export function getAssistantOwner(): string {
   try {
@@ -17,11 +19,14 @@ export function historyKey(owner = getAssistantOwner()) {
 }
 
 export function loadHistory<T>(fallback: T[]): T[] {
+  if (cache && cache.length) return cache as T[];
   try {
     const raw = localStorage.getItem(historyKey()) || sessionStorage.getItem(historyKey());
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as T[];
-    return Array.isArray(parsed) ? parsed : fallback;
+    if (!Array.isArray(parsed)) return fallback;
+    cache = parsed;
+    return parsed;
   } catch {
     return fallback;
   }
@@ -43,8 +48,8 @@ function compact<T>(messages: T[]): T[] {
 }
 
 export function saveHistory<T>(messages: T[]) {
-  // Keep the full text of the thread. Never drop user/assistant words to save space.
-  let keep = messages.slice(-80);
+  const keep = messages.slice(-80);
+  cache = keep as unknown[];
   const write = (payload: string) => {
     localStorage.setItem(historyKey(), payload);
     try { sessionStorage.setItem(historyKey(), payload); } catch { /* ignore */ }
@@ -52,28 +57,24 @@ export function saveHistory<T>(messages: T[]) {
   try {
     write(JSON.stringify(compact(keep)));
     return;
-  } catch {
-    /* quota — drop attachments first, then oldest turns, but keep text */
-  }
+  } catch { /* quota */ }
   try {
     write(JSON.stringify(keep.map((m: any) => ({
+      id: m?.id,
       role: m?.role,
       content: String(m?.content || ''),
       pending: m?.pending,
       sources: m?.sources,
     }))));
     return;
-  } catch {
-    /* still too big */
-  }
-  while (keep.length > 8) {
-    keep = keep.slice(2);
+  } catch { /* still too big */ }
+  let shrink = keep;
+  while (shrink.length > 8) {
+    shrink = shrink.slice(2);
     try {
-      write(JSON.stringify(keep.map((m: any) => ({ role: m?.role, content: String(m?.content || '') }))));
+      write(JSON.stringify(shrink.map((m: any) => ({ id: m?.id, role: m?.role, content: String(m?.content || '') }))));
       return;
-    } catch {
-      /* keep shrinking */
-    }
+    } catch { /* keep shrinking */ }
   }
 }
 

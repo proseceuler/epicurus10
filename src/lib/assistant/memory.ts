@@ -34,10 +34,11 @@ export function rememberFact(fact: string) {
 }
 
 export function harvestMemory(userText: string, assistantText = '') {
-  const blob = `${userText}\n${assistantText}`.replace(/\s+/g, ' ').trim();
+  const user = userText.replace(/\s+/g, ' ').trim();
+  const blob = `${user}\n${assistantText}`.replace(/\s+/g, ' ').trim();
   if (!blob) return;
   const lines: string[] = [];
-  const remember = blob.match(/(?:remember(?: that)?|don't forget|note that)\s*[:\-–]?\s*(.{8,120})/i);
+  const remember = blob.match(/(?:remember(?: that)?|don't forget|note that)\s*[:\-\u2013]?\s*(.{8,120})/i);
   if (remember?.[1]) lines.push(remember[1].replace(/[.?!]+$/, ''));
   const name = blob.match(/\b(?:my name is|i'm|i am)\s+([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})?)/);
   if (name?.[1] && !/^(going|doing|just|not|the|a)\b/i.test(name[1])) lines.push(`Name: ${name[1]}`);
@@ -45,5 +46,8 @@ export function harvestMemory(userText: string, assistantText = '') {
   if (grade?.[2]) lines.push(`Grade ${grade[2]}`);
   const likes = blob.match(/\b(?:i (?:like|love|prefer|hate|need to))\s+(.{6,80})/i);
   if (likes?.[0]) lines.push(likes[0].replace(/[.?!]+$/, ''));
+  const subject = user.match(/\b(?:my|our)\s+(math|science|english|filipino|history|pe|values|computer|ict)\b[^.!?]{0,60}/i);
+  if (subject?.[0]) lines.push(subject[0].replace(/[.?!]+$/, ''));
+  if (/^(i|my|we)\b/i.test(user) && user.length >= 12 && user.length <= 140) lines.push(user.replace(/[.?!]+$/, ''));
   for (const line of lines) rememberFact(line);
 }

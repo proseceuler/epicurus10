@@ -103,14 +103,29 @@ export default function ArrodesVoiceMirror({
         <canvas
           ref={canvasRef}
           className="arrodes-blob"
-          style={{ WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`, maskImage: `url("${ARRODES_HOLE_MASK}")` }}
+          style={{
+            WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`,
+            maskImage: `url("${ARRODES_HOLE_MASK}")`,
+            WebkitMaskMode: 'luminance',
+            maskMode: 'luminance',
+          }}
         />
         <div
           className="arrodes-glass"
           aria-hidden
-          style={{ WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`, maskImage: `url("${ARRODES_HOLE_MASK}")` }}
+          style={{
+            WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`,
+            maskImage: `url("${ARRODES_HOLE_MASK}")`,
+            WebkitMaskMode: 'luminance',
+            maskMode: 'luminance',
+          }}
         />
-        <img className="arrodes-frame" src={ARRODES_FRAME} alt="" draggable={false} />
+        <img
+          className="arrodes-frame"
+          src={ARRODES_FRAME}
+          alt=""
+          draggable={false}
+        />
       </div>
     </div>
   );
@@ -308,11 +323,11 @@ void main() {
   float rings = sin(length(q) * (13.0 + uBass * 16.0) - t * (2.1 + uBass * 3.6)) * 0.5 + 0.5;
   float h = n * 0.55 + n2 * 0.26 + rip * (0.05 + uBass * 0.09 + speak * 0.07) + uAmp * 0.14;
 
-  vec3 slate = vec3(0.27, 0.28, 0.30);
-  vec3 steel = vec3(0.50, 0.52, 0.54);
-  vec3 mercury = vec3(0.66, 0.68, 0.70);
-  vec3 silver = vec3(0.80, 0.81, 0.83);
-  vec3 gleam = vec3(0.94, 0.94, 0.95);
+  vec3 slate = vec3(0.13, 0.14, 0.16);
+  vec3 steel = vec3(0.28, 0.30, 0.33);
+  vec3 mercury = vec3(0.48, 0.50, 0.53);
+  vec3 silver = vec3(0.70, 0.72, 0.74);
+  vec3 gleam = vec3(0.90, 0.91, 0.92);
 
   vec3 pane = mix(slate, steel, smoothstep(0.18, 0.55, h));
   pane = mix(pane, mercury, smoothstep(0.42, 0.78, h + sheet * 0.12));

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type SubjectKey, type ComponentType, type ExType } from '@/lib/types';
 import { computeTermGrade, computeFinalGrade, componentPercentage, exComponentPercentage } from '@/lib/gradeUtils';
-import { Button, Input } from '@/components/kit';
+import { Button, Input, PageHeader } from '@/components/kit';
 import ScientificCalculator from '@/components/ScientificCalculator';
 import { onDataChanged } from '@/lib/assistant/sync';
 import { Calculator, Plus, Trash2, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
@@ -10,7 +10,6 @@ import { Calculator, Plus, Trash2, ChevronRight, TrendingUp, TrendingDown } from
 const COMPONENT_LABELS: Record<ComponentType, string> = { ww: 'Written works', pt: 'Performance tasks', ex: 'Examinations' };
 const COMPONENT_SHORT: Record<ComponentType, string> = { ww: 'WW', pt: 'PT', ex: 'EX' };
 const EX_LABELS: Record<ExType, string> = { st1: 'Summative Test 1', st2: 'Summative Test 2', te: 'Term Examination' };
-const SY_LABEL = 'Grade 10 · S.Y. 2026-2027';
 
 interface Hypo {
   id: string;
@@ -197,40 +196,33 @@ export default function GradesPage() {
 
   return (
     <div className="pb-16">
-      <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-[28px] font-semibold leading-none tracking-tight text-zinc-900">Grades</h1>
-          <p className="mt-2 text-[13px] text-zinc-400">{SY_LABEL}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSimulate((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] ${
-              simulate
-                ? 'border-dashed border-zinc-500 bg-white text-zinc-700'
-                : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300'
-            }`}
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            {simulate ? 'Simulating' : 'Simulate'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCalc((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[13px] text-zinc-600 hover:border-zinc-300"
-          >
-            <Calculator className="h-3.5 w-3.5" />
-            Calculator
-          </button>
-        </div>
-      </div>
-
-      {simulate ? (
-        <div className="mb-5 mt-4 inline-flex rounded-full border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-zinc-400">
-          Simulated scores shown with dashed outlines — not saved to your record.
-        </div>
-      ) : <div className="h-4" />}
+      <PageHeader
+        title="Grades"
+        action={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSimulate((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] ${
+                simulate
+                  ? 'border-dashed border-zinc-500 bg-white text-zinc-700'
+                  : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300'
+              }`}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              {simulate ? 'Simulating' : 'Simulate'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCalc((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[13px] text-zinc-600 hover:border-zinc-300"
+            >
+              <Calculator className="h-3.5 w-3.5" />
+              Calculator
+            </button>
+          </div>
+        }
+      />
 
       <div className="border-b border-zinc-200">
         <div className="flex gap-5 overflow-x-auto">

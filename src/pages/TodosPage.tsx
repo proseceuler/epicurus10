@@ -85,7 +85,7 @@ export default function TodosPage() {
   const toggleTodo = async (todo: Todo) => {
     const next = !todo.completed;
     const { data } = await supabase.from('todos').update({ completed: next }).eq('id', todo.id).select().single();
-    if (next) awardXP({ type: 'todo_complete' });
+    if (next) awardXP({ type: 'todo_complete', key: `todo:${todo.id}`, label: todo.title });
     if (data) setTodos(todos.map((t) => t.id === todo.id ? data as Todo : t));
   };
   const deleteTodo = async (id: string) => {

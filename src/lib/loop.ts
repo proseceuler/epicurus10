@@ -75,9 +75,14 @@ function counted(day: DayRings | undefined) {
   return !!(day && (day.floor || day.focus || day.school));
 }
 
+function changed(a: LoopState, b: LoopState) {
+  return a.streak !== b.streak || a.lastActive !== b.lastActive || a.freezeReady !== b.freezeReady || a.freezeSpentWeek !== b.freezeSpentWeek || a.paused !== b.paused;
+}
+
 function reconcile(state: LoopState): LoopState {
   const today = todayIso();
   const week = mondayIso(today);
+  const before = state;
   if (state.freezeSpentWeek && state.freezeSpentWeek !== week) {
     state = { ...state, freezeSpentWeek: null };
   }
@@ -95,8 +100,15 @@ function reconcile(state: LoopState): LoopState {
     state = { ...state, freezeReady: true };
   }
 
-  if (!state.lastActive) return state;
-  if (state.lastActive >= today) return { ...state, paused: false };
+  if (!state.lastActive) {
+    if (changed(before, state)) save(state);
+    return state;
+  }
+  if (state.lastActive >= today) {
+    const next = { ...state, paused: false };
+    if (changed(before, next)) save(next);
+    return next;
+  }
 
   let cursor = state.lastActive;
   let streak = state.streak;
@@ -105,25 +117,25 @@ function reconcile(state: LoopState): LoopState {
   let paused = state.paused;
 
   while (cursor < prevIso(today)) {
-    const next = (() => {
+    const nxt = (() => {
       const d = new Date(`${cursor}T12:00:00`);
       d.setDate(d.getDate() + 1);
       return todayIso(d);
     })();
-    if (counted(state.days[next])) {
-      cursor = next;
+    if (counted(state.days[nxt])) {
+      cursor = nxt;
       continue;
     }
-    const nextWeek = mondayIso(next);
+    const nextWeek = mondayIso(nxt);
     if (freezeReady && freezeSpentWeek !== nextWeek) {
       freezeReady = false;
       freezeSpentWeek = nextWeek;
-      cursor = next;
+      cursor = nxt;
       continue;
     }
     streak = 0;
     paused = true;
-    cursor = next;
+    cursor = nxt;
   }
 
   if (cursor < today && !counted(state.days[today])) {
@@ -143,7 +155,7 @@ function reconcile(state: LoopState): LoopState {
   }
 
   const nextState = { ...state, streak, lastActive: cursor, freezeReady, freezeSpentWeek, paused };
-  save(nextState);
+  if (changed(before, nextState)) save(nextState);
   return nextState;
 }
 
@@ -187,14 +199,6 @@ export function weekMarks(state = getLoop()): boolean[] {
 export function ringForType(type: string): RingId | null {
   if (type === 'focus_session') return 'focus';
   if (type === 'grade_log' || type === 'class_attend') return 'school';
-  if (
-    type === 'habit_complete' ||
-    type === 'todo_complete' ||
-    type === 'flashcard_review' ||
-    type === 'kanban_done' ||
-    type === 'class_attend'
-  ) {
-    return 'floor';
-  }
+  if (type === 'habit_complete' || type === 'todo_complete' || type === 'flashcard_review' || type === 'kanban_done' || type === 'class_attend') return 'floor';
   return null;
 }

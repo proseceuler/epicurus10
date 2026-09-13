@@ -1,13 +1,13 @@
 /** Inbox / notifications store */
 
-export type InboxKind = 'due' | 'exam' | 'notice' | 'streak' | 'system';
+export type InboxKind = 'due' | 'exam' | 'notice' | 'streak' | 'system' | 'xp' | 'loop';
 
 export type InboxItem = {
   id: string;
   kind: InboxKind;
   title: string;
   body: string;
-  href?: string; // page id hash
+  href?: string;
   created_at: string;
   read: boolean;
   priority: 'low' | 'normal' | 'high';
@@ -52,7 +52,6 @@ export function markAllRead() {
 
 export function pushInbox(item: Omit<InboxItem, 'id' | 'created_at' | 'read'>) {
   const items = getInbox();
-  // de-dupe same title in last 24h
   const dayAgo = Date.now() - 86400000;
   if (items.some((i) => i.title === item.title && new Date(i.created_at).getTime() > dayAgo)) {
     return items;

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { fadeMotion, motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
+import { motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
 export function MotionOverlay({
   open,
@@ -19,15 +19,8 @@ export function MotionOverlay({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          key="overlay"
-          className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
-          initial={reduce ? false : fadeMotion.initial}
-          animate={fadeMotion.animate}
-          exit={fadeMotion.exit}
-          transition={motionTransition(reduce, 0.18)}
-        >
-          <div className="absolute inset-0 bg-zinc-900/30" onClick={onClose} />
+        <div key="overlay" className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}>
+          <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-md" onClick={onClose} />
           <motion.div
             className={`relative ${panelClassName}`}
             initial={reduce ? false : sheetMotion.initial}
@@ -38,7 +31,7 @@ export function MotionOverlay({
           >
             {children}
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
@@ -85,10 +78,10 @@ export function MotionCollapse({
       {open && (
         <motion.div
           className={`overflow-hidden ${className}`}
-          initial={reduce ? false : { opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduce ? { opacity: 1 } : { opacity: 0, y: -4 }}
-          transition={motionTransition(reduce, 0.18)}
+          initial={reduce ? false : { height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={reduce ? { opacity: 1 } : { height: 0, opacity: 0 }}
+          transition={motionTransition(reduce, 0.22)}
         >
           {children}
         </motion.div>

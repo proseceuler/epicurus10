@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
+import { fadeMotion, motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
 export function MotionOverlay({
   open,
@@ -20,13 +20,20 @@ export function MotionOverlay({
     <AnimatePresence>
       {open && (
         <div key="overlay" className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}>
-          <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-md" onClick={onClose} />
+          <motion.div
+            className="absolute inset-0 bg-zinc-900/30 backdrop-blur-md"
+            initial={reduce ? false : fadeMotion.initial}
+            animate={fadeMotion.animate}
+            exit={fadeMotion.exit}
+            transition={motionTransition(reduce, 0.22)}
+            onClick={onClose}
+          />
           <motion.div
             className={`relative ${panelClassName}`}
             initial={reduce ? false : sheetMotion.initial}
             animate={sheetMotion.animate}
             exit={sheetMotion.exit}
-            transition={motionTransition(reduce, 0.2)}
+            transition={motionTransition(reduce, 0.22)}
             onClick={(e) => e.stopPropagation()}
           >
             {children}

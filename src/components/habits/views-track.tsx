@@ -52,6 +52,7 @@ export function TrackView({
     minWidth: 210 + n * 148,
   } as const;
   const lifeSeries = lastNDays(48).map((d) => rateOn(habits, d, done));
+  const waveKey = monthWave.map((v) => v.toFixed(3)).join('|');
 
   return (
     <div className="space-y-2 pb-6">
@@ -76,7 +77,7 @@ export function TrackView({
             <span className="text-[13px] font-semibold text-zinc-700">Habits</span>
           </div>
           <div style={{ gridColumn: '2 / -1' }}>
-            <AreaChart values={monthWave} height={96} />
+            <AreaChart key={waveKey} values={monthWave} height={96} />
           </div>
 
           <div className="border-b border-zinc-200" />
@@ -114,7 +115,7 @@ export function TrackView({
                     const isToday = cell.dateStr === today;
                     return (
                       <div key={cell.dateStr} className="flex items-center justify-center py-1">
-                        <button type="button" onClick={() => onToggle(h.id, cell.dateStr)} className={`inline-block h-[12px] w-[12px] ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`} />
+                        <button type="button" onClick={() => onToggle(h.id, cell.dateStr)} className={`inline-block h-[12px] w-[12px] transition-colors duration-200 ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`} />
                       </div>
                     );
                   })}
@@ -133,7 +134,7 @@ export function TrackView({
                 const tone = dayTone(pct);
                 return (
                   <div key={cell.dateStr} className="flex items-center justify-center py-0.5">
-                    <span className="flex h-[16px] w-full items-center justify-center text-[8px] font-semibold tabular-nums" style={{ background: tone.bg, color: tone.fg }}>{Math.round(pct * 100)}</span>
+                    <span className="flex h-[16px] w-full items-center justify-center text-[8px] font-semibold tabular-nums transition-colors duration-300" style={{ background: tone.bg, color: tone.fg }}>{Math.round(pct * 100)}</span>
                   </div>
                 );
               })}
@@ -147,10 +148,10 @@ export function TrackView({
           <div className="px-2 pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Lifetime Progress</p>
             <div className="mx-auto mt-1 w-[176px] overflow-visible"><BlackHole variant="track" className="aspect-square w-full bg-transparent" /></div>
-            <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800">{life.toFixed(2)}%</p>
+            <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800 transition-all duration-300">{life.toFixed(2)}%</p>
             <div className="mx-auto mt-1 flex h-8 w-[176px] items-end gap-px">
               {lifeSeries.map((v, i) => (
-                <div key={i} className="flex-1 bg-zinc-800" style={{ height: `${Math.max(6, Math.round(v * 100))}%`, opacity: 0.25 + v * 0.75 }} />
+                <div key={i} className="flex-1 bg-zinc-800 transition-[height,opacity] duration-300" style={{ height: `${Math.max(6, Math.round(v * 100))}%`, opacity: 0.25 + v * 0.75 }} />
               ))}
             </div>
           </div>
@@ -166,8 +167,8 @@ export function TrackView({
               <div key={`wc-${wi}`} className="border-l border-zinc-100 px-2 pt-3">
                 <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Weekly Completion %</p>
                 <div className="mt-1 flex items-start justify-between gap-2">
-                  <p className="text-[26px] font-semibold leading-none tabular-nums text-zinc-800">{Math.round(wp * 100)}%</p>
-                  <Spark values={spark} width={64} />
+                  <p className="text-[26px] font-semibold leading-none tabular-nums text-zinc-800 transition-all duration-300">{Math.round(wp * 100)}%</p>
+                  <Spark key={spark.map((v) => v.toFixed(3)).join('|')} values={spark} width={64} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[10px]">
                   <span className="tabular-nums text-zinc-500">({got}/{slots})</span>
@@ -187,7 +188,7 @@ export function TrackView({
                       return (
                         <tr key={h.id} className="border-b border-zinc-100">
                           <td className="truncate py-0.5 pr-1 text-zinc-700">{h.emoji} {h.name}</td>
-                          <td className="py-0.5 text-right tabular-nums" style={{ background: tone.bg, color: tone.fg }}>{Math.round(p * 100)}%</td>
+                          <td className="py-0.5 text-right tabular-nums transition-colors duration-300" style={{ background: tone.bg, color: tone.fg }}>{Math.round(p * 100)}%</td>
                         </tr>
                       );
                     })}

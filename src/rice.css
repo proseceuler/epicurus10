@@ -96,13 +96,14 @@
 }
 .arrodes-orbit {
   perspective: 820px;
+  cursor: pointer;
 }
 .arrodes-orbit .arrodes-tilt {
   position: relative;
   z-index: 2;
   transform: rotateX(18deg) rotateZ(-9deg);
   transform-style: preserve-3d;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-tilt { transform: rotateX(18deg) rotateZ(-9deg); }
 .arrodes-orbit[data-variant='track'] .arrodes-tilt { transform: rotateX(16deg) rotateZ(-8deg); }
@@ -149,7 +150,8 @@
   max-width: 78px;
   animation-duration: 5.6s;
 }
-.arrodes-well:hover {
+.arrodes-well:hover,
+.arrodes-orbit:hover .arrodes-well {
   filter: drop-shadow(0 11px 18px rgba(24, 24, 27, 0.18));
 }
 .arrodes-blob,
@@ -183,7 +185,8 @@
     linear-gradient(180deg, rgba(47, 49, 54, 0.12) 0%, rgba(32, 33, 38, 0.18) 100%);
   transition: background 520ms ease, opacity 520ms ease;
 }
-.arrodes-well:hover .arrodes-glass {
+.arrodes-well:hover .arrodes-glass,
+.arrodes-orbit:hover .arrodes-glass {
   background:
     radial-gradient(ellipse at 32% 18%, rgba(210, 214, 220, 0.11) 0%, rgba(36, 37, 42, 0.0) 58%),
     linear-gradient(165deg, rgba(70, 74, 80, 0.08) 0%, rgba(32, 33, 38, 0.14) 100%);

@@ -2,6 +2,30 @@ import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { fadeMotion, motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
+export function OverlayScrim({ onClose }: { onClose?: () => void }) {
+  const reduce = useReducedMotion();
+  return (
+    <>
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 backdrop-blur-md"
+        initial={reduce ? false : fadeMotion.initial}
+        animate={fadeMotion.animate}
+        exit={fadeMotion.exit}
+        transition={motionTransition(reduce, 0.24)}
+      />
+      <motion.div
+        className="absolute inset-0 bg-zinc-900/30"
+        initial={reduce ? false : fadeMotion.initial}
+        animate={fadeMotion.animate}
+        exit={fadeMotion.exit}
+        transition={motionTransition(reduce, 0.24)}
+        onClick={onClose}
+      />
+    </>
+  );
+}
+
 export function MotionOverlay({
   open,
   onClose,
@@ -19,15 +43,15 @@ export function MotionOverlay({
   return (
     <AnimatePresence>
       {open && (
-        <div key="overlay" className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}>
-          <motion.div
-            className="absolute inset-0 bg-zinc-900/30 backdrop-blur-md"
-            initial={reduce ? false : fadeMotion.initial}
-            animate={fadeMotion.animate}
-            exit={fadeMotion.exit}
-            transition={motionTransition(reduce, 0.22)}
-            onClick={onClose}
-          />
+        <motion.div
+          key="overlay"
+          className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
+          initial={reduce ? false : fadeMotion.initial}
+          animate={fadeMotion.animate}
+          exit={fadeMotion.exit}
+          transition={motionTransition(reduce, 0.22)}
+        >
+          <OverlayScrim onClose={onClose} />
           <motion.div
             className={`relative ${panelClassName}`}
             initial={reduce ? false : sheetMotion.initial}
@@ -38,7 +62,7 @@ export function MotionOverlay({
           >
             {children}
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

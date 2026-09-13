@@ -31,7 +31,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         {pending && (
           <motion.div
             key="confirm-overlay"
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-950/50 p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-900/30 p-4 backdrop-blur-md"
             onClick={() => close(false)}
             role="dialog"
             aria-modal="true"
@@ -42,7 +42,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             transition={motionTransition(reduceMotion, 0.18)}
           >
             <motion.div
-              className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+              className="epic-glass-sheet w-full max-w-sm p-5"
               onClick={(e) => e.stopPropagation()}
               initial={reduceMotion ? false : sheetMotion.initial}
               animate={sheetMotion.animate}

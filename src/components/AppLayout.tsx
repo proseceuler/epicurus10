@@ -2,8 +2,10 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
+import AtaraxiaPanel from '@/components/AtaraxiaPanel';
 import { fadeMotion, motionTransition } from '@/lib/motion';
-import { getXP, xpForNextLevel } from '@/lib/xp';
+import { xpForNextLevel, XP_CHANGED } from '@/lib/xp';
+import { announcePage, refreshInboxFromData } from '@/lib/inboxRefresh';
 import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
 import { supabase } from '@/lib/supabase';
 import {
@@ -58,19 +60,16 @@ function resolvePage(hash: string): PageId {
 
 export function usePageState(): [PageId, (p: PageId) => void] {
   const [page, setPage] = useState<PageId>(() => resolvePage(window.location.hash.slice(1)));
-
   useEffect(() => {
     const onHash = () => setPage(resolvePage(window.location.hash.slice(1)));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-
   const navigate = (p: PageId) => {
     const next = ALIASES[p] ?? p;
     window.location.hash = next;
     setPage(next);
   };
-
   return [page, navigate];
 }
 
@@ -79,6 +78,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantRail, setAssistantRail] = useState(false);
   const [assistantWidth, setAssistantWidth] = useState(340);
+  const [loopOpen, setLoopOpen] = useState(false);
+  const [xpFlash, setXpFlash] = useState<string | null>(null);
   const [badgeTodos, setBadgeTodos] = useState(0);
   const [badgeKanban, setBadgeKanban] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
@@ -112,10 +113,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       setXpProgress(xpForNextLevel());
     };
     void loadBadges();
+    void refreshInboxFromData();
+    announcePage(page);
     const onXp = () => setXpProgress(xpForNextLevel());
-    window.addEventListener('epicure-xp-changed', onXp);
-    return () => window.removeEventListener('epicure-xp-changed', onXp);
+    window.addEventListener(XP_CHANGED, onXp);
+    return () => window.removeEventListener(XP_CHANGED, onXp);
   }, [page]);
+
+  useEffect(() => {
+    const onXp = () => {
+      setXpProgress(xpForNextLevel());
+      setXpFlash('up');
+      window.setTimeout(() => setXpFlash(null), 1200);
+    };
+    window.addEventListener(XP_CHANGED, onXp);
+    return () => window.removeEventListener(XP_CHANGED, onXp);
+  }, []);
 
   useEffect(() => {
     document.title = `${currentLabel} — epicure`;
@@ -123,14 +136,11 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
 
   useEffect(() => {
     let shortcuts: ShortcutMap = getShortcuts();
-    const syncSc = () => {
-      shortcuts = getShortcuts();
-    };
+    const syncSc = () => { shortcuts = getShortcuts(); };
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
       if (typing && !e.metaKey && !e.ctrlKey) return;
-
       if (matchShortcut(e, shortcuts.search)) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
@@ -140,6 +150,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         e.preventDefault();
         setAssistantOpen((v) => !v);
         setAssistantRail(false);
+        setLoopOpen(false);
         return;
       }
       if (matchShortcut(e, shortcuts.inbox)) {
@@ -148,13 +159,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         return;
       }
       const navPairs: [keyof typeof shortcuts, PageId][] = [
-        ['dashboard', 'dashboard'],
-        ['notes', 'notes'],
-        ['todos', 'todos'],
-        ['kanban', 'kanban'],
-        ['calendar', 'calendar'],
-        ['habits', 'habits'],
-        ['focus', 'pomodoro'],
+        ['dashboard', 'dashboard'], ['notes', 'notes'], ['todos', 'todos'],
+        ['kanban', 'kanban'], ['calendar', 'calendar'], ['habits', 'habits'], ['focus', 'pomodoro'],
       ];
       for (const [sid, pageId] of navPairs) {
         if (matchShortcut(e, shortcuts[sid])) {
@@ -166,10 +172,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('epicure-shortcuts-changed', syncSc);
-    const onArrodes = () => {
-      setAssistantOpen(true);
-      setAssistantRail(false);
-    };
+    const onArrodes = () => { setAssistantOpen(true); setAssistantRail(false); };
     window.addEventListener('epicure-open-arrodes', onArrodes);
     return () => {
       window.removeEventListener('keydown', onKey);
@@ -185,21 +188,11 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />
         <div className="absolute -right-24 top-1/3 h-[20rem] w-[20rem] rounded-full bg-white/70 blur-[100px]" />
       </div>
-
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div
-            key="sidebar-overlay"
-            className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            initial={reduceMotion ? false : fadeMotion.initial}
-            animate={fadeMotion.animate}
-            exit={fadeMotion.exit}
-            transition={motionTransition(reduceMotion, 0.18)}
-          />
+          <motion.div key="sidebar-overlay" className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} initial={reduceMotion ? false : fadeMotion.initial} animate={fadeMotion.animate} exit={fadeMotion.exit} transition={motionTransition(reduceMotion, 0.18)} />
         )}
       </AnimatePresence>
-
       <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
@@ -214,30 +207,13 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                 {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const active = page === item.id;
-                  const badge =
-                    item.id === 'todos'
-                      ? badgeTodos
-                      : item.id === 'kanban'
-                        ? badgeKanban
-                        : item.id === 'flashcards'
-                          ? badgeCards
-                          : 0;
+                  const badge = item.id === 'todos' ? badgeTodos : item.id === 'kanban' ? badgeKanban : item.id === 'flashcards' ? badgeCards : 0;
                   return (
                     <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
-                      {active && (
-                        <motion.span
-                          layoutId={reduceMotion ? undefined : 'rice-nav-active'}
-                          className="absolute inset-0 rounded-xl bg-white/15"
-                          transition={motionTransition(reduceMotion, 0.22)}
-                        />
-                      )}
+                      {active && <motion.span layoutId={reduceMotion ? undefined : 'rice-nav-active'} className="absolute inset-0 rounded-xl bg-white/15" transition={motionTransition(reduceMotion, 0.22)} />}
                       <span className="relative shrink-0">
                         <Icon className="h-4 w-4" />
-                        {badge > 0 && (
-                          <span className="chrome-badge absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-600 px-0.5 text-[9px] font-bold text-white">
-                            {badge > 9 ? '9+' : badge}
-                          </span>
-                        )}
+                        {badge > 0 && <span className="chrome-badge absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-600 px-0.5 text-[9px] font-bold text-white">{badge > 9 ? '9+' : badge}</span>}
                       </span>
                       <span className="rice-nav-label relative truncate">{item.label}</span>
                     </button>
@@ -247,26 +223,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             ))}
           </nav>
           <div className="shrink-0 p-2">
-            <button
-              type="button"
-              onClick={() => navigate('settings')}
-              title="Settings"
-              className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${page === 'settings' ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              {page === 'settings' && (
-                <motion.span
-                  layoutId={reduceMotion ? undefined : 'rice-nav-active'}
-                  className="absolute inset-0 rounded-xl bg-white/15"
-                  transition={motionTransition(reduceMotion, 0.22)}
-                />
-              )}
+            <button type="button" onClick={() => navigate('settings')} title="Settings" className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${page === 'settings' ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+              {page === 'settings' && <motion.span layoutId={reduceMotion ? undefined : 'rice-nav-active'} className="absolute inset-0 rounded-xl bg-white/15" transition={motionTransition(reduceMotion, 0.22)} />}
               <SettingsIcon className="relative h-4 w-4 shrink-0" />
               <span className="rice-nav-label relative truncate">Settings</span>
             </button>
           </div>
         </div>
       </aside>
-
       <div className="rice-main relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <header className="z-20 flex shrink-0 items-center justify-between px-3 pt-3">
           <div className="flex h-10 items-center gap-2 rounded-2xl glass px-2 lg:hidden">
@@ -276,35 +240,22 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden items-center gap-2 sm:flex" title={`Level ${xpProgress.level}`}>
-              <div className="h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80">
-                <div
-                  className="h-full rounded-full bg-zinc-800 transition-[width] duration-300"
-                  style={{ width: `${Math.round(xpProgress.progress * 100)}%` }}
-                />
-              </div>
-            </div>
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
+            <button type="button" title={`Level ${xpProgress.level}`} aria-label="Open progress" onClick={() => { setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }} className={`relative flex h-10 items-center gap-2 rounded-full px-3 glass transition-colors duration-200 ${loopOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`}>
+              <span className="text-[11px] font-semibold tabular-nums">L{xpProgress.level}</span>
+              <span className={`h-1 w-14 overflow-hidden rounded-full ${loopOpen ? 'bg-white/25' : 'bg-zinc-200/80'}`}>
+                <span className={`block h-full rounded-full transition-[width] duration-300 ${loopOpen ? 'bg-white' : 'bg-zinc-800'}`} style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
+              </span>
+              {xpFlash && !loopOpen && <span className="absolute -top-2 right-2 text-[10px] font-semibold text-zinc-700">+</span>}
+            </button>
+            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
       </div>
-
-      <GlobalAssistant
-        open={assistantOpen}
-        rail={assistantRail}
-        page={page}
-        width={assistantWidth}
-        onWidth={(n) => {
-          setAssistantWidth(n);
-          try { localStorage.setItem('epicure-assistant-width', String(n)); } catch { /* ignore */ }
-        }}
-        onClose={() => { setAssistantOpen(false); setAssistantRail(false); }}
-        onRail={() => { setAssistantOpen(false); setAssistantRail(true); }}
-        navigate={navigate}
-      />
+      <AtaraxiaPanel open={loopOpen} onClose={() => setLoopOpen(false)} navigate={navigate} />
+      <GlobalAssistant open={assistantOpen} rail={assistantRail} page={page} width={assistantWidth} onWidth={(n) => { setAssistantWidth(n); try { localStorage.setItem('epicure-assistant-width', String(n)); } catch { /* ignore */ } }} onClose={() => { setAssistantOpen(false); setAssistantRail(false); }} onRail={() => { setAssistantOpen(false); setAssistantRail(true); setLoopOpen(false); }} navigate={navigate} />
       <GlobalDock navigate={navigate} page={page} />
     </div>
   );

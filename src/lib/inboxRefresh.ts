@@ -1,9 +1,27 @@
 import { getCalendarEvents } from '@/lib/calendarStore';
 import { pushInbox } from '@/lib/inbox';
+import { getLoop } from '@/lib/loop';
 import { isDue } from '@/lib/sm2';
 import { supabase } from '@/lib/supabase';
+import { todayIso } from '@/lib/xp';
+import type { PageId } from '@/components/AppLayout';
 
-/** Scan due todos, calendar, and flashcards; push inbox notices (deduped). */
+const TOUCH_KEY = 'epicure:inbox-touch:v1';
+
+function touched(page: string) {
+  if (typeof window === 'undefined') return true;
+  try {
+    const map = JSON.parse(localStorage.getItem(TOUCH_KEY) || '{}') as Record<string, string>;
+    const today = todayIso();
+    if (map[page] === today) return true;
+    map[page] = today;
+    localStorage.setItem(TOUCH_KEY, JSON.stringify(map));
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function refreshInboxFromData() {
   if (typeof window === 'undefined') return;
 
@@ -53,7 +71,7 @@ export async function refreshInboxFromData() {
     for (const e of getCalendarEvents()) {
       if (e.start_date === todayStr || (e.start_date <= todayStr && e.end_date >= todayStr)) {
         pushInbox({
-          kind: e.kind === 'exam' ? 'exam' : e.kind === 'holiday' ? 'notice' : 'notice',
+          kind: e.kind === 'exam' ? 'exam' : 'notice',
           title: e.title,
           body: e.kind === 'exam' ? 'Exam / assessment today' : e.description || 'Calendar',
           href: 'calendar',
@@ -80,4 +98,56 @@ export async function refreshInboxFromData() {
   } catch {
     /* ignore */
   }
+
+  const loop = getLoop();
+  if (loop.streak >= 3) {
+    pushInbox({
+      kind: 'streak',
+      title: `${loop.streak}-day streak`,
+      body: loop.freezeReady ? 'A freeze is ready.' : loop.paused ? 'Streak is paused.' : 'Floor ring keeps this alive.',
+      href: 'habits',
+      priority: 'low',
+    });
+  }
+}
+
+export function announcePage(page: PageId) {
+  if (touched(page)) return;
+  const loop = getLoop();
+  const rings = loop.days[todayIso()];
+  const open = [
+    !rings?.floor ? 'floor' : null,
+    !rings?.focus ? 'focus' : null,
+    !rings?.school ? 'school' : null,
+  ].filter(Boolean);
+
+  const table: Partial<Record<PageId, { title: string; body: string; kind: 'notice' | 'loop' | 'due' | 'streak' | 'system' }>> = {
+    dashboard: {
+      kind: 'loop',
+      title: open.length ? `${open.length} ring${open.length === 1 ? '' : 's'} still open` : 'Day complete',
+      body: open.length ? `Still open: ${open.join(', ')}.` : 'Floor, focus, and school are closed.',
+    },
+    grades: { kind: 'notice', title: 'Grades', body: 'Log a WW, PT, or EX to close the school ring.' },
+    classhub: { kind: 'notice', title: 'Class Hub', body: 'Mark attend to close floor and school.' },
+    todos: { kind: 'due', title: 'To-Do List', body: 'Finishing a task closes the floor ring.' },
+    kanban: { kind: 'notice', title: 'Kanban', body: 'Moving a card to done pays XP once.' },
+    calendar: { kind: 'notice', title: 'Calendar', body: "Today's events also land in Inbox." },
+    notes: { kind: 'notice', title: 'Notes', body: 'A new note counts once per day toward XP.' },
+    drive: { kind: 'notice', title: 'Cloud Drive', body: 'Files stay here. Progress lives in the level chip.' },
+    pomodoro: { kind: 'loop', title: 'Focus', body: 'A session of 15 minutes or more closes the focus ring.' },
+    habits: { kind: 'streak', title: 'Habits', body: loop.streak ? `Streak ${loop.streak}d.` : 'Checking a habit today closes the floor ring.' },
+    finance: { kind: 'notice', title: 'Baon', body: 'Saving leftover baon into a goal pays XP. Spending does not.' },
+    flashcards: { kind: 'notice', title: 'Flashcards', body: 'Each due card pays XP once per due date.' },
+    settings: { kind: 'system', title: 'Settings', body: 'Shortcuts and data live here. No XP on this tab.' },
+  };
+
+  const msg = table[page];
+  if (!msg) return;
+  pushInbox({
+    kind: msg.kind,
+    title: msg.title,
+    body: msg.body,
+    href: page,
+    priority: 'low',
+  });
 }

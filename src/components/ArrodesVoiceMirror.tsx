@@ -110,12 +110,43 @@ export default function ArrodesVoiceMirror({
 
   useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);
 
-  const pointInWell = (e: React.PointerEvent) => {
-    const el = wrapRef.current;
-    if (!el) return { x: 0.5, y: 0.5 };
-    const r = el.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / Math.max(1, r.width), y: 1 - (e.clientY - r.top) / Math.max(1, r.height) };
-  };
+  useEffect(() => {
+    const well = wrapRef.current;
+    if (!well) return;
+    const host = (well.closest('.arrodes-orbit') as HTMLElement | null) ?? well;
+    const point = (e: PointerEvent) => {
+      const r = well.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) / Math.max(1, r.width),
+        y: 1 - (e.clientY - r.top) / Math.max(1, r.height),
+      };
+    };
+    const onEnter = (e: PointerEvent) => {
+      hoverGoalRef.current = 1;
+      hoverPtGoalRef.current = point(e);
+    };
+    const onMove = (e: PointerEvent) => {
+      hoverGoalRef.current = 1;
+      hoverPtGoalRef.current = point(e);
+    };
+    const onLeave = () => { hoverGoalRef.current = 0; };
+    const onDown = (e: PointerEvent) => {
+      e.preventDefault();
+      const pt = point(e);
+      splashRef.current = { t: (performance.now() - startRef.current) / 1000, x: pt.x, y: pt.y };
+      hoverGoalRef.current = 1;
+    };
+    host.addEventListener('pointerenter', onEnter);
+    host.addEventListener('pointermove', onMove);
+    host.addEventListener('pointerleave', onLeave);
+    host.addEventListener('pointerdown', onDown);
+    return () => {
+      host.removeEventListener('pointerenter', onEnter);
+      host.removeEventListener('pointermove', onMove);
+      host.removeEventListener('pointerleave', onLeave);
+      host.removeEventListener('pointerdown', onDown);
+    };
+  }, []);
 
   return (
     <div
@@ -126,21 +157,7 @@ export default function ArrodesVoiceMirror({
       data-variant={variant}
       data-exit={exiting ? '1' : '0'}
     >
-      <div
-        ref={wrapRef}
-        className="arrodes-well"
-        role="button"
-        tabIndex={0}
-        title="Hover the glass. Click for a puddle."
-        onPointerEnter={() => { hoverGoalRef.current = 1; }}
-        onPointerMove={(e) => { hoverGoalRef.current = 1; hoverPtGoalRef.current = pointInWell(e); }}
-        onPointerLeave={() => { hoverGoalRef.current = 0; }}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          const pt = pointInWell(e);
-          splashRef.current = { t: (performance.now() - startRef.current) / 1000, x: pt.x, y: pt.y };
-        }}
-      >
+      <div ref={wrapRef} className="arrodes-well" role="button" tabIndex={0} title="Hover the glass. Click for a puddle.">
         <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
         <div className="arrodes-glass" aria-hidden style={holeMask} />
         <img className="arrodes-frame" src={frameSrc} alt="" draggable={false} />

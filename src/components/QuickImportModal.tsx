@@ -41,9 +41,16 @@ export default function QuickImportModal({ open, onClose }: { open: boolean; onC
           exit={fadeMotion.exit}
           transition={motionTransition(reduceMotion, 0.18)}
         >
-          <div className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
           <motion.div
-            className="relative w-full max-w-xl glass glass-shadow-lg rounded-3xl p-6"
+            className="absolute inset-0 bg-zinc-900/30"
+            onClick={busy ? undefined : onClose}
+            initial={reduceMotion ? false : { opacity: 0, backdropFilter: "blur(0px)", WebkitBackdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)", WebkitBackdropFilter: "blur(0px)" }}
+            transition={motionTransition(reduceMotion, 0.32)}
+          />
+          <motion.div
+            className="epic-glass-sheet relative w-full max-w-xl p-6"
             initial={reduceMotion ? false : sheetMotion.initial}
             animate={sheetMotion.animate}
             exit={sheetMotion.exit}

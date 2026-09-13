@@ -39,12 +39,20 @@ const PAGES: { page: PageId; title: string; hint: string; keys: string[] }[] = [
 ];
 
 const TABS: { page: PageId; title: string; hint: string; keys: string[] }[] = [
+  { page: 'habits', title: 'Habit Home', hint: 'Rings and today', keys: ['habit home', 'rings'] },
   { page: 'habits', title: 'Habit Tracker tab', hint: 'Grid and weekly %', keys: ['tracker tab', 'habit grid'] },
   { page: 'habits', title: 'Habit Insights', hint: 'Trends', keys: ['insights'] },
+  { page: 'classhub', title: 'Class info', hint: 'Teacher, room, links', keys: ['teacher', 'room', 'links'] },
   { page: 'classhub', title: 'Timetable', hint: 'Weekly class grid', keys: ['timetable', 'schedule'] },
   { page: 'calendar', title: 'Week view', hint: 'All-day + hours', keys: ['week view'] },
   { page: 'calendar', title: 'Month view', hint: 'Month grid', keys: ['month view'] },
   { page: 'grades', title: 'Simulate grades', hint: 'Hypothetical scores', keys: ['simulate'] },
+  { page: 'notes', title: 'Notes vault', hint: 'Markdown notes', keys: ['vault', 'markdown'] },
+  { page: 'notes', title: 'Whiteboard', hint: 'Infinite board', keys: ['whiteboard', 'canvas'] },
+  { page: 'finance', title: 'Baon goals', hint: 'Savings targets', keys: ['goal', 'save'] },
+  { page: 'pomodoro', title: 'Focus timer', hint: 'Pomodoro', keys: ['pomodoro', 'session'] },
+  { page: 'flashcards', title: 'Review cards', hint: 'Due reviews', keys: ['review', 'sm2'] },
+  { page: 'settings', title: 'Shortcuts', hint: 'Hotkeys', keys: ['hotkey', 'shortcut'] },
 ];
 
 function score(hay: string, q: string) {
@@ -77,7 +85,7 @@ export default function GlobalSearch({
 }: {
   open: boolean;
   onClose: () => void;
-  navigate: (p: PageId) => void;
+  navigate: (p: PageId, focus?: string | null) => void;
   mode?: 'modal' | 'dock';
 }) {
   const [q, setQ] = useState('');
@@ -162,7 +170,7 @@ export default function GlobalSearch({
 
   const go = (h: Hit) => {
     window.location.hash = hashFor(h.page, h.subject);
-    navigate(h.page);
+    navigate(h.page, h.subject);
     onClose();
   };
 
@@ -225,14 +233,21 @@ export default function GlobalSearch({
   return (
     <AnimatePresence>
       {open && (
-        <div key="search-overlay" className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[8vh]">
+        <motion.div
+          key="search-overlay"
+          className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[10vh]"
+          initial={reduceMotion ? false : fadeMotion.initial}
+          animate={fadeMotion.animate}
+          exit={fadeMotion.exit}
+          transition={motionTransition(reduceMotion, 0.22)}
+        >
           <motion.div
-            className="absolute inset-0 bg-zinc-900/30 backdrop-blur-md"
+            className="absolute inset-0 bg-zinc-900/30"
             onClick={onClose}
-            initial={reduceMotion ? false : fadeMotion.initial}
-            animate={fadeMotion.animate}
-            exit={fadeMotion.exit}
-            transition={motionTransition(reduceMotion, 0.22)}
+            initial={reduceMotion ? false : { opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            exit={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            transition={motionTransition(reduceMotion, 0.32)}
           />
           <motion.div
             className="epic-glass-sheet relative w-full max-w-xl overflow-hidden"
@@ -248,7 +263,7 @@ export default function GlobalSearch({
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search pages, classes, notes, tasks, events…"
+                placeholder="Search pages, tabs, classes, notes, tasks, cards, events…"
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') onClose();
@@ -261,7 +276,7 @@ export default function GlobalSearch({
             </div>
             {list}
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

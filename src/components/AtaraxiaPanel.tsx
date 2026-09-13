@@ -4,7 +4,7 @@ import type { PageId } from '@/components/AppLayout';
 import { getLoop, ringsFor, weekMarks, LOOP_CHANGED } from '@/lib/loop';
 import { getXP, recentAwards, xpForNextLevel, XP_CHANGED, todayIso } from '@/lib/xp';
 import { titleForLevel } from '@/lib/progress';
-import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition, sheetMotion } from '@/lib/motion';
 import { X } from 'lucide-react';
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -66,21 +66,11 @@ export default function AtaraxiaPanel({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          key="ataraxia-root"
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          initial={reduce ? false : fadeMotion.initial}
-          animate={fadeMotion.animate}
-          exit={fadeMotion.exit}
-          transition={motionTransition(reduce, 0.22)}
-        >
-          <motion.button
+        <div key="ataraxia-root" className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
             type="button"
             aria-label="Close progress"
-            className="absolute inset-0 bg-zinc-900/35 backdrop-blur-sm"
-            initial={reduce ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-zinc-900/35 backdrop-blur-md"
             onClick={onClose}
           />
           <motion.div
@@ -216,7 +206,7 @@ export default function AtaraxiaPanel({
               ))}
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

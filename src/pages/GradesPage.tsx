@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, SUBJECT_MAP, EX_BREAKDOWN, NUM_TERMS, type Assessment, type SubjectKey, type ComponentType, type ExType } from '@/lib/types';
 import { computeTermGrade, computeFinalGrade, componentPercentage, exComponentPercentage } from '@/lib/gradeUtils';
@@ -10,7 +11,7 @@ import { Calculator, ChevronRight, TrendingUp } from 'lucide-react';
 import {
   COMPONENT_LABELS, COMPONENT_SHORT, EX_LABELS, PASSING, PILL, PILL_ON, PILL_OFF,
   type Hypo, ringLabel, asInt, hypoAsAssessments, neededOnRemaining,
-  TermSparkWide, TermTrendLine, GradeRing, ItemRow, AddRow,
+  TermSparkWide, TermTrendLine, GradeRing, ItemRow, AddRow, VolatilityMeter,
 } from '@/pages/gradesKit';
 
 export default function GradesPage() {
@@ -50,6 +51,7 @@ export default function GradesPage() {
   const shownTerm = computeTermGrade(selectedSubject, selectedTerm, merged);
   const finalGrade = computeFinalGrade(selectedSubject, assessments);
   const delta = shownTerm !== null && realTerm !== null ? Math.round(shownTerm) - Math.round(realTerm) : 0;
+  const termValues = [1, 2, 3].map((t) => computeTermGrade(selectedSubject, t, assessments));
 
   const subjectAssessments = merged.filter(
     (a) => a.subject_key === selectedSubject && a.quarter === selectedTerm,
@@ -151,23 +153,7 @@ export default function GradesPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        {SUBJECTS.map((s) => {
-          const on = selectedSubject === s.key;
-          return (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setSelectedSubject(s.key)}
-              className={`${PILL} ${on ? PILL_ON : PILL_OFF}`}
-            >
-              {s.shortName}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-3 mb-5 flex flex-wrap gap-2">
+      <div className="mb-5 flex flex-wrap gap-2">
         {Array.from({ length: NUM_TERMS }, (_, i) => i + 1).map((t) => (
           <button
             key={t}
@@ -181,23 +167,32 @@ export default function GradesPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-12">
-        <div className="rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-zinc-200/70 lg:col-span-5">
-          <TermTrendLine values={[1, 2, 3].map((t) => computeTermGrade(selectedSubject, t, assessments))} />
-          <p className="mt-3 text-[12px] text-zinc-400">{subject.shortName}</p>
-          <GradeRing
-            value={asInt(shownTerm)}
-            caption={simulate ? 'projected' : 'term grade'}
-            chip={ringChip}
-            dashed={simulate}
-          />
+        <div className="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-zinc-200/70 lg:col-span-5">
+          <TermTrendLine values={termValues} />
+          <p className="mt-2 text-[12px] text-zinc-400">{subject.shortName}</p>
+          <div className="mt-1 flex items-center gap-3">
+            <GradeRing
+              value={asInt(shownTerm)}
+              caption={simulate ? 'projected' : 'term grade'}
+              chip={ringChip}
+              dashed={simulate}
+            />
+            <VolatilityMeter values={termValues} />
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 lg:col-span-4">
           <div className="flex-1 rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-zinc-200/70">
             <p className="text-[11px] text-zinc-400">Final grade</p>
-            <p className="mt-2 text-[36px] font-semibold leading-none tracking-tight text-zinc-900 tabular-nums">
+            <motion.p
+              key={asInt(finalGrade) ?? 'none'}
+              className="mt-2 text-[36px] font-semibold leading-none tracking-tight text-zinc-900 tabular-nums"
+              initial={{ opacity: 0.4, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28 }}
+            >
               {asInt(finalGrade) ?? '—'}
-            </p>
+            </motion.p>
             <div className="mt-4 space-y-2">
               {Array.from({ length: NUM_TERMS }, (_, i) => i + 1).map((t) => {
                 const tg = computeTermGrade(selectedSubject, t, assessments);
@@ -210,10 +205,16 @@ export default function GradesPage() {
               })}
             </div>
           </div>
-          <div className="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-zinc-200/70">
+          <motion.div
+            key={`${simulate}-${needed.text}`}
+            className="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-zinc-200/70"
+            initial={{ opacity: 0.5, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28 }}
+          >
             <p className="text-[11px] text-zinc-400">To hit {needed.target}</p>
             <p className="mt-1.5 text-[14px] leading-snug text-zinc-800">{needed.text}</p>
-          </div>
+          </motion.div>
         </div>
 
         <div className="flex flex-col gap-4 lg:col-span-3">
@@ -243,7 +244,7 @@ export default function GradesPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-12">
+      <div className="mt-4 grid items-start gap-3 lg:grid-cols-12">
         <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-zinc-200/70 lg:col-span-5">
           <div className="space-y-3">
             {(['ww', 'pt', 'ex'] as ComponentType[]).map((comp) => {
@@ -274,11 +275,18 @@ export default function GradesPage() {
                   </button>
                   <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-zinc-100">
                     <div className="relative h-full">
-                      <div className="h-full bg-zinc-900" style={{ width: `${Math.min(100, realItems.length ? realPct : 0)}%` }} />
+                      <motion.div
+                        className="h-full bg-zinc-900"
+                        initial={false}
+                        animate={{ width: `${Math.min(100, realItems.length ? realPct : 0)}%` }}
+                        transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+                      />
                       {simulate && shownPct > realPct ? (
-                        <div
+                        <motion.div
                           className="absolute top-0 h-full border-y border-dashed border-zinc-400 bg-zinc-300/40"
-                          style={{ left: `${Math.min(100, realPct)}%`, width: `${Math.min(100 - realPct, shownPct - realPct)}%` }}
+                          initial={false}
+                          animate={{ left: `${Math.min(100, realPct)}%`, width: `${Math.min(100 - realPct, shownPct - realPct)}%` }}
+                          transition={{ duration: 0.4 }}
                         />
                       ) : null}
                     </div>

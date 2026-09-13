@@ -10,6 +10,7 @@ import { xpForNextLevel, XP_CHANGED } from '@/lib/xp';
 import { announcePage, refreshInboxFromData } from '@/lib/inboxRefresh';
 import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
 import { supabase } from '@/lib/supabase';
+import { hashFor, pageFromHash } from '@/lib/routeFocus';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
@@ -57,27 +58,27 @@ const GROUPS = ['Core', 'Work', 'Pulse'];
 const FUNCTION_LOGO = katex.renderToString('f', { throwOnError: false, output: 'html' });
 
 function resolvePage(hash: string): PageId {
-  const raw = hash as PageId;
+  const raw = (pageFromHash(hash) || hash) as PageId;
   if (ALIASES[raw]) return ALIASES[raw] as PageId;
   return NAV_ITEMS.some((n) => n.id === raw) || raw === 'settings' ? raw : 'dashboard';
 }
 
-export function usePageState(): [PageId, (p: PageId) => void] {
+export function usePageState(): [PageId, (p: PageId, focus?: string | null) => void] {
   const [page, setPage] = useState<PageId>(() => resolvePage(window.location.hash.slice(1)));
   useEffect(() => {
     const onHash = () => setPage(resolvePage(window.location.hash.slice(1)));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const navigate = (p: PageId) => {
+  const navigate = (p: PageId, focus?: string | null) => {
     const next = ALIASES[p] ?? p;
-    window.location.hash = next;
+    window.location.hash = hashFor(next, focus);
     setPage(next);
   };
   return [page, navigate];
 }
 
-export default function AppLayout({ page, navigate, children }: { page: PageId; navigate: (p: PageId) => void; children: ReactNode }) {
+export default function AppLayout({ page, navigate, children }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void; children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantRail, setAssistantRail] = useState(false);
@@ -211,12 +212,13 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             {GROUPS.map((group) => (
               <div key={group} className="mb-3">
                 <p className="rice-nav-label mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{group}</p>
-                {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
+                {NAV_ITEMS.filter((n) => n.group === group).map((item, idx, list) => {
                   const Icon = item.icon;
                   const active = page === item.id;
+                  const belowSelected = idx > 0 && list[idx - 1].id === page;
                   const badge = item.id === 'todos' ? badgeTodos : item.id === 'kanban' ? badgeKanban : item.id === 'flashcards' ? badgeCards : 0;
                   return (
-                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 epic-press ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 ${belowSelected ? 'epic-press-down' : 'epic-press'} ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
                       {active && <motion.span layoutId={reduceMotion ? undefined : 'rice-nav-active'} className="absolute inset-0 rounded-xl bg-white/15" transition={motionTransition(reduceMotion, 0.22)} />}
                       <span className="relative shrink-0">
                         <Icon className="h-4 w-4" />

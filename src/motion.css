@@ -12,6 +12,12 @@
 .epic-press:not(:disabled):active {
   transform: scale(0.98) translateY(0);
 }
+.epic-press-down:not(:disabled):hover {
+  transform: translateY(2px);
+}
+.epic-press-down:not(:disabled):active {
+  transform: scale(0.98) translateY(2px);
+}
 
 .epic-fade-in {
   animation: epicFadeIn var(--epic-ui) var(--epic-ease) both;
@@ -37,18 +43,19 @@
   perspective: 900px;
 }
 
-/* Menus stay opaque so list items never paint outside the rounded card. */
 .epic-menu {
   display: flex;
   flex-direction: column;
   max-height: min(20rem, calc(100vh - 1.5rem));
   overflow: hidden;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.62);
   background-clip: padding-box;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 0.9rem;
   outline: none;
-  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.14);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 24px 64px rgba(24, 24, 27, 0.16);
 }
 
 .epic-menu-scroll {
@@ -78,16 +85,17 @@
 }
 
 .epic-popover {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.62);
   background-clip: padding-box;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 1.25rem;
   outline: none;
   overflow: visible;
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
   box-shadow: 0 16px 40px rgba(24, 24, 27, 0.12);
 }
 
-/* Calendar-style glass sheets for every modal / popup. */
 .epic-sheet,
 .epic-glass-sheet {
   background: rgba(255, 255, 255, 0.62);
@@ -117,12 +125,13 @@ select.glass-input,
     scroll-behavior: auto !important;
   }
   .epic-press:not(:disabled):hover,
-  .epic-press:not(:disabled):active {
+  .epic-press:not(:disabled):active,
+  .epic-press-down:not(:disabled):hover,
+  .epic-press-down:not(:disabled):active {
     transform: none;
   }
 }
 
-/* Charts draw in when a page mounts */
 .ht-chart-line {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;

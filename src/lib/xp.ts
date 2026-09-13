@@ -15,13 +15,19 @@ export type XPType =
 
 export type AwardRequest = {
   type: XPType;
-  /** Stable id so the same action never pays twice (toggle-farm proof). */
-  key: string;
+  key?: string;
   label?: string;
   minutes?: number;
   date?: string;
   href?: string;
 };
+
+export type XPEvent =
+  | { type: 'habit_complete'; date: string }
+  | { type: 'todo_complete' }
+  | { type: 'focus_session'; minutes: number }
+  | { type: 'flashcard_review' }
+  | { type: 'streak_bonus'; days: number };
 
 export type AwardResult = {
   awarded: boolean;
@@ -160,20 +166,22 @@ function rateOk(now: number) {
   }
 }
 
-function payoutFor(req: AwardRequest): number {
-  if (req.type === 'focus_session') {
-    const mins = Math.min(MAX_FOCUS_MIN, Math.max(0, Math.round(Number(req.minutes) || 0)));
+function payoutFor(type: XPType, minutes?: number): number {
+  if (type === 'focus_session') {
+    const mins = Math.min(MAX_FOCUS_MIN, Math.max(0, Math.round(Number(minutes) || 0)));
     if (mins < MIN_FOCUS_MIN) return 0;
     return Math.min(40, Math.round(mins / 5) * 3);
   }
-  if (req.type === 'streak_bonus') {
-    const days = Math.min(60, Math.max(0, Math.round(Number(req.minutes) || 0)));
+  if (type === 'streak_bonus') {
+    const days = Math.min(60, Math.max(0, Math.round(Number(minutes) || 0)));
     return Math.min(50, days * 3);
   }
-  return PAYOUT[req.type] || 0;
+  return PAYOUT[type] || 0;
 }
 
-export function awardXP(req: AwardRequest): AwardResult {
+export function awardXP(req: AwardRequest | XPEvent): AwardResult {
+  const type = req.type as XPType;
+  const extra = req as AwardRequest & { minutes?: number; days?: number };
   const cur = getXP();
   const blank: AwardResult = {
     awarded: false,
@@ -182,40 +190,42 @@ export function awardXP(req: AwardRequest): AwardResult {
     level: cur.level,
     prevLevel: cur.level,
     leveledUp: false,
-    label: req.label || req.type,
-    type: req.type,
+    label: extra.label || type,
+    type,
   };
 
   if (!isBrowser()) return { ...blank, reason: 'ssr' };
-  const key = String(req.key || '').trim().slice(0, 120);
-  if (!key) return { ...blank, reason: 'no-key' };
-
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(req.date || '') ? req.date! : todayIso();
+  let key = String(extra.key || '').trim().slice(0, 120);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(extra.date || '') ? extra.date! : todayIso();
+  if (!key) {
+    const n = readLedger().filter((e) => e.date === date && e.type === type).length;
+    key = `legacy:${type}:${date}:${n}`;
+  }
   if (date > todayIso()) return { ...blank, reason: 'future' };
 
   const ledger = readLedger();
   if (ledger.some((e) => e.key === key)) return { ...blank, reason: 'duplicate' };
 
-  const delta = payoutFor(req);
+  const minutes = extra.minutes ?? extra.days;
+  const delta = payoutFor(type, minutes);
   if (delta <= 0) return { ...blank, reason: 'no-payout' };
 
   const today = todayIso();
   const todayRows = ledger.filter((e) => e.date === today);
-  if (todayRows.filter((e) => e.type === req.type).length >= DAILY_COUNT[req.type]) {
+  if (todayRows.filter((e) => e.type === type).length >= DAILY_COUNT[type]) {
     return { ...blank, reason: 'daily-count' };
   }
   const todayXp = todayRows.reduce((s, e) => s + e.delta, 0);
   if (todayXp + delta > DAILY_XP_CAP) return { ...blank, reason: 'daily-cap' };
-
   if (!rateOk(Date.now())) return { ...blank, reason: 'rate' };
 
   const entry: LedgerEntry = {
-    type: req.type,
+    type,
     key,
     delta,
     date,
     at: Date.now(),
-    label: (req.label || req.type).slice(0, 80),
+    label: (extra.label || type).slice(0, 80),
   };
   writeLedger([...ledger, entry]);
   const next = getXP();
@@ -227,13 +237,6 @@ export function awardXP(req: AwardRequest): AwardResult {
     prevLevel: cur.level,
     leveledUp: next.level > cur.level,
     label: entry.label,
-    type: req.type,
+    type,
   };
 }
-
-export type XPEvent =
-  | { type: 'habit_complete'; date: string }
-  | { type: 'todo_complete' }
-  | { type: 'focus_session'; minutes: number }
-  | { type: 'flashcard_review' }
-  | { type: 'streak_bonus'; days: number };

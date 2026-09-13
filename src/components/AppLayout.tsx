@@ -1,5 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalAssistant from '@/components/GlobalAssistant';
 import AtaraxiaPanel from '@/components/AtaraxiaPanel';
@@ -11,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Calculator, FolderTree, SquareCheck as CheckSquare, Calendar,
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
-  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud, FunctionSquare,
+  Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
 } from 'lucide-react';
 
 export type PageId =
@@ -52,6 +54,8 @@ const ALIASES: Partial<Record<PageId, PageId>> = {
 
 const GROUPS = ['Core', 'Work', 'Pulse'];
 
+const FUNCTION_LOGO = katex.renderToString('f', { throwOnError: false, output: 'html' });
+
 function resolvePage(hash: string): PageId {
   const raw = hash as PageId;
   if (ALIASES[raw]) return ALIASES[raw] as PageId;
@@ -79,7 +83,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [assistantRail, setAssistantRail] = useState(false);
   const [assistantWidth, setAssistantWidth] = useState(340);
   const [loopOpen, setLoopOpen] = useState(false);
-  const [xpFlash, setXpFlash] = useState<string | null>(null);
+  const [xpFlash, setXpFlash] = useState(false);
   const [badgeTodos, setBadgeTodos] = useState(0);
   const [badgeKanban, setBadgeKanban] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
@@ -123,8 +127,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   useEffect(() => {
     const onXp = () => {
       setXpProgress(xpForNextLevel());
-      setXpFlash('up');
-      window.setTimeout(() => setXpFlash(null), 1200);
+      setXpFlash(true);
+      window.setTimeout(() => setXpFlash(false), 900);
     };
     window.addEventListener(XP_CHANGED, onXp);
     return () => window.removeEventListener(XP_CHANGED, onXp);
@@ -196,9 +200,12 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white" title="epicure">
-              <FunctionSquare className="h-4 w-4" strokeWidth={1.75} />
-            </div>
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center text-white [&_.katex]:text-[18px] [&_.katex]:leading-none"
+              title="epicure"
+              aria-label="epicure"
+              dangerouslySetInnerHTML={{ __html: FUNCTION_LOGO }}
+            />
           </div>
           <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
             {GROUPS.map((group) => (
@@ -239,13 +246,17 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
             <h1 className="truncate text-sm font-semibold text-zinc-800">{currentLabel}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button type="button" title={`Level ${xpProgress.level}`} aria-label="Open progress" onClick={() => { setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }} className={`relative flex h-10 items-center gap-2 rounded-full px-3 glass transition-colors duration-200 ${loopOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`}>
-              <span className="text-[11px] font-semibold tabular-nums">L{xpProgress.level}</span>
-              <span className={`h-1 w-14 overflow-hidden rounded-full ${loopOpen ? 'bg-white/25' : 'bg-zinc-200/80'}`}>
-                <span className={`block h-full rounded-full transition-[width] duration-300 ${loopOpen ? 'bg-white' : 'bg-zinc-800'}`} style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              title="Progress"
+              aria-label="Open progress"
+              onClick={() => { setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }}
+              className="relative flex h-10 items-center"
+            >
+              <span className={`block h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80 ${xpFlash ? 'ring-1 ring-zinc-400/60' : ''}`}>
+                <span className="block h-full rounded-full bg-zinc-800 transition-[width] duration-300" style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
               </span>
-              {xpFlash && !loopOpen && <span className="absolute -top-2 right-2 text-[10px] font-semibold text-zinc-700">+</span>}
             </button>
             <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />

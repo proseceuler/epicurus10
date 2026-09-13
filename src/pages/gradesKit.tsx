@@ -158,7 +158,17 @@ export function TermTrendLine({ values }: { values: (number | null)[] }) {
       <svg viewBox={`0 0 ${w} ${h}`} className="h-6 w-full" preserveAspectRatio="none" aria-hidden>
         <line x1="0" y1={h - 1} x2={w} y2={h - 1} stroke="#f4f4f5" strokeWidth="1" />
         {known.length ? (
-          <polyline fill="none" stroke="#18181b" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" points={pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} />
+          <motion.polyline
+            fill="none"
+            stroke="#18181b"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            points={pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.45 }}
+          />
         ) : (
           <line x1="0" y1={h / 2} x2={w} y2={h / 2} stroke="#e4e4e7" strokeWidth="1.4" />
         )}
@@ -175,6 +185,69 @@ export function TermTrendLine({ values }: { values: (number | null)[] }) {
   );
 }
 
+export function termVolatility(values: (number | null)[]) {
+  const nums = values.filter((v): v is number => v !== null);
+  if (nums.length < 2) {
+    return { range: 0, mad: 0, sd: 0, label: 'Need another term', hint: 'Two terms needed to judge swing.', nums };
+  }
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const sd = Math.sqrt(nums.reduce((s, v) => s + (v - mean) ** 2, 0) / nums.length);
+  let steps = 0;
+  for (let i = 1; i < nums.length; i++) steps += Math.abs(nums[i] - nums[i - 1]);
+  const mad = steps / (nums.length - 1);
+  const range = Math.max(...nums) - Math.min(...nums);
+  const score = Math.max(sd, mad);
+  const label = score < 2 ? 'Steady' : score < 5 ? 'Mild swing' : 'Volatile';
+  const hint = score < 2
+    ? `T1–T3 stay within ${Math.round(range)} pts.`
+    : `Range ${Math.round(range)} pts · typical step ${mad.toFixed(1)}.`;
+  return { range, mad, sd, label, hint, nums };
+}
+
+export function VolatilityMeter({ values }: { values: (number | null)[] }) {
+  const v = termVolatility(values);
+  const lo = 70;
+  const hi = 100;
+  const xOf = (n: number) => `${((Math.max(lo, Math.min(hi, n)) - lo) / (hi - lo)) * 100}%`;
+  const min = v.nums.length ? Math.min(...v.nums) : null;
+  const max = v.nums.length ? Math.max(...v.nums) : null;
+  return (
+    <div className="flex min-w-0 flex-1 flex-col justify-center py-2 pl-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Consistency</p>
+      <p className="mt-1 text-[18px] font-semibold tracking-tight text-zinc-800">{v.label}</p>
+      <div className="relative mt-3 h-2 rounded-full bg-zinc-100">
+        {min !== null && max !== null ? (
+          <motion.span
+            className="absolute top-0 h-full rounded-full bg-zinc-300"
+            initial={false}
+            animate={{ left: xOf(min), width: `calc(${xOf(max)} - ${xOf(min)})` }}
+            transition={{ duration: 0.4 }}
+          />
+        ) : null}
+        {values.map((g, i) => (
+          g === null ? null : (
+            <motion.span
+              key={i}
+              className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-900"
+              initial={false}
+              animate={{ left: xOf(g) }}
+              transition={{ duration: 0.4 }}
+            />
+          )
+        ))}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[10px] tabular-nums text-zinc-400">
+        <span>70</span>
+        <span>100</span>
+      </div>
+      <p className="mt-2 text-[12px] leading-snug text-zinc-500">{v.hint}</p>
+      <p className="mt-1 text-[11px] tabular-nums text-zinc-400">
+        {values.map((g, i) => `T${i + 1} ${g === null ? '—' : Math.round(g)}`).join('  ·  ')}
+      </p>
+    </div>
+  );
+}
+
 export function GradeRing({
   value,
   caption,
@@ -187,36 +260,43 @@ export function GradeRing({
   dashed?: boolean;
 }) {
   const pct = value === null ? 0 : Math.max(0, Math.min(100, value));
-  const r = 58;
+  const r = 52;
   const c = 2 * Math.PI * r;
   const dash = c * (1 - pct / 100);
   return (
-    <div className="flex flex-col items-center justify-center py-4">
-      <div className="relative h-[168px] w-[168px]">
-        <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90">
-          <circle cx="80" cy="80" r={r} fill="none" stroke="#e4e4e7" strokeWidth="14" />
-          <circle
-            cx="80"
-            cy="80"
+    <div className="flex shrink-0 flex-col items-center justify-center py-2">
+      <div className="relative h-[132px] w-[132px]">
+        <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
+          <circle cx="70" cy="70" r={r} fill="none" stroke="#e4e4e7" strokeWidth="12" />
+          <motion.circle
+            cx="70"
+            cy="70"
             r={r}
             fill="none"
             stroke={dashed ? '#3f3f46' : '#18181b'}
-            strokeWidth="14"
+            strokeWidth="12"
             strokeLinecap="butt"
-            strokeDasharray={c}
-            strokeDashoffset={dash}
-            style={dashed ? { strokeDasharray: '7 5', strokeDashoffset: dash } : undefined}
+            strokeDasharray={dashed ? '7 5' : c}
+            animate={{ strokeDashoffset: dash }}
+            initial={false}
+            transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[42px] font-semibold leading-none tracking-tight text-zinc-900 tabular-nums">
+          <motion.span
+            key={value === null ? 'empty' : Math.round(value)}
+            className="text-[34px] font-semibold leading-none tracking-tight text-zinc-900 tabular-nums"
+            initial={{ opacity: 0.35, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22 }}
+          >
             {value === null ? '—' : Math.round(value)}
-          </span>
+          </motion.span>
           <span className="mt-1 text-[11px] text-zinc-400">{caption}</span>
         </div>
       </div>
       {chip ? (
-        <span className={`mt-3 rounded-full border px-2.5 py-0.5 text-[11px] text-zinc-500 ${
+        <span className={`mt-2 rounded-full border px-2.5 py-0.5 text-[11px] text-zinc-500 ${
           dashed ? 'border-dashed border-zinc-400' : 'border-zinc-200 bg-zinc-50'
         }`}>
           {chip}

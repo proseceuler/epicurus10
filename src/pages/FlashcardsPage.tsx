@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import { onDataChanged } from '@/lib/assistant/sync';
 import { SUBJECTS, type FlashcardDeck, type Flashcard, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
-import { Plus, Trash2, Layers, ChevronLeft, ChevronRight, RotateCcw, Check, X, BookOpen } from 'lucide-react';
+import { MotionOverlay } from '@/components/MotionUI';
+import { Plus, Trash2, Layers, ChevronLeft, RotateCcw, BookOpen } from 'lucide-react';
 import { scheduleSM2, isDue, type SM2Rating } from '@/lib/sm2';
 import { awardXP } from '@/lib/xp';
 
@@ -179,7 +180,6 @@ export default function FlashcardsPage() {
   if (selectedDeck) {
     const dCards = deckCards(selectedDeck.id);
     const dDue = dueCards(selectedDeck.id);
-    const subject = SUBJECTS.find((s) => s.key === selectedDeck.subject_key);
 
     return (
       <div>
@@ -232,44 +232,23 @@ export default function FlashcardsPage() {
           </div>
         )}
 
-        <AnimatePresence>
-          {showAddCard && (
-            <motion.div
-              key="add-card-overlay"
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              initial={reduceMotion ? false : fadeMotion.initial}
-              animate={fadeMotion.animate}
-              exit={fadeMotion.exit}
-              transition={motionTransition(reduceMotion, 0.18)}
-            >
-              <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-sm" onClick={() => setShowAddCard(false)} />
-              <motion.div
-                className="glass glass-shadow-lg relative w-full max-w-md rounded-3xl p-6"
-                initial={reduceMotion ? false : sheetMotion.initial}
-                animate={sheetMotion.animate}
-                exit={sheetMotion.exit}
-                transition={motionTransition(reduceMotion, 0.2)}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="mb-4 font-semibold text-zinc-800">Add Flashcard</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500">Front (Question)</label>
-                    <textarea value={newCardFront} onChange={(e) => setNewCardFront(e.target.value)} className="h-20 w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-700 glass-input" placeholder="What is the question?" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500">Back (Answer)</label>
-                    <textarea value={newCardBack} onChange={(e) => setNewCardBack(e.target.value)} className="h-20 w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-700 glass-input" placeholder="What is the answer?" />
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button onClick={createCard}><Plus className="w-4 h-4" /> Add Card</Button>
-                    <Button variant="ghost" onClick={() => setShowAddCard(false)}>Cancel</Button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <MotionOverlay open={showAddCard} onClose={() => setShowAddCard(false)}>
+          <h3 className="mb-4 font-semibold text-zinc-800">Add Flashcard</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Front (Question)</label>
+              <textarea value={newCardFront} onChange={(e) => setNewCardFront(e.target.value)} className="h-20 w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-700 glass-input" placeholder="What is the question?" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Back (Answer)</label>
+              <textarea value={newCardBack} onChange={(e) => setNewCardBack(e.target.value)} className="h-20 w-full resize-none rounded-xl px-3 py-2 text-sm text-zinc-700 glass-input" placeholder="What is the answer?" />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button onClick={createCard}><Plus className="w-4 h-4" /> Add Card</Button>
+              <Button variant="ghost" onClick={() => setShowAddCard(false)}>Cancel</Button>
+            </div>
+          </div>
+        </MotionOverlay>
       </div>
     );
   }
@@ -336,44 +315,23 @@ export default function FlashcardsPage() {
         </div>
       )}
 
-      <AnimatePresence>
-        {showAddDeck && (
-          <motion.div
-            key="add-deck-overlay"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            initial={reduceMotion ? false : fadeMotion.initial}
-            animate={fadeMotion.animate}
-            exit={fadeMotion.exit}
-            transition={motionTransition(reduceMotion, 0.18)}
-          >
-            <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-sm" onClick={() => setShowAddDeck(false)} />
-            <motion.div
-              className="glass glass-shadow-lg relative w-full max-w-md rounded-3xl p-6"
-              initial={reduceMotion ? false : sheetMotion.initial}
-              animate={sheetMotion.animate}
-              exit={sheetMotion.exit}
-              transition={motionTransition(reduceMotion, 0.2)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="mb-4 font-semibold text-zinc-800">New Flashcard Deck</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-500">Deck Name</label>
-                  <Input value={newDeckName} onChange={setNewDeckName} placeholder="e.g. Math Chapter 3" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-500">Subject (optional)</label>
-                  <Select value={newDeckSubject} onChange={(v) => setNewDeckSubject(v as SubjectKey | '')} options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]} />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={createDeck}><Plus className="w-4 h-4" /> Create Deck</Button>
-                  <Button variant="ghost" onClick={() => setShowAddDeck(false)}>Cancel</Button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MotionOverlay open={showAddDeck} onClose={() => setShowAddDeck(false)}>
+        <h3 className="mb-4 font-semibold text-zinc-800">New Flashcard Deck</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Deck Name</label>
+            <Input value={newDeckName} onChange={setNewDeckName} placeholder="e.g. Math Chapter 3" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Subject (optional)</label>
+            <Select value={newDeckSubject} onChange={(v) => setNewDeckSubject(v as SubjectKey | '')} options={[{ value: '', label: 'No subject' }, ...SUBJECTS.map((s) => ({ value: s.key, label: s.name }))]} />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={createDeck}><Plus className="w-4 h-4" /> Create Deck</Button>
+            <Button variant="ghost" onClick={() => setShowAddDeck(false)}>Cancel</Button>
+          </div>
+        </div>
+      </MotionOverlay>
     </div>
   );
 }

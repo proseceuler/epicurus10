@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type ClassHub, type ClassHubLink, type SubjectKey } from '@/lib/types';
+import { focusFromHash, hashFor, subjectFromHash } from '@/lib/routeFocus';
 import { Card, Button, Input, EmptyState, TimeField } from '@/components/kit';
 import { FolderTree, Plus, Trash2, Link2, Clock, MapPin, User, Save, ExternalLink } from 'lucide-react';
 import { TimetableTab } from '@/pages/classhub/TimetableTab';
@@ -41,7 +42,7 @@ function formatOfficeHours(days: number[], start: string, end: string) {
 function ClassInfoTab() {
   const [hubs, setHubs] = useState<Record<string, ClassHub>>({});
   const [links, setLinks] = useState<ClassHubLink[]>([]);
-  const [selected, setSelected] = useState<SubjectKey>('math');
+  const [selected, setSelected] = useState<SubjectKey>(() => subjectFromHash() || 'math');
   const [loading, setLoading] = useState(true);
   const [editForm, setEditForm] = useState({ teacher_name: '', office_hours: '', room: '', notes: '' });
   const [officeDays, setOfficeDays] = useState<number[]>([]);
@@ -68,6 +69,18 @@ function ClassInfoTab() {
 
   useEffect(() => { void loadData(); }, [loadData]);
   useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
+  useEffect(() => {
+    const sync = () => {
+      const fromHash = subjectFromHash();
+      if (fromHash) setSelected(fromHash);
+      if (focusFromHash() === 'timetable') {
+        window.setTimeout(() => document.getElementById('timetable')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+      }
+    };
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
 
   useEffect(() => {
     const hub = hubs[selected];
@@ -133,7 +146,7 @@ function ClassInfoTab() {
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
         {SUBJECTS.map((s) => (
-          <button key={s.key} onClick={() => setSelected(s.key)} className={`rounded-xl border px-3 py-1.5 text-sm font-medium transition-all ${selected === s.key ? 'border-zinc-900 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600 glass-hover'}`}>{s.shortName}</button>
+          <button key={s.key} onClick={() => { setSelected(s.key); window.location.hash = hashFor('classhub', s.key); }} className={`rounded-xl border px-3 py-1.5 text-sm font-medium transition-all ${selected === s.key ? 'border-zinc-900 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600 glass-hover'}`}>{s.shortName}</button>
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">

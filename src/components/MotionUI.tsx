@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { motionTransition, overlayPresence, overlayTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
+/** Lift overlays out of .rice-shell so backdrop-filter can blur the page. */
+export function BodyPortal({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+}
+
 export function OverlayScrim({
   onClose,
   className = 'absolute -inset-[120px]',

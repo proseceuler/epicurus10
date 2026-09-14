@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { registerConfirmImpl, type ConfirmOptions } from '@/lib/confirm';
 import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
-import { OverlayScrim } from '@/components/MotionUI';
+import { BodyPortal, OverlayScrim } from '@/components/MotionUI';
 
 type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
 
@@ -28,6 +28,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
+      <BodyPortal>
       <AnimatePresence>
         {pending && (
           <motion.div
@@ -79,6 +80,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </motion.div>
         )}
       </AnimatePresence>
+      </BodyPortal>
     </>
   );
 }

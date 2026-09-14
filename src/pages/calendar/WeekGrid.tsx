@@ -152,8 +152,8 @@ export function WeekGrid(p: Props) {
   const allDayLanes = allDayBars.reduce((m, b) => Math.max(m, b.lane + 1), 1);
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[640px] overflow-y-auto [scrollbar-gutter:stable]">
+    <div className="overflow-x-auto overscroll-x-contain">
+      <div className="min-w-[min(100%,36rem)] sm:min-w-[640px]">
         <div style={{ display: 'grid', gridTemplateColumns: cols }}>
           <div />
           {p.rangeDays.map((d) => {
@@ -214,10 +214,9 @@ export function WeekGrid(p: Props) {
             )}
           </div>
         </div>
-      </div>
 
-      <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto [scrollbar-gutter:stable]">
-        <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: cols }}>
+        <div ref={scrollerRef} className="max-h-[min(32rem,calc(100dvh-16rem))] overflow-y-auto overflow-x-hidden">
+          <div style={{ display: 'grid', gridTemplateColumns: cols }}>
           <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] text-zinc-400" style={{ top: ((h * 60 - GRID_START) / 60) * hourH }}>
@@ -330,6 +329,7 @@ export function WeekGrid(p: Props) {
               </div>
             );
           })}
+          </div>
         </div>
       </div>
 

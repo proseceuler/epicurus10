@@ -245,6 +245,7 @@ html, body, #root {
   position: relative;
   width: 108px;
   aspect-ratio: 420 / 520;
+  overflow: hidden;
   animation: arrodes-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
   background: transparent;
@@ -333,6 +334,8 @@ html, body, #root {
 }
 .arrodes-blob {
   z-index: 1;
+  max-width: 100%;
+  max-height: 100%;
   background: #6e737a;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
@@ -388,11 +391,25 @@ html, body, #root {
 [data-global-dock] .dock-sheet {
   width: min(22rem, calc(100vw - 1.5rem));
   max-width: calc(100vw - 1.5rem);
+  overflow: visible;
+  scrollbar-width: none;
 }
+[data-global-dock] .dock-sheet::-webkit-scrollbar { display: none; width: 0; height: 0; }
 [data-global-dock] .dock-rail {
   max-width: calc(100vw - 5.25rem);
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+[data-global-dock] .dock-rail::-webkit-scrollbar { display: none; width: 0; height: 0; }
+[data-global-dock] .dock-fab {
+  width: 3.5rem;
+  height: 3.5rem;
+  min-width: 3.5rem;
+  min-height: 3.5rem;
+  border-radius: 999px;
+  flex: none;
 }
 .rice-main { color: #27272a; }
 @media (min-width: 1280px) {
@@ -412,6 +429,13 @@ html, body, #root {
   .hud-cursor { animation: none; }
   .arrodes-well, .arrodes-stage[data-variant='home'] .arrodes-well {
     animation: none !important;
+    overflow: hidden;
+  }
+  .arrodes-blob,
+  .arrodes-glass {
+    inset: 7% 9%;
+    width: auto;
+    height: auto;
   }
   .assistant-panel {
     backdrop-filter: none;
@@ -423,15 +447,17 @@ html, body, #root {
     max-width: calc(100vw - 1.25rem);
   }
   [data-global-dock] .dock-sheet {
-    position: fixed;
-    left: max(0.75rem, env(safe-area-inset-left));
-    right: max(0.75rem, env(safe-area-inset-right));
-    bottom: calc(4.85rem + env(safe-area-inset-bottom));
-    width: auto;
-    max-width: none;
+    position: absolute;
+    left: auto;
+    right: 0;
+    bottom: 4.35rem;
+    width: min(22rem, calc(100vw - 1.5rem));
+    max-width: calc(100vw - 1.5rem);
     max-height: min(72dvh, calc(100dvh - 7.25rem));
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-width: none;
   }
   [data-global-dock] .dock-rail {
     max-width: calc(100vw - 5.5rem);

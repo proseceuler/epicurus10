@@ -131,19 +131,19 @@ export default function InboxPanel({
 
   if (detached) {
     return (
-      <div className="fixed z-[70] w-[min(100vw-2rem,22rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl" style={{ left: pos.x, top: pos.y }}>
+      <div className="epic-glass-sheet fixed z-[70] w-[min(100vw-2rem,22rem)] overflow-hidden" style={{ left: pos.x, top: pos.y }}>
         {body}
       </div>
     );
   }
 
   if (embedded) {
-    return <div className="overflow-hidden rounded-xl bg-white/90">{body}</div>;
+    return <div className="epic-glass-sheet overflow-hidden">{body}</div>;
   }
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center sm:justify-end sm:pr-6 sm:pt-16" onClick={onClose}>
-      <div className="glass mb-24 max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl shadow-2xl sm:mb-0" onClick={(e) => e.stopPropagation()}>
+      <div className="epic-glass-sheet mb-24 max-h-[70vh] w-full max-w-md overflow-hidden sm:mb-0" onClick={(e) => e.stopPropagation()}>
         {body}
       </div>
     </div>

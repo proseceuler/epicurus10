@@ -184,6 +184,8 @@ export function TimetableTab() {
       <MotionOverlay
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
+        zClass="z-[80]"
+        frameClassName="items-center justify-center overflow-visible p-4"
         panelClassName="epic-glass-sheet epic-glass-open relative max-h-[88vh] w-full max-w-md overflow-visible p-6"
       >
         <h3 className="mb-4 font-semibold text-zinc-800">Add Class to Timetable</h3>
@@ -219,6 +221,8 @@ export function TimetableTab() {
       <MotionOverlay
         open={Boolean(editingEntry)}
         onClose={() => setEditingEntry(null)}
+        zClass="z-[80]"
+        frameClassName="items-center justify-center overflow-visible p-4"
         panelClassName="epic-glass-sheet epic-glass-open relative max-h-[88vh] w-full max-w-md overflow-visible p-6"
       >
         <h3 className="mb-4 font-semibold text-zinc-800">Edit Class</h3>

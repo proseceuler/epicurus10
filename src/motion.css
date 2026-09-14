@@ -48,10 +48,9 @@
 .epic-scrim,
 .epic-scrim-blur {
   --epic-blur: 22px;
-  isolation: isolate;
-  background: rgba(24, 24, 27, 0.46);
-  -webkit-backdrop-filter: blur(var(--epic-blur)) saturate(1.08);
-  backdrop-filter: blur(var(--epic-blur)) saturate(1.08);
+  background: rgba(24, 24, 27, 0.42);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
 }
 
 .epic-flip-wrap {
@@ -65,7 +64,7 @@
   overflow: visible;
   clip-path: inset(0 round 0.9rem);
   -webkit-clip-path: inset(0 round 0.9rem);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.55);
   background-clip: padding-box;
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 0.9rem;
@@ -120,7 +119,7 @@
   overflow: visible;
   clip-path: inset(0 round 1.25rem);
   -webkit-clip-path: inset(0 round 1.25rem);
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.55);
   background-clip: padding-box;
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 1.25rem;

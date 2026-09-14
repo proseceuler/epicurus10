@@ -117,19 +117,19 @@ export function MotionCollapse({
 }) {
   const reduce = useReducedMotion();
   return (
-    <AnimatePresence initial={false}>
-      {open && (
-        <motion.div
-          className={`overflow-hidden ${className}`}
-          initial={reduce ? false : { height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={reduce ? { opacity: 1 } : { height: 0, opacity: 0 }}
-          transition={motionTransition(reduce, 0.22)}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div
+      className={`grid ${className}`}
+      style={{
+        gridTemplateRows: open ? '1fr' : '0fr',
+        opacity: open ? 1 : 0,
+        pointerEvents: open ? 'auto' : 'none',
+        transition: reduce
+          ? 'none'
+          : 'grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms cubic-bezier(0.32, 0.72, 0, 1)',
+      }}
+    >
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
   );
 }
 

@@ -5,6 +5,8 @@
 
 html, body, #root {
   background: #f5f5f7;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 .rice-shell {
@@ -13,6 +15,8 @@ html, body, #root {
   --assistant-w: 340px;
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  max-width: 100vw;
+  overflow: hidden;
 }
 .rice-shell.rice-shell--mono { filter: none; }
 .rice-shell.rice-shell--mono .rice-sidebar,
@@ -107,7 +111,7 @@ html, body, #root {
   gap: 12px;
   padding: 16px 18px 18px;
 }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .hud-term-body {
     flex-direction: row;
     align-items: stretch;
@@ -124,7 +128,7 @@ html, body, #root {
   line-height: 1.15;
   user-select: none;
 }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .hud-term-div { display: block; }
 }
 .hud-fetch {
@@ -190,19 +194,19 @@ html, body, #root {
 .rice-sidebar .rice-nav-label { opacity: 0; width: 0; overflow: hidden; white-space: nowrap; transition: opacity 160ms ease; }
 .rice-sidebar.rice-sidebar-open .rice-nav-label,
 .rice-sidebar.w-56 .rice-nav-label { opacity: 1; width: auto; }
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .rice-sidebar.rice-sidebar-open .rice-nav-label { opacity: 1; width: auto; }
 }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .rice-main { padding-left: 4.75rem; transition: padding-left 280ms ease, padding-right 280ms ease; }
   .rice-shell.assistant-open .rice-main { padding-right: var(--assistant-w, 340px); }
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+@media (hover: hover) and (pointer: fine) and (min-width: 1280px) {
   .rice-sidebar.rice-sidebar-collapsed:hover { width: 14rem; }
   .rice-sidebar.rice-sidebar-collapsed:hover .rice-nav-label { opacity: 1; width: auto; }
   .rice-sidebar.rice-sidebar-collapsed:hover ~ .rice-main { padding-left: 15.5rem; }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .assistant-panel {
     width: 100% !important;
     max-width: 100vw;
@@ -380,7 +384,7 @@ html, body, #root {
   -webkit-overflow-scrolling: touch;
 }
 .rice-main { color: #27272a; }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.75rem); left: auto; bottom: 1.25rem; }
 }
 
@@ -391,4 +395,41 @@ html, body, #root {
 @keyframes dock-rail-in {
   from { opacity: 0; transform: translateX(14px); }
   to { opacity: 1; transform: translateX(0); }
+}
+@media (max-width: 1279px), (pointer: coarse) {
+  .film-grain { display: none; }
+  .hud-cursor { animation: none; }
+  .arrodes-well, .arrodes-stage[data-variant='home'] .arrodes-well {
+    animation: none !important;
+  }
+  .assistant-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (max-width: 1279px) {
+  [data-global-dock] {
+    max-width: calc(100vw - 1.25rem);
+  }
+  [data-global-dock] .dock-sheet {
+    position: fixed;
+    left: max(0.75rem, env(safe-area-inset-left));
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: calc(4.85rem + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(72dvh, calc(100dvh - 7.25rem));
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  [data-global-dock] .dock-rail {
+    max-width: calc(100vw - 5.5rem);
+  }
+  .assistant-panel {
+    width: 100% !important;
+    max-width: 100vw;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .film-grain, .hud-cursor { animation: none; display: none; }
 }

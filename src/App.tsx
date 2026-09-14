@@ -1,25 +1,26 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
-import AppLayout, { usePageState } from '@/components/AppLayout';
+import AppLayout, { usePageState, type PageId } from '@/components/AppLayout';
 import { motionTransition, pageMotion } from '@/lib/motion';
-import DashboardPage from '@/pages/DashboardPage';
-import GradesPage from '@/pages/GradesPage';
-import ClassHubPage from '@/pages/ClassHubPage';
-import TodosPage from '@/pages/TodosPage';
-import KanbanPage from '@/pages/KanbanPage';
-import CalendarPage from '@/pages/CalendarPage';
-import PomodoroPage from '@/pages/PomodoroPage';
-import HabitsPage from '@/pages/HabitsPage';
-import FinancePage from '@/pages/FinancePage';
-import NotesPage from '@/pages/NotesPage';
-import FlashcardsPage from '@/pages/FlashcardsPage';
-import SettingsPage from '@/pages/SettingsPage';
-import DrivePage from '@/pages/DrivePage';
 import './rice.css';
 import './styles.css';
 import './motion.css';
+
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const GradesPage = lazy(() => import('@/pages/GradesPage'));
+const ClassHubPage = lazy(() => import('@/pages/ClassHubPage'));
+const TodosPage = lazy(() => import('@/pages/TodosPage'));
+const KanbanPage = lazy(() => import('@/pages/KanbanPage'));
+const CalendarPage = lazy(() => import('@/pages/CalendarPage'));
+const PomodoroPage = lazy(() => import('@/pages/PomodoroPage'));
+const HabitsPage = lazy(() => import('@/pages/HabitsPage'));
+const FinancePage = lazy(() => import('@/pages/FinancePage'));
+const NotesPage = lazy(() => import('@/pages/NotesPage'));
+const FlashcardsPage = lazy(() => import('@/pages/FlashcardsPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const DrivePage = lazy(() => import('@/pages/DrivePage'));
 
 function registerPwa() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
@@ -29,28 +30,37 @@ function registerPwa() {
 }
 registerPwa();
 
+function PageFallback() {
+  return <div className="min-h-[40vh]" aria-hidden />;
+}
+
+function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void }) {
+  const pages: Record<string, ComponentType<{ navigate?: typeof navigate }>> = {
+    dashboard: DashboardPage,
+    grades: GradesPage,
+    forecast: GradesPage,
+    classhub: ClassHubPage,
+    assistant: DashboardPage,
+    todos: TodosPage,
+    kanban: KanbanPage,
+    calendar: CalendarPage,
+    notes: NotesPage,
+    drive: DrivePage,
+    pomodoro: PomodoroPage,
+    analytics: PomodoroPage,
+    habits: HabitsPage,
+    finance: FinancePage,
+    flashcards: FlashcardsPage,
+    settings: SettingsPage,
+  };
+  const Page = pages[page] ?? DashboardPage;
+  if (page === 'dashboard' || page === 'assistant') return <DashboardPage navigate={navigate} />;
+  return <Page />;
+}
+
 function App() {
   const [page, navigate] = usePageState();
   const reduceMotion = useReducedMotion();
-
-  const pages: Record<string, ReactNode> = {
-    dashboard: <DashboardPage navigate={navigate} />,
-    grades: <GradesPage />,
-    forecast: <GradesPage />,
-    classhub: <ClassHubPage />,
-    assistant: <DashboardPage navigate={navigate} />,
-    todos: <TodosPage />,
-    kanban: <KanbanPage />,
-    calendar: <CalendarPage />,
-    notes: <NotesPage />,
-    drive: <DrivePage />,
-    pomodoro: <PomodoroPage />,
-    analytics: <PomodoroPage />,
-    habits: <HabitsPage />,
-    finance: <FinancePage />,
-    flashcards: <FlashcardsPage />,
-    settings: <SettingsPage />,
-  };
 
   return (
     <PomodoroProvider>
@@ -65,7 +75,9 @@ function App() {
             exit={reduceMotion ? pageMotion.animate : pageMotion.exit}
             transition={motionTransition(reduceMotion, 0.2)}
           >
-            {pages[page] ?? pages.dashboard}
+            <Suspense fallback={<PageFallback />}>
+              <ActivePage page={page} navigate={navigate} />
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </AppLayout>

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { addCalendarEvent, getCalendarEvents, deleteCalendarEvent } from '@/lib/calendarStore';
 import { SUBJECTS, type TimetableEntry, type ClassAttendance, type SubjectKey } from '@/lib/types';
 import { Card, Button, Input, Select, EmptyState, Badge } from '@/components/kit';
+import { MotionOverlay } from '@/components/MotionUI';
 import { onDataChanged } from '@/lib/assistant/sync';
 import { Plus, Trash2, Clock, MapPin, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 
@@ -180,40 +181,69 @@ export function TimetableTab() {
           })}
         </div>
       )}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/30 p-4 backdrop-blur-sm" onClick={() => setShowAddModal(false)}>
-          <div className="glass glass-shadow-lg w-full max-w-md rounded-3xl p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 font-semibold text-zinc-800">Add Class to Timetable</h3>
-            <div className="space-y-3">
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">Subject</label><Select value={newSubject} onChange={(v) => setNewSubject(v as SubjectKey)} options={SUBJECTS.map((s) => ({ value: s.key, label: s.name }))} /></div>
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">Day</label><Select value={String(newDay)} onChange={(v) => setNewDay(parseInt(v))} options={SCHOOL_DAYS.map((d) => ({ value: String(d), label: DAYS[d] }))} /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="mb-1 block text-xs font-medium text-zinc-500">Start Time</label><Input type="time" value={newStart} onChange={setNewStart} /></div>
-                <div><label className="mb-1 block text-xs font-medium text-zinc-500">End Time</label><Input type="time" value={newEnd} onChange={setNewEnd} /></div>
-              </div>
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">Room</label><Input value={newRoom} onChange={setNewRoom} placeholder="e.g. Room 201" /></div>
-              <div className="flex gap-2 pt-2"><Button onClick={addEntry}><Plus className="w-4 h-4" /> Add Class</Button><Button variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button></div>
+      <MotionOverlay
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        panelClassName="epic-glass-sheet epic-glass-open relative max-h-[88vh] w-full max-w-md overflow-visible p-6"
+      >
+        <h3 className="mb-4 font-semibold text-zinc-800">Add Class to Timetable</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Subject</label>
+            <Select value={newSubject} onChange={(v) => setNewSubject(v as SubjectKey)} options={SUBJECTS.map((s) => ({ value: s.key, label: s.name }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Day</label>
+            <Select value={String(newDay)} onChange={(v) => setNewDay(parseInt(v))} options={SCHOOL_DAYS.map((d) => ({ value: String(d), label: DAYS[d] }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Start Time</label>
+              <Input type="time" value={newStart} onChange={setNewStart} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">End Time</label>
+              <Input type="time" value={newEnd} onChange={setNewEnd} />
             </div>
           </div>
-        </div>
-      )}
-      {editingEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/30 p-4 backdrop-blur-sm" onClick={() => setEditingEntry(null)}>
-          <div className="glass glass-shadow-lg w-full max-w-md rounded-3xl p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 font-semibold text-zinc-800">Edit Class</h3>
-            <div className="space-y-3">
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">Start Time</label><Input type="time" value={editingEntry.start_time} onChange={(v) => setEditingEntry({ ...editingEntry, start_time: v })} /></div>
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">End Time</label><Input type="time" value={editingEntry.end_time} onChange={(v) => setEditingEntry({ ...editingEntry, end_time: v })} /></div>
-              <div><label className="mb-1 block text-xs font-medium text-zinc-500">Room</label><Input value={editingEntry.room} onChange={(v) => setEditingEntry({ ...editingEntry, room: v })} /></div>
-              <div className="flex gap-2 pt-2">
-                <Button onClick={async () => { await updateEntry(editingEntry.id, { start_time: editingEntry.start_time, end_time: editingEntry.end_time, room: editingEntry.room }); setEditingEntry(null); }}>Save</Button>
-                <Button variant="danger" onClick={async () => { await deleteEntry(editingEntry.id); setEditingEntry(null); }}><Trash2 className="w-4 h-4" /> Delete</Button>
-                <Button variant="ghost" onClick={() => setEditingEntry(null)}>Cancel</Button>
-              </div>
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Room</label>
+            <Input value={newRoom} onChange={setNewRoom} placeholder="e.g. Room 201" />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={addEntry}><Plus className="w-4 h-4" /> Add Class</Button>
+            <Button variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button>
           </div>
         </div>
-      )}
+      </MotionOverlay>
+      <MotionOverlay
+        open={Boolean(editingEntry)}
+        onClose={() => setEditingEntry(null)}
+        panelClassName="epic-glass-sheet epic-glass-open relative max-h-[88vh] w-full max-w-md overflow-visible p-6"
+      >
+        <h3 className="mb-4 font-semibold text-zinc-800">Edit Class</h3>
+        {editingEntry && (
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Start Time</label>
+              <Input type="time" value={editingEntry.start_time} onChange={(v) => setEditingEntry({ ...editingEntry, start_time: v })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">End Time</label>
+              <Input type="time" value={editingEntry.end_time} onChange={(v) => setEditingEntry({ ...editingEntry, end_time: v })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Room</label>
+              <Input value={editingEntry.room} onChange={(v) => setEditingEntry({ ...editingEntry, room: v })} />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button onClick={async () => { await updateEntry(editingEntry.id, { start_time: editingEntry.start_time, end_time: editingEntry.end_time, room: editingEntry.room }); setEditingEntry(null); }}>Save</Button>
+              <Button variant="danger" onClick={async () => { await deleteEntry(editingEntry.id); setEditingEntry(null); }}><Trash2 className="w-4 h-4" /> Delete</Button>
+              <Button variant="ghost" onClick={() => setEditingEntry(null)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+      </MotionOverlay>
     </div>
   );
 }

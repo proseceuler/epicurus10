@@ -13,7 +13,7 @@ export default function BlackHole({
   const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
     <div
-      className={`arrodes-orbit relative flex items-center justify-center overflow-hidden bg-transparent ${className}`}
+      className={`arrodes-orbit relative flex items-center justify-center bg-transparent ${track ? 'overflow-hidden' : 'overflow-visible'} ${className}`}
       data-variant={track ? 'track' : 'home'}
     >
       <AccretionDisc compact={track} />
@@ -39,9 +39,10 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
 
-    const scale = compact ? 0.58 : 0.62;
-    const rings = [0.28, 0.36, 0.44, 0.52].map((r) => r * scale);
-    const dots = Array.from({ length: compact ? 360 : 420 }, (_, i) => {
+    // Home = e696b76 rings, unscaled. Tracker keeps the compact hug-mirror.
+    const scale = compact ? 0.58 : 1;
+    const rings = [0.34, 0.46, 0.58, 0.72].map((r) => r * scale);
+    const dots = Array.from({ length: compact ? 560 : 760 }, (_, i) => {
       const ring = rings[i % rings.length];
       const t = Math.pow(Math.random(), 0.7);
       return {

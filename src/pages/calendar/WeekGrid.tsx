@@ -65,11 +65,40 @@ type Props = {
   onDelete?: (id: string) => void;
 };
 
+type AllDayBar = {
+  id: string;
+  label: string;
+  cls: string;
+  startIdx: number;
+  span: number;
+  lane: number;
+  drag: DragPayload;
+  onClick?: () => void;
+};
+
+function packAllDay(items: Omit<AllDayBar, 'lane'>[]): AllDayBar[] {
+  const sorted = items.slice().sort((a, b) => a.startIdx - b.startIdx || b.span - a.span);
+  const lanes: number[] = [];
+  return sorted.map((item) => {
+    let lane = lanes.findIndex((end) => end <= item.startIdx);
+    if (lane < 0) {
+      lane = lanes.length;
+      lanes.push(item.startIdx + item.span);
+    } else {
+      lanes[lane] = item.startIdx + item.span;
+    }
+    return { ...item, lane };
+  });
+}
+
 export function WeekGrid(p: Props) {
   const hourH = p.density === 'compact' ? 40 : 52;
   const gridH = HOURS.length * hourH;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; colorOpen?: boolean } | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const colCount = p.rangeDays.length;
+  const cols = `3.25rem repeat(${colCount}, minmax(0, 1fr))`;
+  const dayIsos = p.rangeDays.map((d) => iso(d));
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -77,7 +106,7 @@ export function WeekGrid(p: Props) {
     const now = new Date();
     const hour = Math.max(0, now.getHours() - 1);
     el.scrollTop = hour * hourH;
-  }, [hourH]);
+  }, [hourH, p.rangeDays.length]);
 
   const minutesFromY = (el: HTMLElement, clientY: number) => {
     const rect = el.getBoundingClientRect();
@@ -85,61 +114,95 @@ export function WeekGrid(p: Props) {
     return GRID_START + (y / hourH) * 60;
   };
 
+  const allDayBars = (() => {
+    const raw: Omit<AllDayBar, 'lane'>[] = [];
+    const seen = new Set<string>();
+    const firstIso = dayIsos[0];
+    const lastIso = dayIsos[dayIsos.length - 1];
+    for (const d of p.rangeDays) {
+      const dayIso = iso(d);
+      for (const e of p.eventsForDay(dayIso).filter((ev) => ev.all_day)) {
+        if (seen.has(e.id)) continue;
+        seen.add(e.id);
+        const startIso = e.start_date < firstIso ? firstIso : e.start_date;
+        const endIso = e.end_date > lastIso ? lastIso : e.end_date;
+        const startIdx = Math.max(0, dayIsos.indexOf(startIso));
+        const endIdx = Math.max(startIdx, dayIsos.indexOf(endIso));
+        raw.push({
+          id: `ev-${e.id}`,
+          label: e.title,
+          cls: KIND_STYLE[e.kind] ?? KIND_STYLE.event,
+          startIdx,
+          span: endIdx - startIdx + 1,
+          drag: { kind: 'event', id: e.id },
+          onClick: () => p.openEvent(e),
+        });
+      }
+    }
+    for (let i = 0; i < p.rangeDays.length; i++) {
+      const dayIso = dayIsos[i];
+      for (const t of p.todosForDay(dayIso)) raw.push({ id: `td-${t.id}`, label: t.title, cls: SOURCE_STYLE.todo, startIdx: i, span: 1, drag: { kind: 'todo', id: t.id } });
+      for (const t of p.kanbanForDay(dayIso)) raw.push({ id: `kb-${t.id}`, label: t.title, cls: SOURCE_STYLE.kanban, startIdx: i, span: 1, drag: { kind: 'kanban', id: t.id } });
+      for (const n of p.notesForDay(dayIso)) raw.push({ id: `nt-${n.id}`, label: n.title, cls: SOURCE_STYLE.note, startIdx: i, span: 1, drag: { kind: 'note', id: n.id } });
+      for (const h of p.habitsForDay(dayIso)) raw.push({ id: `hb-${h.id}`, label: h.name, cls: SOURCE_STYLE.habit, startIdx: i, span: 1, drag: { kind: 'habit', id: h.id } });
+    }
+    return packAllDay(raw);
+  })();
+  const allDayLanes = allDayBars.reduce((m, b) => Math.max(m, b.lane + 1), 1);
+
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: `3.25rem repeat(${p.rangeDays.length}, minmax(0, 1fr))` }}>
-        <div />
+    <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto [scrollbar-gutter:stable]">
+      <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: cols }}>
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm" />
         {p.rangeDays.map((d) => {
           const dayIso = iso(d);
           const today = d.toDateString() === p.todayStr;
           return (
-            <button key={dayIso} type="button" onClick={() => p.setSelectedDay(dayIso)} onDoubleClick={() => p.openForm(dayIso)} className="px-1 pb-2 text-center">
+            <button key={dayIso} type="button" onClick={() => p.setSelectedDay(dayIso)} onDoubleClick={() => p.openForm(dayIso)} className="sticky top-0 z-20 bg-white/80 px-1 pb-2 pt-1 text-center backdrop-blur-sm">
               <div className={`text-[11px] font-medium uppercase tracking-wide ${today ? 'text-blue-600' : 'text-zinc-500'}`}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
               <div className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${today ? 'bg-blue-600 text-white' : 'text-zinc-800'}`}>{d.getDate()}</div>
             </button>
           );
         })}
 
-        <div className="flex items-center justify-end pr-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
-        {p.rangeDays.map((d) => {
-          const dayIso = iso(d);
-          const chips = [
-            ...p.eventsForDay(dayIso).filter((e) => e.all_day).map((e) => ({ id: `ev-${e.id}`, label: e.title, cls: KIND_STYLE[e.kind] ?? KIND_STYLE.event, drag: { kind: 'event' as const, id: e.id }, onClick: () => p.openEvent(e) })),
-            ...p.todosForDay(dayIso).map((t) => ({ id: `td-${t.id}`, label: t.title, cls: SOURCE_STYLE.todo, drag: { kind: 'todo' as const, id: t.id } })),
-            ...p.kanbanForDay(dayIso).map((t) => ({ id: `kb-${t.id}`, label: t.title, cls: SOURCE_STYLE.kanban, drag: { kind: 'kanban' as const, id: t.id } })),
-            ...p.notesForDay(dayIso).map((n) => ({ id: `nt-${n.id}`, label: n.title, cls: SOURCE_STYLE.note, drag: { kind: 'note' as const, id: n.id } })),
-            ...p.habitsForDay(dayIso).map((h) => ({ id: `hb-${h.id}`, label: h.name, cls: SOURCE_STYLE.habit, drag: { kind: 'habit' as const, id: h.id } })),
-          ];
-          const shown = chips.slice(0, 2);
-          const extra = chips.length - shown.length;
-          return (
-            <div
-              key={`all-${dayIso}`}
-              className="min-h-[28px] max-h-[44px] overflow-hidden border-l border-zinc-200/80 px-1 py-0.5"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }}
-              onDoubleClick={() => p.openForm(dayIso)}
-            >
-              {shown.map((c) => (
-                <div
-                  key={c.id}
-                  draggable
-                  onDragStart={(ev) => p.writeDrag(ev, c.drag)}
-                  onClick={'onClick' in c ? c.onClick : undefined}
-                  className={`mb-0.5 truncate rounded px-1 py-px text-[10px] leading-4 ${c.cls}`}
-                >
-                  {c.label}
-                </div>
-              ))}
-              {extra > 0 && <div className="px-1 text-[10px] text-zinc-500">+{extra} more</div>}
-            </div>
-          );
-        })}
-      </div>
+        <div className="flex items-start justify-end pr-2 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
+        <div className="relative border-l border-zinc-200/80" style={{ gridColumn: `2 / span ${colCount}`, minHeight: Math.max(28, allDayLanes * 20 + 8) }}>
+          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}>
+            {dayIsos.map((dayIso, i) => (
+              <div
+                key={`all-${dayIso}`}
+                className={i ? 'border-l border-zinc-200/80' : ''}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }}
+                onDoubleClick={() => p.openForm(dayIso)}
+              />
+            ))}
+          </div>
+          <div
+            className="relative grid"
+            style={{
+              gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${allDayLanes}, 1.15rem)`,
+              gap: '2px 0',
+              padding: '4px 0',
+            }}
+          >
+            {allDayBars.map((bar) => (
+              <div
+                key={bar.id}
+                draggable
+                onDragStart={(ev) => p.writeDrag(ev, bar.drag)}
+                onClick={bar.onClick}
+                className={`z-[1] mx-0.5 cursor-pointer truncate rounded px-1.5 text-[10px] leading-[1.15rem] ${bar.cls}`}
+                style={{ gridColumn: `${bar.startIdx + 1} / span ${bar.span}`, gridRow: bar.lane + 1 }}
+              >
+                {bar.label}
+              </div>
+            ))}
+          </div>
+        </div>
 
-      <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto">
-        <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: `3.25rem repeat(${p.rangeDays.length}, minmax(0, 1fr))` }}>
-          <div className="relative" style={{ height: gridH }}>
+        <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] text-zinc-400" style={{ top: ((h * 60 - GRID_START) / 60) * hourH }}>
                 {hourLabel(h)}
@@ -251,7 +314,6 @@ export function WeekGrid(p: Props) {
               </div>
             );
           })}
-        </div>
       </div>
 
       {menu && (

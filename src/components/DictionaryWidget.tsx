@@ -232,7 +232,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
 
   return (
     <div className={containerClass} style={style}>
-      <div className="glass glass-shadow-lg rounded-3xl overflow-hidden">
+      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
         {/* Title bar */}
         <div
           className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}

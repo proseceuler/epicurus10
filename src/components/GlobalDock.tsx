@@ -25,7 +25,7 @@ const DOCK_ITEMS: { tab: DockTab; icon: typeof Calculator; label: string }[] = [
   { tab: 'pomodoro', icon: Timer, label: 'Focus' },
 ];
 
-export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void; page: PageId }) {
+export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?: string | null) => void; page: PageId }) {
   const pomodoro = usePomodoro();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DockTab>('main');
@@ -49,16 +49,6 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
   }, []);
 
   useEffect(() => {
-    const onSearch = () => {
-      setOpen((was) => {
-        if (was && activeTab === 'search') {
-          setActiveTab('main');
-          return false;
-        }
-        setActiveTab('search');
-        return true;
-      });
-    };
     const onInbox = () => {
       setOpen((was) => {
         if (was && activeTab === 'inbox' && !inboxDetached) {
@@ -70,15 +60,17 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
         return true;
       });
     };
-    window.addEventListener('epicure-toggle-search', onSearch);
     window.addEventListener('epicure-toggle-inbox', onInbox);
     return () => {
-      window.removeEventListener('epicure-toggle-search', onSearch);
       window.removeEventListener('epicure-toggle-inbox', onInbox);
     };
   }, [activeTab, inboxDetached]);
 
   const openTab = (tab: DockTab) => {
+    if (tab === 'search') {
+      window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
+      return;
+    }
     setOpen(true);
     setActiveTab(tab);
     if (tab === 'pomodoro') pomodoro.setDockOpen(true);
@@ -164,7 +156,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 <DictionaryWidget detached={false} onDetach={() => setDictDetached(true)} onSnapBack={() => setDictDetached(false)} onClose={closeTab} />
               )}
               {activeTab === 'search' && (
-                <div className="glass glass-shadow-lg rounded-2xl">
+                <div className="epic-glass-sheet overflow-hidden rounded-2xl">
                   <GlobalSearch open mode="dock" navigate={navigate} onClose={() => { setActiveTab('main'); setOpen(false); }} />
                 </div>
               )}
@@ -172,7 +164,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 <InboxPanel open embedded navigate={navigate} onDetach={() => { setInboxDetached(true); setOpen(false); }} onClose={closeTab} />
               )}
               {activeTab === 'pomodoro' && (
-                <div className="glass glass-shadow-lg flex min-w-[280px] items-center gap-2 rounded-2xl px-3 py-2">
+                <div className="epic-glass-sheet flex min-w-[280px] items-center gap-2 rounded-2xl px-3 py-2">
                   {pomodoro.isRunning ? (
                     <button type="button" onClick={pomodoro.pause} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Pause className="h-4 w-4" /></button>
                   ) : (
@@ -187,7 +179,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 </div>
               )}
               {activeTab === 'quicktask' && (
-                <div className="glass glass-shadow-lg flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
+                <div className="epic-glass-sheet flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
                   <Plus className="h-5 w-5 shrink-0 text-zinc-400" />
                   <input value={quickTask} onChange={(e) => setQuickTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickTask()} placeholder="Quick add task..." className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
                   <button type="button" onClick={addQuickTask} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Add</button>
@@ -195,7 +187,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 </div>
               )}
               {activeTab === 'quicknote' && (
-                <div className="glass glass-shadow-lg flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
+                <div className="epic-glass-sheet flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
                   <StickyNote className="h-5 w-5 shrink-0 text-amber-500" />
                   <input value={quickNote} onChange={(e) => setQuickNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickNote()} placeholder="Sticky note..." className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
                   <button type="button" onClick={addQuickNote} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Save</button>
@@ -215,7 +207,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 36 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="glass glass-shadow-lg flex items-center gap-0.5 rounded-2xl px-2 py-2"
+                className="epic-glass-sheet flex items-center gap-0.5 rounded-2xl px-2 py-2"
               >
                 {DOCK_ITEMS.map((item, i) => (
                   <motion.div
@@ -259,7 +251,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId) => void
                 ? 'relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg'
                 : pomodoro.isRunning
                   ? 'relative flex h-14 min-w-[3.5rem] shrink-0 items-center justify-center rounded-full bg-zinc-900 px-2.5 text-white shadow-lg ring-2 ring-zinc-900/15'
-                  : 'relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full glass glass-shadow-lg text-zinc-800'
+                  : 'relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full epic-glass-sheet text-zinc-800'
             }
           >
             {open ? (

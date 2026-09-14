@@ -316,19 +316,19 @@ export default function CalendarPage() {
               {upcomingEvents.map((e) => (
                 <div key={e.id} draggable onDragStart={(ev) => writeDrag(ev, { kind: 'event', id: e.id })} onClick={() => { setCurrentDate(parse(e.start_date)); setSelectedDay(e.start_date); openEvent(e); }} className="flex cursor-grab items-center gap-2 rounded-lg p-2 hover:bg-white/50">
                   <span className={`h-2 w-2 shrink-0 rounded-full ${e.kind === 'exam' ? 'bg-zinc-900' : e.kind === 'deadline' ? 'bg-zinc-600' : 'bg-zinc-700'}`} />
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{e.title}</p><p className="text-[11px] text-zinc-400">{e.start_date}{e.start_time ? ` \u00b7 ${e.start_time}` : ' \u00b7 all day'}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{e.title}</p><p className="text-[11px] text-zinc-400">{e.start_date}{e.start_time ? ` · ${e.start_time}` : ' · all day'}</p></div>
                 </div>
               ))}
               {upcomingTodos.map((t) => (
                 <div key={`ut-${t.id}`} draggable onDragStart={(ev) => writeDrag(ev, { kind: 'todo', id: t.id })} className="flex cursor-grab items-center gap-2 rounded-lg p-2 hover:bg-white/50">
                   <CheckSquare className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{t.title}</p><p className="text-[11px] text-zinc-500">To-do \u00b7 {t.due_date}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{t.title}</p><p className="text-[11px] text-zinc-500">To-do · {t.due_date}</p></div>
                 </div>
               ))}
               {upcomingKanban.map((t) => (
                 <div key={`uk-${t.id}`} draggable onDragStart={(ev) => writeDrag(ev, { kind: 'kanban', id: t.id })} className="flex cursor-grab items-center gap-2 rounded-lg p-2 hover:bg-white/50">
                   <FolderTree className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{t.title}</p><p className="text-[11px] text-zinc-500">Kanban \u00b7 {t.due_date}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-700">{t.title}</p><p className="text-[11px] text-zinc-500">Kanban · {t.due_date}</p></div>
                 </div>
               ))}
               {upcomingEvents.length + upcomingTodos.length + upcomingKanban.length === 0 && (

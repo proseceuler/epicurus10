@@ -3,9 +3,11 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import GlobalDock from '@/components/GlobalDock';
+import GlobalSearch from '@/components/GlobalSearch';
 import GlobalAssistant from '@/components/GlobalAssistant';
 import AtaraxiaPanel from '@/components/AtaraxiaPanel';
-import { fadeMotion, motionTransition } from '@/lib/motion';
+import { motionTransition, overlayPresence } from '@/lib/motion';
+import { OverlayScrim } from '@/components/MotionUI';
 import { xpForNextLevel, XP_CHANGED } from '@/lib/xp';
 import { announcePage, refreshInboxFromData } from '@/lib/inboxRefresh';
 import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
@@ -89,6 +91,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [badgeKanban, setBadgeKanban] = useState(0);
   const [badgeCards, setBadgeCards] = useState(0);
   const [xpProgress, setXpProgress] = useState(() => xpForNextLevel());
+  const [searchOpen, setSearchOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
 
@@ -146,9 +149,9 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
       if (typing && !e.metaKey && !e.ctrlKey) return;
-      if (matchShortcut(e, shortcuts.search)) {
+      if (matchShortcut(e, shortcuts.search) || (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === '/')) {
         e.preventDefault();
-        window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
+        setSearchOpen((v) => !v);
         return;
       }
       if (matchShortcut(e, shortcuts.assistant)) {
@@ -178,11 +181,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     window.addEventListener('keydown', onKey);
     window.addEventListener('epicure-shortcuts-changed', syncSc);
     const onArrodes = () => { setAssistantOpen(true); setAssistantRail(false); };
+    const onSearch = () => setSearchOpen((v) => !v);
     window.addEventListener('epicure-open-arrodes', onArrodes);
+    window.addEventListener('epicure-toggle-search', onSearch);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('epicure-shortcuts-changed', syncSc);
       window.removeEventListener('epicure-open-arrodes', onArrodes);
+      window.removeEventListener('epicure-toggle-search', onSearch);
     };
   }, [navigate]);
 
@@ -195,7 +201,9 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </div>
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div key="sidebar-overlay" className="fixed inset-0 z-30 bg-zinc-900/25 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} initial={reduceMotion ? false : fadeMotion.initial} animate={fadeMotion.animate} exit={fadeMotion.exit} transition={motionTransition(reduceMotion, 0.18)} />
+          <motion.div key="sidebar-overlay" className="fixed inset-0 z-30 lg:hidden" initial={false} animate={{ opacity: 1 }} exit={{ opacity: 1 }} transition={overlayPresence(reduceMotion)}>
+            <OverlayScrim onClose={() => setSidebarOpen(false)} />
+          </motion.div>
         )}
       </AnimatePresence>
       <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
@@ -269,6 +277,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </div>
       <AtaraxiaPanel open={loopOpen} onClose={() => setLoopOpen(false)} navigate={navigate} />
       <GlobalAssistant open={assistantOpen} rail={assistantRail} page={page} width={assistantWidth} onWidth={(n) => { setAssistantWidth(n); try { localStorage.setItem('epicure-assistant-width', String(n)); } catch { /* ignore */ } }} onClose={() => { setAssistantOpen(false); setAssistantRail(false); }} onRail={() => { setAssistantOpen(false); setAssistantRail(true); setLoopOpen(false); }} navigate={navigate} />
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} navigate={navigate} />
       <GlobalDock navigate={navigate} page={page} />
     </div>
   );

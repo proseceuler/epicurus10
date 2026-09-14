@@ -18,6 +18,7 @@ import { getXP } from '@/lib/xp';
 import WeeklyRecapSlideshow, { shouldShowSundayRecap } from '@/components/WeeklyRecapSlideshow';
 import { fetchWeather, type WeatherSnapshot } from '@/lib/weather';
 import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
+import { DashboardTerm } from '@/components/DashboardTerm';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
 
@@ -69,7 +70,6 @@ function computeHabitStreak(
   let run = 0;
   const start = new Date();
   start.setHours(12, 0, 0, 0);
-  // scan last 365 days for best + current
   for (let i = 0; i < 365; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() - i);
@@ -80,7 +80,6 @@ function computeHabitStreak(
       run = 0;
     }
   }
-  // current: from today (or yesterday if today incomplete)
   let current = 0;
   const cursor = new Date(start);
   if (!dayComplete(iso(cursor))) {
@@ -97,7 +96,6 @@ function computeHabitStreak(
 /** Official DepEd SY 2026–2027 term windows (Order No. 009, s. 2026). */
 function termWeekProgress(term: number): { week: number; total: number; pct: number; label: string } {
   const now = new Date();
-  // T1: Jun 8 – Sep 15, 2026 | T2: Sep 16 – Dec 18, 2026 | T3: Jan 4 – Apr 8, 2027
   const windows: Record<number, [Date, Date]> = {
     1: [new Date(2026, 5, 8), new Date(2026, 8, 15)],
     2: [new Date(2026, 8, 16), new Date(2026, 11, 18)],
@@ -116,7 +114,7 @@ function termWeekProgress(term: number): { week: number; total: number; pct: num
 
 function currentDepEdTerm(now = new Date()): number {
   const t = now.getTime();
-  if (t < new Date(2026, 8, 16).getTime()) return 1; // before T2 start
+  if (t < new Date(2026, 8, 16).getTime()) return 1;
   if (t < new Date(2027, 0, 4).getTime()) return 2;
   return 3;
 }
@@ -248,11 +246,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   }, [sessions]);
 
   const weekRecap = useMemo(() => {
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
-    const tasksDone = activeTodos.filter((t) => t.completed).length; // approx
-    // todos may not track completed_at — use open vs graded as soft signals
     const focusMin = weekFocus;
     return {
       focusLabel: `${Math.floor(focusMin / 60)}h ${focusMin % 60}m`,
@@ -275,7 +268,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
       .catch(() => setWeather(null));
   }, []);
 
-
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
       setAwake(true);
@@ -295,7 +287,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
     setEditingSigil(false);
   };
 
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
   const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
   const weekFocusLabel = `${Math.floor(weekFocus / 60)}h ${weekFocus % 60}m`;
@@ -324,87 +315,25 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
       />
     )}
     <div>
-      <section className={`hud-hero mb-8 ${awake ? 'hud-awake' : ''}`}>
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-14">
-          <div className="min-w-0 flex-1">
-            {editingSigil ? (
-              <div>
-                <textarea
-                  defaultValue={sigil}
-                  rows={10}
-                  className="hud-sigil-frame w-full resize-y rounded-lg bg-transparent p-2 font-mono text-[11px] leading-[1.15] text-zinc-700 outline-none"
-                  autoFocus
-                  onBlur={(e) => saveSigil(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setEditingSigil(false);
-                  }}
-                />
-                <p className="mt-1 font-mono text-[10px] text-[#5c6168]">click away to save · original glyph only</p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingSigil(true)}
-                title="Customize sigil"
-                className="hud-sigil hud-sigil-frame block w-full text-left"
-              >
-                <pre className="select-none font-mono leading-[1.12] text-[clamp(10px,1.6vw,16px)]">{sigil}</pre>
-              </button>
-            )}
-          </div>
+      <DashboardTerm
+        awake={awake}
+        sigil={sigil}
+        editingSigil={editingSigil}
+        setEditingSigil={setEditingSigil}
+        saveSigil={saveSigil}
+        time={clock.time}
+        dateLabel={clock.dateLabel}
+        weather={weather}
+        host="epicure"
+        streak={streak}
+        term={currentTerm}
+        terms={NUM_TERMS}
+        focusLabel={focusLabel}
+        gpa={gpa}
+        tasks={activeTodos.length}
+        navigate={navigate}
+      />
 
-          <div className="font-mono text-[12px] leading-6 text-zinc-600 lg:min-w-[300px] lg:pt-2">
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="text-3xl font-semibold tabular-nums tracking-tight text-zinc-900">{clock.time}</span>
-              <span className="text-[11px] uppercase tracking-wider text-zinc-500">{clock.dateLabel}</span>
-            </div>
-            {weather ? (
-              <p className="mb-2 font-mono text-[11px] text-zinc-600">
-                {weather.tempC}°C · {weather.description}
-                <span className="text-zinc-400"> · {weather.city}</span>
-              </p>
-            ) : (
-              <p className="mb-2 font-mono text-[10px] text-zinc-400">weather · set key in Settings</p>
-            )}
-            <p className="text-zinc-800">
-              user<span className="text-zinc-500">@</span>
-              {host}
-            </p>
-            <p className="text-zinc-400">{'─'.repeat(22)}</p>
-            <StatRow label="OS" value="epicure 10.2" />
-            <StatRow label="STREAK" value={`${streak}d`} />
-            <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
-            <StatRow label="FOCUS" value={focusLabel} />
-            <StatRow label="GPA" value={gpa} />
-            <StatRow label="TASKS" value={`${activeTodos.length} open`} />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('grades')}
-                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
-              >
-                → grades
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('habits')}
-                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
-              >
-                → habits
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('todos')}
-                className="font-mono text-[11px] tracking-wide text-zinc-600 hover:text-zinc-900"
-              >
-                → tasks
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-            {/* Insight strip — no GPA/Baon duplicates */}
       <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <InsightTile
           icon={Flame}
@@ -435,7 +364,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
           onOpen={() => navigate('grades')}
         />
       </div>
-
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-4">
@@ -544,15 +472,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
-  return (
-    <p>
-      <span className="inline-block w-[7.5rem] text-zinc-500">{label}:</span>
-      <span className="text-zinc-800">{value}</span>
-    </p>
-  );
-}
-
 function InsightTile({
   icon: Icon,
   label,
@@ -570,14 +489,14 @@ function InsightTile({
     <button
       type="button"
       onClick={onOpen}
-      className="glass group rounded-2xl p-4 text-left transition-colors hover:bg-white/50"
+      className="glass group rounded-2xl p-4 text-left font-mono transition-colors hover:bg-white/50"
     >
       <div className="mb-2 flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-zinc-500" />
-        <span className="text-xs font-medium text-zinc-500">{label}</span>
+        <span className="text-[11px] lowercase tracking-wide text-zinc-500">{label}</span>
       </div>
       <div className="text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
-      <div className="mt-1 text-[11px] text-zinc-500">{hint}</div>
+      <div className="mt-1 text-[11px] lowercase text-zinc-500">{hint}</div>
     </button>
   );
 }

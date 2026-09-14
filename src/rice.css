@@ -344,8 +344,81 @@ html, body, #root {
   }
 }
 
-/* --- slice-6 additive fixes (do not remove original rules) --- */
-/* Circle FAB: true circle + soft shadow (no old squircle shadow) */
+/* Habit tracker + dashboard HUD (restored — was missing from truncated CSS) */
+.ht-shell { color: #27272a; }
+.ht-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+.ht-pane {
+  border-radius: 1rem;
+  border: 1px solid rgba(24, 24, 27, 0.06);
+  background: rgba(255, 255, 255, 0.55);
+}
+.ht-card {
+  border-radius: 0.875rem;
+  border: 1px solid rgba(24, 24, 27, 0.06);
+  background: #fff;
+}
+.ht-flat { background: transparent; border: 0; }
+.ht-table { width: 100%; border-collapse: collapse; }
+.ht-hscroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.hud-panel {
+  border-radius: 1rem;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+}
+.hud-clock { font-variant-numeric: tabular-nums; }
+.hud-clock-time {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #18181b;
+}
+.hud-clock-date {
+  font-size: 0.7rem;
+  color: #71717a;
+  text-transform: lowercase;
+}
+.hud-fetch { font-size: 0.75rem; line-height: 1.55; color: #3f3f46; }
+.hud-k { color: #a1a1aa; min-width: 4.5rem; display: inline-block; }
+.hud-link {
+  color: #52525b;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.hud-link:hover { color: #18181b; }
+.hud-rule {
+  border: 0;
+  border-top: 1px solid rgba(24, 24, 27, 0.08);
+  margin: 0.5rem 0;
+}
+.hud-dot {
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #18181b;
+}
+.hud-dot-mid { background: #a1a1aa; }
+.hud-dot-dim { background: #d4d4d8; }
+.hud-awake { color: #18181b; }
+.dock-rail-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- slice-6 additive fixes --- */
 [data-global-dock] .dock-fab {
   width: 3.25rem !important;
   height: 3.25rem !important;
@@ -357,11 +430,6 @@ html, body, #root {
   flex: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06) !important;
 }
-[data-global-dock] .dock-fab.shadow-lg {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06) !important;
-}
-
-/* Mobile/tablet: prevent left-push from sidebar padding */
 @media (max-width: 1279px) {
   .rice-main {
     padding-left: 0 !important;

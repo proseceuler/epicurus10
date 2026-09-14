@@ -284,9 +284,9 @@ html, body, #root {
   pointer-events: none;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: 8%;
-  width: 84%;
-  height: 84%;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
 }
 .arrodes-disc {
   position: absolute;
@@ -297,21 +297,14 @@ html, body, #root {
 }
 .arrodes-disc--back { z-index: 1; }
 .arrodes-disc--front { z-index: 4; }
-.arrodes-orbit[data-variant='home'] {
-  width: min(72vw, 300px);
-  height: min(72vw, 300px);
-  max-width: 300px;
-  max-height: 300px;
-  overflow: hidden;
-}
 .arrodes-stage[data-variant='home'] {
   width: auto;
-  max-width: 100%;
+  max-width: none;
   margin: 0;
 }
 .arrodes-stage[data-variant='home'] .arrodes-well {
-  width: min(56vw, 220px);
-  max-width: 220px;
+  width: min(68vw, 340px);
+  max-width: 340px;
   animation-duration: 6.4s;
 }
 .arrodes-orbit[data-variant='track'] {

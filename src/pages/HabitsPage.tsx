@@ -10,8 +10,8 @@ import {
   MONTHS, monthDays, doneSet, isDone, todayIso, lastNDays, lifetimePct,
 } from '@/lib/habit-stats';
 import { awardXP } from '@/lib/xp';
-import { focusFromHash } from '@/lib/routeFocus';
 import { onDataChanged } from '@/lib/assistant/sync';
+import { useHashFocus } from '@/lib/routeFocus';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -20,12 +20,12 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'insights', label: 'Insights' },
 ];
 const DEFAULT_HABITS = [
-  { name: 'Journal', emoji: '\ud83d\udcd4', goal_target: 30 },
-  { name: 'Push Up', emoji: '\ud83d\udcaa', goal_target: 25 },
-  { name: 'Healthy Diet', emoji: '\ud83e\udd57', goal_target: 30 },
-  { name: 'Read 3 pages', emoji: '\ud83d\udcda', goal_target: 30 },
-  { name: 'Active Learning', emoji: '\ud83e\udde0', goal_target: 25 },
-  { name: 'Run', emoji: '\ud83c\udfc3', goal_target: 20 },
+  { name: 'Journal', emoji: '📔', goal_target: 30 },
+  { name: 'Push Up', emoji: '💪', goal_target: 25 },
+  { name: 'Healthy Diet', emoji: '🥗', goal_target: 30 },
+  { name: 'Read 3 pages', emoji: '📚', goal_target: 30 },
+  { name: 'Active Learning', emoji: '🧠', goal_target: 25 },
+  { name: 'Run', emoji: '🏃', goal_target: 20 },
 ];
 
 function dedupeHabits(list: Habit[]) {
@@ -42,13 +42,14 @@ function dedupeHabits(list: Habit[]) {
 
 export default function HabitsPage() {
   const [view, setView] = useState<View>('home');
+  const hashFocus = useHashFocus();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth());
   const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState({ name: '', emoji: '\u2705', goal: '30' });
+  const [draft, setDraft] = useState({ name: '', emoji: '✅', goal: '30' });
   const seeded = useRef(false);
   const today = todayIso();
   const done = useMemo(() => doneSet(completions), [completions]);
@@ -77,14 +78,9 @@ export default function HabitsPage() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => onDataChanged(() => { void load(); }), [load]);
   useEffect(() => {
-    const apply = () => {
-      const focus = focusFromHash();
-      if (focus === 'home' || focus === 'track' || focus === 'dash' || focus === 'insights') setView(focus);
-    };
-    apply();
-    window.addEventListener('hashchange', apply);
-    return () => window.removeEventListener('hashchange', apply);
-  }, []);
+    if (!hashFocus) return;
+    if (hashFocus === 'home' || hashFocus === 'track' || hashFocus === 'dash' || hashFocus === 'insights') setView(hashFocus);
+  }, [hashFocus]);
 
   const days = useMemo(() => monthDays(year, month), [year, month]);
   const weeks = useMemo(() => {
@@ -108,10 +104,10 @@ export default function HabitsPage() {
 
   const addHabit = async () => {
     if (!draft.name.trim()) return;
-    const { data } = await supabase.from('habits').insert({ name: draft.name.trim(), emoji: draft.emoji || '\u2705', goal_target: parseInt(draft.goal) || 30, color: 'zinc' }).select().single();
+    const { data } = await supabase.from('habits').insert({ name: draft.name.trim(), emoji: draft.emoji || '✅', goal_target: parseInt(draft.goal) || 30, color: 'zinc' }).select().single();
     if (data) {
       setHabits((cur) => dedupeHabits([...cur, data as Habit]));
-      setDraft({ name: '', emoji: '\u2705', goal: '30' });
+      setDraft({ name: '', emoji: '✅', goal: '30' });
       setShowAdd(false);
     }
   };
@@ -132,7 +128,7 @@ export default function HabitsPage() {
   }));
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20 text-xs text-zinc-500">Loading tracker\u2026</div>;
+    return <div className="flex items-center justify-center py-20 text-xs text-zinc-500">Loading tracker…</div>;
   }
 
   return (

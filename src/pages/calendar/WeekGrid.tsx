@@ -106,7 +106,7 @@ export function WeekGrid(p: Props) {
     if (!el) return;
     const now = new Date();
     const hour = Math.max(0, now.getHours() - 1);
-    el.scrollTop = hour * hourH;
+    el.scrollTop = hour * hourH + 72;
   }, [hourH, p.rangeDays.length]);
 
   const minutesFromY = (el: HTMLElement, clientY: number) => {
@@ -154,7 +154,8 @@ export function WeekGrid(p: Props) {
   return (
     <div className="overflow-x-auto overscroll-x-contain">
       <div className="min-w-[min(100%,36rem)] sm:min-w-[640px]">
-        <div className="[scrollbar-gutter:stable]" style={{ display: 'grid', gridTemplateColumns: cols }}>
+        <div ref={scrollerRef} className="max-h-[min(38rem,calc(100dvh-14rem))] overflow-y-auto overflow-x-hidden">
+        <div className="sticky top-0 z-10 bg-[#f5f5f7]" style={{ display: 'grid', gridTemplateColumns: cols }}>
           <div />
           {p.rangeDays.map((d) => {
             const dayIso = iso(d);
@@ -168,7 +169,7 @@ export function WeekGrid(p: Props) {
           })}
         </div>
 
-        <div className="[scrollbar-gutter:stable]" style={{ display: 'grid', gridTemplateColumns: cols, minHeight: allDayOpen ? Math.max(28, allDayLanes * 20 + 8) : 28 }}>
+        <div className="sticky top-[3.25rem] z-10 border-b border-zinc-200/80 bg-[#f5f5f7]" style={{ display: 'grid', gridTemplateColumns: cols, minHeight: allDayOpen ? Math.max(28, allDayLanes * 20 + 8) : 28 }}>
           <button
             type="button"
             onClick={() => setAllDayOpen((v) => !v)}
@@ -215,8 +216,7 @@ export function WeekGrid(p: Props) {
           </div>
         </div>
 
-        <div ref={scrollerRef} className="max-h-[min(32rem,calc(100dvh-16rem))] overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
-          <div style={{ display: 'grid', gridTemplateColumns: cols }}>
+        <div style={{ display: 'grid', gridTemplateColumns: cols }}>
           <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] text-zinc-400" style={{ top: ((h * 60 - GRID_START) / 60) * hourH }}>

@@ -41,15 +41,15 @@ export default function GlobalAssistant({
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-40 bg-transparent lg:hidden" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-40 bg-zinc-900/25 xl:hidden" onClick={onClose} />}
       <aside
         aria-hidden={!open}
         data-voice={voiceChrome ? '1' : '0'}
         data-leaving={e.voiceLeaving ? '1' : '0'}
-        className={`assistant-panel fixed inset-y-0 right-0 z-50 flex flex-col border-l border-zinc-200/80 bg-white/96 shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
-        style={{ width }}
+        className={`assistant-panel fixed inset-y-0 right-0 z-50 flex min-w-0 flex-col border-l border-zinc-200/80 bg-white/96 shadow-[-8px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
+        style={{ width, ['--panel-w' as string]: `${width}px` }}
       >
-        <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize lg:block" onPointerDown={startDrag} />
+        <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize xl:block" onPointerDown={startDrag} />
         <div className="assistant-chrome flex items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white ${e.listening || e.speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>

@@ -39,15 +39,15 @@ function noiseBuffer(ctx: AudioContext, seconds = 2.4, color: 'white' | 'pink' |
   for (let i = 0; i < size; i++) {
     const white = Math.random() * 2 - 1;
     if (color === 'white') {
-      out[i] = white * 0.35;
+      out[i] = white * 0.72;
     } else if (color === 'pink') {
       b0 = 0.99886 * b0 + white * 0.0555179;
       b1 = 0.99332 * b1 + white * 0.0750759;
       b2 = 0.969 * b2 + white * 0.153852;
-      out[i] = (b0 + b1 + b2 + white * 0.3) * 0.08;
+      out[i] = (b0 + b1 + b2 + white * 0.3) * 0.3;
     } else {
       last = (last + 0.02 * white) / 1.02;
-      out[i] = last * 1.15;
+      out[i] = last * 3.4;
     }
   }
   return buffer;
@@ -78,9 +78,9 @@ function tone(ctx: AudioContext, freq: number, type: OscillatorType = 'sine') {
 }
 
 function soften(ctx: AudioContext) {
-  const lp = filter(ctx, 'lowpass', 680, 0.55);
-  const shelf = filter(ctx, 'highshelf', 1400, 0.7);
-  shelf.gain.value = -18;
+  const lp = filter(ctx, 'lowpass', 2800, 0.65);
+  const shelf = filter(ctx, 'highshelf', 2000, 0.7);
+  shelf.gain.value = -12;
   lp.connect(shelf);
   return { input: lp, output: shelf };
 }
@@ -91,7 +91,6 @@ export class AmbientMixer {
 
   private audio() {
     if (!this.ctx || this.ctx.state === 'closed') this.ctx = new AudioContext();
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
     return this.ctx;
   }
 
@@ -106,7 +105,7 @@ export class AmbientMixer {
   setVolume(id: AmbientId, volume01: number) {
     const voice = this.voices.get(id);
     if (!voice) return;
-    voice.gain.gain.setTargetAtTime(Math.max(0, Math.min(0.7, volume01 * 0.55)), this.audio().currentTime, 0.05);
+    voice.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, volume01)), this.audio().currentTime, 0.05);
   }
 
   stop(id: AmbientId, fadeMs = 180) {
@@ -142,12 +141,13 @@ export class AmbientMixer {
     });
   }
 
-  play(id: AmbientId, volume01: number) {
+  async play(id: AmbientId, volume01: number) {
     if (this.voices.has(id)) {
       this.setVolume(id, volume01);
       return;
     }
     const ctx = this.audio();
+    if (ctx.state === 'suspended') await ctx.resume();
     const master = ctx.createGain();
     master.gain.value = 0;
     master.connect(ctx.destination);
@@ -155,7 +155,7 @@ export class AmbientMixer {
     soft.output.connect(master);
     const stoppers: Array<() => void> = [];
 
-    const attachNoise = (color: 'white' | 'pink' | 'brown', pre?: BiquadFilterNode, level = 0.08) => {
+    const attachNoise = (color: 'white' | 'pink' | 'brown', pre?: BiquadFilterNode, level = 0.42) => {
       const src = loopNoise(ctx, color);
       const g = ctx.createGain();
       g.gain.value = level;
@@ -166,52 +166,52 @@ export class AmbientMixer {
     };
 
     if (id === 'white') {
-      attachNoise('pink', filter(ctx, 'lowpass', 520), 0.07);
+      attachNoise('pink', filter(ctx, 'lowpass', 1100), 0.48);
     } else if (id === 'rain') {
-      attachNoise('brown', filter(ctx, 'bandpass', 480, 0.45), 0.11);
+      attachNoise('brown', filter(ctx, 'bandpass', 620, 0.55), 0.58);
     } else if (id === 'lofi') {
-      attachNoise('brown', filter(ctx, 'lowpass', 280), 0.09);
-      const osc = tone(ctx, 58, 'sine');
+      attachNoise('brown', filter(ctx, 'lowpass', 480), 0.5);
+      const osc = tone(ctx, 52, 'sine');
       const og = ctx.createGain();
-      og.gain.value = 0.012;
+      og.gain.value = 0.03;
       osc.connect(og).connect(soft.input);
       stoppers.push(() => osc.stop());
     } else if (id === 'forest') {
-      attachNoise('pink', filter(ctx, 'bandpass', 640, 0.5), 0.06);
+      attachNoise('pink', filter(ctx, 'lowpass', 1400), 0.42);
     } else if (id === 'ocean') {
       const src = loopNoise(ctx, 'brown');
-      const lp = filter(ctx, 'lowpass', 240);
+      const lp = filter(ctx, 'lowpass', 280);
       const g = ctx.createGain();
-      g.gain.value = 0.1;
+      g.gain.value = 0.55;
       const lfo = tone(ctx, 0.08, 'sine');
       const lg = ctx.createGain();
-      lg.gain.value = 0.035;
+      lg.gain.value = 0.08;
       lfo.connect(lg).connect(g.gain);
       src.connect(lp).connect(g).connect(soft.input);
       stoppers.push(() => { src.stop(); lfo.stop(); });
     } else if (id === 'cafe') {
-      attachNoise('pink', filter(ctx, 'lowpass', 560), 0.05);
+      attachNoise('pink', filter(ctx, 'lowpass', 1000), 0.4);
     } else if (id === 'fire') {
-      attachNoise('brown', filter(ctx, 'bandpass', 420, 0.7), 0.09);
+      attachNoise('brown', filter(ctx, 'bandpass', 480, 0.8), 0.52);
     } else if (id === 'thunder') {
-      attachNoise('brown', filter(ctx, 'lowpass', 110), 0.12);
-      const rumble = tone(ctx, 36, 'sine');
+      attachNoise('brown', filter(ctx, 'lowpass', 180), 0.6);
+      const rumble = tone(ctx, 34, 'sine');
       const rg = ctx.createGain();
-      rg.gain.value = 0.02;
+      rg.gain.value = 0.04;
       rumble.connect(rg).connect(soft.input);
       stoppers.push(() => rumble.stop());
     } else if (id === 'library') {
-      attachNoise('pink', filter(ctx, 'lowpass', 380), 0.035);
+      attachNoise('pink', filter(ctx, 'lowpass', 600), 0.36);
     } else {
-      attachNoise('pink', filter(ctx, 'lowpass', 200), 0.07);
-      const hum = tone(ctx, 62, 'sine');
+      attachNoise('pink', filter(ctx, 'lowpass', 320), 0.48);
+      const hum = tone(ctx, 56, 'sine');
       const hg = ctx.createGain();
-      hg.gain.value = 0.014;
+      hg.gain.value = 0.03;
       hum.connect(hg).connect(soft.input);
       stoppers.push(() => hum.stop());
     }
 
-    master.gain.setTargetAtTime(Math.max(0.02, Math.min(0.7, volume01 * 0.55)), ctx.currentTime, 0.1);
+    master.gain.setTargetAtTime(Math.max(0.12, Math.min(1, volume01)), ctx.currentTime, 0.08);
     this.voices.set(id, {
       gain: master,
       stop: () => {

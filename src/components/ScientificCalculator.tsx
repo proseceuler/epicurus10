@@ -73,8 +73,8 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-80'
-    : 'w-full max-w-[320px] mx-auto';
+    ? 'fixed z-[70] w-[min(20rem,calc(100vw-1.5rem))]'
+    : 'w-full max-w-[min(320px,calc(100vw-1.5rem))] mx-auto';
 
   const style = detached ? { left: pos.x, top: pos.y } : undefined;
 

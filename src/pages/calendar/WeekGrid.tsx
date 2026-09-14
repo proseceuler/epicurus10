@@ -151,58 +151,64 @@ export function WeekGrid(p: Props) {
   const allDayLanes = allDayBars.reduce((m, b) => Math.max(m, b.lane + 1), 1);
 
   return (
-    <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto [scrollbar-gutter:stable]">
-      <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: cols }}>
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm" />
-        {p.rangeDays.map((d) => {
-          const dayIso = iso(d);
-          const today = d.toDateString() === p.todayStr;
-          return (
-            <button key={dayIso} type="button" onClick={() => p.setSelectedDay(dayIso)} onDoubleClick={() => p.openForm(dayIso)} className="sticky top-0 z-20 bg-white/80 px-1 pb-2 pt-1 text-center backdrop-blur-sm">
-              <div className={`text-[11px] font-medium uppercase tracking-wide ${today ? 'text-blue-600' : 'text-zinc-500'}`}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-              <div className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${today ? 'bg-blue-600 text-white' : 'text-zinc-800'}`}>{d.getDate()}</div>
-            </button>
-          );
-        })}
-
-        <div className="flex items-start justify-end pr-2 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
-        <div className="relative border-l border-zinc-200/80" style={{ gridColumn: `2 / span ${colCount}`, minHeight: Math.max(28, allDayLanes * 20 + 8) }}>
-          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}>
-            {dayIsos.map((dayIso, i) => (
-              <div
-                key={`all-${dayIso}`}
-                className={i ? 'border-l border-zinc-200/80' : ''}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }}
-                onDoubleClick={() => p.openForm(dayIso)}
-              />
-            ))}
-          </div>
-          <div
-            className="relative grid"
-            style={{
-              gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${allDayLanes}, 1.15rem)`,
-              gap: '2px 0',
-              padding: '4px 0',
-            }}
-          >
-            {allDayBars.map((bar) => (
-              <div
-                key={bar.id}
-                draggable
-                onDragStart={(ev) => p.writeDrag(ev, bar.drag)}
-                onClick={bar.onClick}
-                className={`z-[1] mx-0.5 cursor-pointer truncate rounded px-1.5 text-[10px] leading-[1.15rem] ${bar.cls}`}
-                style={{ gridColumn: `${bar.startIdx + 1} / span ${bar.span}`, gridRow: bar.lane + 1 }}
-              >
-                {bar.label}
-              </div>
-            ))}
-          </div>
+    <div className="overflow-x-auto">
+      <div className="min-w-[640px] overflow-y-auto [scrollbar-gutter:stable]">
+        <div style={{ display: 'grid', gridTemplateColumns: cols }}>
+          <div />
+          {p.rangeDays.map((d) => {
+            const dayIso = iso(d);
+            const today = d.toDateString() === p.todayStr;
+            return (
+              <button key={dayIso} type="button" onClick={() => p.setSelectedDay(dayIso)} onDoubleClick={() => p.openForm(dayIso)} className="px-1 pb-2 text-center">
+                <div className={`text-[11px] font-medium uppercase tracking-wide ${today ? 'text-blue-600' : 'text-zinc-500'}`}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                <div className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${today ? 'bg-blue-600 text-white' : 'text-zinc-800'}`}>{d.getDate()}</div>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="relative" style={{ height: gridH }}>
+        <div style={{ display: 'grid', gridTemplateColumns: cols, minHeight: Math.max(28, allDayLanes * 20 + 8) }}>
+          <div className="flex items-start justify-end pr-2 pt-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
+          <div className="relative" style={{ gridColumn: `2 / span ${colCount}` }}>
+            <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}>
+              {dayIsos.map((dayIso) => (
+                <div
+                  key={`all-${dayIso}`}
+                  className="border-l border-zinc-200/80"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }}
+                  onDoubleClick={() => p.openForm(dayIso)}
+                />
+              ))}
+            </div>
+            <div
+              className="relative grid py-1"
+              style={{
+                gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${allDayLanes}, 1.15rem)`,
+                rowGap: 2,
+              }}
+            >
+              {allDayBars.map((bar) => (
+                <div
+                  key={bar.id}
+                  draggable
+                  onDragStart={(ev) => p.writeDrag(ev, bar.drag)}
+                  onClick={bar.onClick}
+                  className={`z-[1] mx-0.5 cursor-pointer truncate rounded px-1.5 text-[10px] leading-[1.15rem] ${bar.cls}`}
+                  style={{ gridColumn: `${bar.startIdx + 1} / span ${bar.span}`, gridRow: bar.lane + 1 }}
+                >
+                  {bar.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div ref={scrollerRef} className="max-h-[min(32rem,calc(100vh-18rem))] overflow-auto [scrollbar-gutter:stable]">
+        <div className="min-w-[640px]" style={{ display: 'grid', gridTemplateColumns: cols }}>
+          <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] text-zinc-400" style={{ top: ((h * 60 - GRID_START) / 60) * hourH }}>
                 {hourLabel(h)}
@@ -314,6 +320,7 @@ export function WeekGrid(p: Props) {
               </div>
             );
           })}
+        </div>
       </div>
 
       {menu && (

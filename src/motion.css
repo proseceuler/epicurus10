@@ -39,6 +39,14 @@
   100% { background-position: 0 0; }
 }
 
+.epic-scrim {
+  --epic-blur: 0;
+  -webkit-backdrop-filter: blur(calc(var(--epic-blur) * 1px)) saturate(140%);
+  backdrop-filter: blur(calc(var(--epic-blur) * 1px)) saturate(140%);
+  transform: translateZ(0);
+  will-change: opacity, backdrop-filter;
+}
+
 .epic-flip-wrap {
   perspective: 900px;
 }
@@ -62,7 +70,7 @@
   flex: 1 1 auto;
   min-height: 0;
   max-height: min(18.5rem, calc(100vh - 2.5rem));
-  overflow-x: hidden;
+  overflow-x-hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.35rem;
@@ -70,7 +78,7 @@
 
 .epic-time-col {
   max-height: 12.25rem;
-  overflow-x: hidden;
+  overflow-x-hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

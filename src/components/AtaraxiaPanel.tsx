@@ -4,7 +4,8 @@ import type { PageId } from '@/components/AppLayout';
 import { getLoop, ringsFor, weekMarks, LOOP_CHANGED } from '@/lib/loop';
 import { getXP, recentAwards, xpForNextLevel, XP_CHANGED, todayIso } from '@/lib/xp';
 import { titleForLevel } from '@/lib/progress';
-import { motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
+import { OverlayScrim } from '@/components/MotionUI';
 import { X } from 'lucide-react';
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -66,13 +67,8 @@ export default function AtaraxiaPanel({
   return (
     <AnimatePresence>
       {open && (
-        <div key="ataraxia-root" className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close progress"
-            className="absolute inset-0 bg-zinc-900/35 backdrop-blur-md"
-            onClick={onClose}
-          />
+        <motion.div key="ataraxia-root" className="fixed inset-0 z-[60] flex items-center justify-center p-4" initial={false} animate={{ opacity: 1 }} exit={{ opacity: 1 }} transition={overlayPresence(reduce)}>
+          <OverlayScrim onClose={onClose} />
           <motion.div
             role="dialog"
             aria-label="Ataraxia"
@@ -206,7 +202,7 @@ export default function AtaraxiaPanel({
               ))}
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

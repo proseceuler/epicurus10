@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { OverlayScrim } from '@/components/MotionUI';
 import { getXP } from '@/lib/xp';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -91,17 +92,18 @@ export default function WeeklyRecapSlideshow({
 
   return (
     <motion.div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: leaving ? 0 : 1 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      onAnimationComplete={() => { if (leaving) onClose(); }}
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      initial={false}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
     >
+      <OverlayScrim onClose={close} shown={!leaving} />
       <motion.div
         className="glass relative w-full max-w-md overflow-hidden rounded-3xl p-6 shadow-2xl"
         initial={{ opacity: 0, y: 18, scale: 0.97 }}
         animate={leaving ? { opacity: 0, y: 18, scale: 0.96 } : { opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+        onAnimationComplete={() => { if (leaving) onClose(); }}
       >
         <motion.button
           type="button"

@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
 import AnalyticsPage from '@/pages/AnalyticsPage';
-import { MotionSwap } from '@/components/MotionUI';
+import { MotionCollapse, MotionSwap } from '@/components/MotionUI';
 import { AmbientMixer, AMBIENT_LIBRARY, clearCustomAmbient, hasCustomAmbient, setCustomAmbient, type AmbientId } from '@/lib/ambientSounds';
 import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House, Plus, X } from 'lucide-react';
 
@@ -140,7 +140,7 @@ export default function PomodoroPage() {
                   {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                   {soundOn ? 'Sound On' : 'Sound Off'}
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowSettings(!showSettings)}>
+                <Button variant={showSettings ? 'primary' : 'secondary'} size="sm" onClick={() => setShowSettings(!showSettings)}>
                   <Settings className="w-4 h-4" /> Settings
                 </Button>
               </>
@@ -349,31 +349,33 @@ export default function PomodoroPage() {
             </div>
           </Card>
 
-          {showSettings && pomo.settings && (
-            <Card className="p-3">
-              <h3 className="font-semibold text-zinc-800 mb-2 text-sm">Timer Settings</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { key: 'focus_duration', label: 'Focus (min)', min: 1, max: 120, def: 25 },
-                  { key: 'short_break_duration', label: 'Short (min)', min: 1, max: 60, def: 5 },
-                  { key: 'long_break_duration', label: 'Long (min)', min: 1, max: 60, def: 15 },
-                  { key: 'sessions_before_long_break', label: 'Sessions', min: 1, max: 10, def: 4 },
-                ].map((field) => (
-                  <div key={field.key}>
-                    <label className="text-[10px] font-medium text-zinc-500 mb-0.5 block">{field.label}</label>
-                    <input
-                      type="number"
-                      min={field.min}
-                      max={field.max}
-                      value={(pomo.settings as PomodoroSettings)[field.key as keyof PomodoroSettings] as number}
-                      onChange={(e) => saveSettings({ [field.key]: parseInt(e.target.value) || field.def } as Partial<PomodoroSettings>)}
-                      className="w-full px-2 py-1.5 glass-input rounded-xl text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <MotionCollapse open={showSettings && Boolean(pomo.settings)}>
+            {pomo.settings && (
+              <Card className="mt-3 p-3">
+                <h3 className="mb-2 text-sm font-semibold text-zinc-800">Timer Settings</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'focus_duration', label: 'Focus (min)', min: 1, max: 120, def: 25 },
+                    { key: 'short_break_duration', label: 'Short (min)', min: 1, max: 60, def: 5 },
+                    { key: 'long_break_duration', label: 'Long (min)', min: 1, max: 60, def: 15 },
+                    { key: 'sessions_before_long_break', label: 'Sessions', min: 1, max: 10, def: 4 },
+                  ].map((field) => (
+                    <div key={field.key}>
+                      <label className="mb-0.5 block text-[10px] font-medium text-zinc-500">{field.label}</label>
+                      <input
+                        type="number"
+                        min={field.min}
+                        max={field.max}
+                        value={(pomo.settings as PomodoroSettings)[field.key as keyof PomodoroSettings] as number}
+                        onChange={(e) => saveSettings({ [field.key]: parseInt(e.target.value) || field.def } as Partial<PomodoroSettings>)}
+                        className="w-full rounded-xl px-2 py-1.5 text-sm glass-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </MotionCollapse>
         </div>
       </div>
       )}

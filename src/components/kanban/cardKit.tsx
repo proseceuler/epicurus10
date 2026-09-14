@@ -70,7 +70,7 @@ export function MiniSheet({ title, open, onClose, children, align = 'left' }: {
   return (
     <MotionPopover open={open} className={`absolute top-[calc(100%+6px)] z-30 w-[min(92vw,20.5rem)] p-0 ${align === 'right' ? 'right-0' : 'left-0'}`}>
       <div ref={ref} className="relative overflow-hidden rounded-[1.15rem]">
-        <div className="relative flex items-center justify-center border-b border-white/35 px-10 py-2.5">
+        <div className="relative flex items-center justify-center border-b border-zinc-200/40 px-10 py-2.5">
           <h4 className="text-[13px] font-semibold text-zinc-700">{title}</h4>
           <button type="button" onClick={onClose} className="absolute right-2.5 top-2 rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"><X className="h-4 w-4" /></button>
         </div>

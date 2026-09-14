@@ -68,7 +68,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   onClick={() => close(true)}
                   className={`epic-press rounded-lg px-3 py-1.5 text-sm font-medium ${
                     pending.danger !== false
-                      ? 'bg-rose-600 text-white hover:bg-rose-700'
+                      ? 'bg-zinc-800 text-white hover:bg-zinc-900'
                       : 'bg-zinc-900 text-white hover:bg-zinc-800'
                   }`}
                 >

@@ -12,6 +12,10 @@ html, body, #root {
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
+/* Grayscale on page chrome only — never on .rice-shell itself (that
+   creates a containing block and paints the 1px Chrome tab-bar seam)
+   and never on portaled overlays (backdrop-filter cannot sample
+   through an ancestor filter). */
 .rice-shell.rice-shell--mono { filter: none; }
 .rice-shell.rice-shell--mono .rice-sidebar,
 .rice-shell.rice-shell--mono .rice-main,
@@ -88,3 +92,165 @@ html, body, #root {
 .rice-palette { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12); }
 .assistant-panel { backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%); }
 .assistant-panel[data-voice='1'] form { border-top: 0 !important; }
+
+/* Arrodes mirror */
+.arrodes-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0 0.35rem;
+  width: 100%;
+}
+.arrodes-well {
+  position: relative;
+  width: 108px;
+  aspect-ratio: 420 / 520;
+  animation: arrodes-float 4.8s ease-in-out infinite;
+  filter: drop-shadow(0 8px 14px rgba(24, 24, 27, 0.14));
+  background: transparent;
+  border: 0;
+  outline: 0;
+  cursor: pointer;
+  transform-origin: center bottom;
+  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1), filter 480ms ease;
+}
+.arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
+.assistant-panel[data-voice='1']:not([data-leaving='1']) .arrodes-stage[data-variant='dock'] .arrodes-well,
+.assistant-panel[data-voice='1']:not([data-leaving='1']) .arrodes-well {
+  animation: arrodes-grow 1100ms cubic-bezier(0.22, 1, 0.36, 1) both, arrodes-float 4.8s ease-in-out 1100ms infinite;
+}
+.assistant-panel[data-leaving='1'] .arrodes-stage[data-variant='dock'] .arrodes-well,
+.arrodes-stage[data-variant='dock'][data-exit='1'] .arrodes-well {
+  animation: arrodes-shrink 1100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.arrodes-orbit {
+  perspective: 820px;
+  cursor: pointer;
+}
+.arrodes-orbit .arrodes-tilt {
+  position: relative;
+  z-index: 2;
+  transform: rotateX(18deg) rotateZ(-9deg);
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+.arrodes-orbit[data-variant='home'] .arrodes-tilt { transform: rotateX(18deg) rotateZ(-9deg); }
+.arrodes-orbit[data-variant='track'] .arrodes-tilt { transform: rotateX(16deg) rotateZ(-8deg); }
+.arrodes-disc-stack {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+}
+.arrodes-disc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.arrodes-disc--back { z-index: 1; }
+.arrodes-disc--front { z-index: 4; }
+.arrodes-stage[data-variant='home'] {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+.arrodes-stage[data-variant='home'] .arrodes-well {
+  width: min(68vw, 340px);
+  max-width: 340px;
+  animation-duration: 6.4s;
+}
+.arrodes-orbit[data-variant='track'] {
+  width: 176px;
+  height: 176px;
+}
+.arrodes-stage[data-variant='track'] {
+  width: auto;
+}
+.arrodes-stage[data-variant='track'] .arrodes-well {
+  width: 78px;
+  max-width: 78px;
+  animation-duration: 5.6s;
+}
+.arrodes-well:hover,
+.arrodes-orbit:hover .arrodes-well {
+  filter: drop-shadow(0 11px 18px rgba(24, 24, 27, 0.18));
+}
+.arrodes-blob,
+.arrodes-glass,
+.arrodes-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.arrodes-blob {
+  z-index: 1;
+  background: #6e737a;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.arrodes-glass {
+  z-index: 2;
+  pointer-events: none;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  background:
+    radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.10) 0%, rgba(36, 37, 42, 0.0) 55%),
+    linear-gradient(180deg, rgba(47, 49, 54, 0.12) 0%, rgba(32, 33, 38, 0.18) 100%);
+  transition: background 520ms ease, opacity 520ms ease;
+}
+.arrodes-well:hover .arrodes-glass,
+.arrodes-orbit:hover .arrodes-glass {
+  background:
+    radial-gradient(ellipse at 32% 18%, rgba(210, 214, 220, 0.11) 0%, rgba(36, 37, 42, 0.0) 58%),
+    linear-gradient(165deg, rgba(70, 74, 80, 0.08) 0%, rgba(32, 33, 38, 0.14) 100%);
+}
+.arrodes-frame {
+  z-index: 3;
+  pointer-events: none;
+  object-fit: contain;
+  object-position: center;
+}
+.arrodes-stage[data-exit='1'] { pointer-events: none; }
+@keyframes arrodes-float {
+  0%, 100% { transform: translateY(0) rotate(-0.8deg); }
+  50% { transform: translateY(-6px) rotate(0.8deg); }
+}
+@keyframes arrodes-grow {
+  0% { width: 88px; opacity: 1; }
+  100% { width: 156px; opacity: 1; }
+}
+@keyframes arrodes-shrink {
+  0% { width: 156px; opacity: 1; }
+  100% { width: 88px; opacity: 0; }
+}
+.rice-shell [data-global-dock] { transition: right 280ms ease, left 280ms ease, bottom 280ms ease; }
+.rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.5rem); left: auto; bottom: 1rem; transform: none; }
+.rice-main { color: #27272a; }
+@media (min-width: 1024px) {
+  .rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.75rem); left: auto; bottom: 1.25rem; }
+}
+
+.dock-rail-item {
+  display: inline-flex;
+  animation: dock-rail-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes dock-rail-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
+}

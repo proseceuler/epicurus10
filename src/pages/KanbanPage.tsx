@@ -9,6 +9,7 @@ import { PageHeader, Button } from '@/components/kit';
 import { KanbanCardPreview, CardDetailModal } from '@/components/KanbanCards';
 import { ListActions } from '@/components/kanban/ListActions';
 import { FolderTree, Plus, X, GripVertical } from 'lucide-react';
+import { useHashFocus } from '@/lib/routeFocus';
 
 export default function KanbanPage() {
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
@@ -17,6 +18,7 @@ export default function KanbanPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const hashFocus = useHashFocus();
   const [addingCol, setAddingCol] = useState<Status | null>(null);
   const [quickTitle, setQuickTitle] = useState('');
   const [draggingList, setDraggingList] = useState<string | null>(null);
@@ -40,6 +42,9 @@ export default function KanbanPage() {
   }, []);
   useEffect(() => { loadTasks(); }, [loadTasks]);
   useEffect(() => onDataChanged(() => { void loadTasks(); }), [loadTasks]);
+  useEffect(() => {
+    if (hashFocus) setSelectedId(hashFocus);
+  }, [hashFocus]);
   const selected = tasks.find((t) => t.id === selectedId) ?? null;
 
   const persist = async (id: string, patch: Partial<KanbanTask>) => {
@@ -227,7 +232,7 @@ export default function KanbanPage() {
           )}
         </div>
       </div>
-      {selected && <CardDetailModal task={selected} lists={lists} links={links} recentLinks={tasks.flatMap((t) => t.attachments ?? [])} onClose={() => setSelectedId(null)} onDelete={() => deleteTask(selected.id)} onStatus={(status) => updateStatus(selected.id, status)} onSave={(patch) => persist(selected.id, patch)} />}
+      <CardDetailModal task={selected} lists={lists} links={links} recentLinks={tasks.flatMap((t) => t.attachments ?? [])} onClose={() => setSelectedId(null)} onDelete={() => { if (selected) deleteTask(selected.id); }} onStatus={(status) => { if (selected) updateStatus(selected.id, status); }} onSave={(patch) => { if (selected) persist(selected.id, patch); }} />
     </div>
   );
 }

@@ -1,17 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/components/AppLayout';
-import ScientificCalculator from '@/components/ScientificCalculator';
-import DictionaryWidget from '@/components/DictionaryWidget';
-import InboxPanel from '@/components/InboxPanel';
-import GlobalSearch from '@/components/GlobalSearch';
 import { unreadCount, INBOX_CHANGED } from '@/lib/inbox';
 import {
   Calculator, BookOpen, Plus, Timer, Play, Pause, Square,
   GripHorizontal, X, StickyNote, Bell, Search,
 } from 'lucide-react';
+
+const ScientificCalculator = lazy(() => import('@/components/ScientificCalculator'));
+const DictionaryWidget = lazy(() => import('@/components/DictionaryWidget'));
+const InboxPanel = lazy(() => import('@/components/InboxPanel'));
+const GlobalSearch = lazy(() => import('@/components/GlobalSearch'));
 
 type DockTab = 'main' | 'pomodoro' | 'calculator' | 'dictionary' | 'quicktask' | 'quicknote' | 'inbox' | 'search';
 
@@ -112,33 +113,39 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
       {pomodoro.isFloating && pomodoro.isRunning && <FloatingPomodoro />}
 
       {activeTab === 'calculator' && calcDetached && (
-        <ScientificCalculator
-          detached
-          onDetach={() => setCalcDetached(true)}
-          onSnapBack={() => setCalcDetached(false)}
-          onClose={() => { setCalcDetached(false); setActiveTab('main'); }}
-        />
+        <Suspense fallback={null}>
+          <ScientificCalculator
+            detached
+            onDetach={() => setCalcDetached(true)}
+            onSnapBack={() => setCalcDetached(false)}
+            onClose={() => { setCalcDetached(false); setActiveTab('main'); }}
+          />
+        </Suspense>
       )}
       {activeTab === 'dictionary' && dictDetached && (
-        <DictionaryWidget
-          detached
-          onDetach={() => setDictDetached(true)}
-          onSnapBack={() => setDictDetached(false)}
-          onClose={() => { setDictDetached(false); setActiveTab('main'); }}
-        />
+        <Suspense fallback={null}>
+          <DictionaryWidget
+            detached
+            onDetach={() => setDictDetached(true)}
+            onSnapBack={() => setDictDetached(false)}
+            onClose={() => { setDictDetached(false); setActiveTab('main'); }}
+          />
+        </Suspense>
       )}
       {inboxDetached && (
-        <InboxPanel
-          open
-          detached
-          navigate={navigate}
-          onDetach={() => setInboxDetached(true)}
-          onSnapBack={() => { setInboxDetached(false); setActiveTab('inbox'); setOpen(true); }}
-          onClose={() => { setInboxDetached(false); setActiveTab('main'); }}
-        />
+        <Suspense fallback={null}>
+          <InboxPanel
+            open
+            detached
+            navigate={navigate}
+            onDetach={() => setInboxDetached(true)}
+            onSnapBack={() => { setInboxDetached(false); setActiveTab('inbox'); setOpen(true); }}
+            onClose={() => { setInboxDetached(false); setActiveTab('main'); }}
+          />
+        </Suspense>
       )}
 
-      <div data-global-dock className="fixed bottom-4 right-4 z-40">
+      <div data-global-dock className="fixed z-40">
         <AnimatePresence>
           {toolOpen && !calcDetached && !dictDetached && !(activeTab === 'inbox' && inboxDetached) && (
             <motion.div
@@ -147,53 +154,55 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 28 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute bottom-[4.35rem] right-0 origin-bottom-right"
+              className="dock-sheet absolute bottom-[4.35rem] right-0 origin-bottom-right"
             >
-              {activeTab === 'calculator' && (
-                <ScientificCalculator detached={false} onDetach={() => setCalcDetached(true)} onSnapBack={() => setCalcDetached(false)} onClose={closeTab} />
-              )}
-              {activeTab === 'dictionary' && (
-                <DictionaryWidget detached={false} onDetach={() => setDictDetached(true)} onSnapBack={() => setDictDetached(false)} onClose={closeTab} />
-              )}
-              {activeTab === 'search' && (
-                <div className="epic-glass-sheet overflow-hidden rounded-2xl">
-                  <GlobalSearch open mode="dock" navigate={navigate} onClose={() => { setActiveTab('main'); setOpen(false); }} />
-                </div>
-              )}
-              {activeTab === 'inbox' && (
-                <InboxPanel open embedded navigate={navigate} onDetach={() => { setInboxDetached(true); setOpen(false); }} onClose={closeTab} />
-              )}
-              {activeTab === 'pomodoro' && (
-                <div className="epic-glass-sheet flex min-w-[280px] items-center gap-2 rounded-2xl px-3 py-2">
-                  {pomodoro.isRunning ? (
-                    <button type="button" onClick={pomodoro.pause} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Pause className="h-4 w-4" /></button>
-                  ) : (
-                    <button type="button" onClick={pomodoro.start} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Play className="h-4 w-4" /></button>
-                  )}
-                  <button type="button" onClick={pomodoro.reset} className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-200/50"><Square className="h-3.5 w-3.5" /></button>
-                  <div className="flex-1 text-center">
-                    <div className="text-2xl font-bold tabular-nums text-zinc-900">{timeStr}</div>
-                    <div className="text-[10px] capitalize text-zinc-400">{pomodoro.sessionType.replace('_', ' ')}</div>
+              <Suspense fallback={null}>
+                {activeTab === 'calculator' && (
+                  <ScientificCalculator detached={false} onDetach={() => setCalcDetached(true)} onSnapBack={() => setCalcDetached(false)} onClose={closeTab} />
+                )}
+                {activeTab === 'dictionary' && (
+                  <DictionaryWidget detached={false} onDetach={() => setDictDetached(true)} onSnapBack={() => setDictDetached(false)} onClose={closeTab} />
+                )}
+                {activeTab === 'search' && (
+                  <div className="epic-glass-sheet w-full min-w-0 overflow-hidden rounded-2xl">
+                    <GlobalSearch open mode="dock" navigate={navigate} onClose={() => { setActiveTab('main'); setOpen(false); }} />
                   </div>
-                  <button type="button" onClick={closeTab} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
-                </div>
-              )}
-              {activeTab === 'quicktask' && (
-                <div className="epic-glass-sheet flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
-                  <Plus className="h-5 w-5 shrink-0 text-zinc-400" />
-                  <input value={quickTask} onChange={(e) => setQuickTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickTask()} placeholder="Quick add task..." className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
-                  <button type="button" onClick={addQuickTask} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Add</button>
-                  <button type="button" onClick={closeTab} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
-                </div>
-              )}
-              {activeTab === 'quicknote' && (
-                <div className="epic-glass-sheet flex min-w-[300px] items-center gap-2 rounded-2xl px-3 py-2">
-                  <StickyNote className="h-5 w-5 shrink-0 text-amber-500" />
-                  <input value={quickNote} onChange={(e) => setQuickNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickNote()} placeholder="Sticky note..." className="min-w-[120px] flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
-                  <button type="button" onClick={addQuickNote} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Save</button>
-                  <button type="button" onClick={closeTab} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
-                </div>
-              )}
+                )}
+                {activeTab === 'inbox' && (
+                  <InboxPanel open embedded navigate={navigate} onDetach={() => { setInboxDetached(true); setOpen(false); }} onClose={closeTab} />
+                )}
+                {activeTab === 'pomodoro' && (
+                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                    {pomodoro.isRunning ? (
+                      <button type="button" onClick={pomodoro.pause} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Pause className="h-4 w-4" /></button>
+                    ) : (
+                      <button type="button" onClick={pomodoro.start} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Play className="h-4 w-4" /></button>
+                    )}
+                    <button type="button" onClick={pomodoro.reset} className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-200/50"><Square className="h-3.5 w-3.5" /></button>
+                    <div className="flex-1 text-center">
+                      <div className="text-2xl font-bold tabular-nums text-zinc-900">{timeStr}</div>
+                      <div className="text-[10px] capitalize text-zinc-400">{pomodoro.sessionType.replace('_', ' ')}</div>
+                    </div>
+                    <button type="button" onClick={closeTab} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
+                  </div>
+                )}
+                {activeTab === 'quicktask' && (
+                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                    <Plus className="h-5 w-5 shrink-0 text-zinc-400" />
+                    <input value={quickTask} onChange={(e) => setQuickTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickTask()} placeholder="Quick add task..." className="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
+                    <button type="button" onClick={addQuickTask} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Add</button>
+                    <button type="button" onClick={closeTab} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
+                  </div>
+                )}
+                {activeTab === 'quicknote' && (
+                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                    <StickyNote className="h-5 w-5 shrink-0 text-amber-500" />
+                    <input value={quickNote} onChange={(e) => setQuickNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickNote()} placeholder="Sticky note..." className="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
+                    <button type="button" onClick={addQuickNote} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Save</button>
+                    <button type="button" onClick={closeTab} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-zinc-200/50"><X className="h-4 w-4 text-zinc-500" /></button>
+                  </div>
+                )}
+              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>
@@ -207,7 +216,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 36 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="epic-glass-sheet flex items-center gap-0.5 rounded-2xl px-2 py-2"
+                className="dock-rail epic-glass-sheet flex items-center gap-0.5 rounded-2xl px-2 py-2"
               >
                 {DOCK_ITEMS.map((item, i) => (
                   <motion.div
@@ -302,7 +311,7 @@ function DockButton({
 
 function FloatingPomodoro() {
   const pomodoro = usePomodoro();
-  const [pos, setPos] = useState({ x: window.innerWidth - 220, y: 80 });
+  const [pos, setPos] = useState({ x: Math.max(8, window.innerWidth - 220), y: 80 });
   const draggingRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
   const minutes = Math.floor(pomodoro.timeLeft / 60);
@@ -312,7 +321,9 @@ function FloatingPomodoro() {
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!draggingRef.current) return;
-      setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
+      const x = Math.min(window.innerWidth - 160, Math.max(8, e.clientX - offsetRef.current.x));
+      const y = Math.min(window.innerHeight - 48, Math.max(8, e.clientY - offsetRef.current.y));
+      setPos({ x, y });
     };
     const onUp = () => { draggingRef.current = false; };
     window.addEventListener('mousemove', onMove);

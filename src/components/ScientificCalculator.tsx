@@ -12,23 +12,32 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
   const [scientific, setScientific] = useState(false);
-  const [pos, setPos] = useState({ x: window.innerWidth - 340, y: 80 });
+  const [pos, setPos] = useState(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    return { x: Math.max(8, window.innerWidth - (isMobile ? 260 : 340)), y: isMobile ? 60 : 80 };
+  });
   const dragRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!dragRef.current) return;
       setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
     };
     const onUp = () => { dragRef.current = false; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
   }, []);
 
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.PointerEvent) => {
     if (!detached) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = true;
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
   };
@@ -59,7 +68,7 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
           .replace(/\^/g, '**')
           .replace(/%/g, '/100');
         // eslint-disable-next-line no-new-func
-        const result = Function(`"use strict"; return (${sanitized})`)();
+        const result = Function('"use strict"; return (' + sanitized + ')')();
         setDisplay(String(result));
         setExpression(String(result));
       } catch {
@@ -73,10 +82,10 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-[min(22rem,calc(100vw-1.5rem))]'
+    ? 'fixed z-[70] w-[min(16rem,calc(100vw-1.25rem))] sm:w-[min(18rem,calc(100vw-1.5rem))] md:w-[min(22rem,calc(100vw-1.5rem))]'
     : 'w-full min-w-0';
 
-  const style = detached ? { left: pos.x, top: pos.y } : undefined;
+  const style = detached ? { left: pos.x, top: pos.y, touchAction: 'none' as const } : undefined;
 
   const basicKeys = [
     ['C', '⌫', '%', '÷'],
@@ -101,8 +110,8 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
     <div className={containerClass} style={style}>
       <div className={detached ? 'epic-glass-sheet overflow-hidden rounded-3xl' : 'overflow-hidden'}>
         <div
-          className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
-          onMouseDown={onDragStart}
+          className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move touch-none' : ''}`}
+          onPointerDown={onDragStart}
         >
           <div className="flex items-center gap-2">
             {detached && <GripHorizontal className="w-3.5 h-3.5 text-zinc-400" />}
@@ -111,9 +120,10 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setScientific(!scientific)}
+              type="button"
+              onClick={() => setScientific((v) => !v)}
               className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center"
-              title={scientific ? 'Basic mode' : 'Scientific mode'}
+              title={scientific ? 'Basic' : 'Scientific'}
             >
               {scientific ? <Minimize className="w-3.5 h-3.5 text-zinc-500" /> : <Expand className="w-3.5 h-3.5 text-zinc-500" />}
             </button>
@@ -131,28 +141,20 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
             </button>
           </div>
         </div>
-
-        <div className="px-4 py-3 bg-white/40">
+        <div className="px-4 py-3">
           <div className="text-right text-[10px] text-zinc-400 h-4 truncate">{expression || '\u00A0'}</div>
-          <div className="text-right text-3xl font-light text-zinc-900 tabular-nums truncate">{display}</div>
+          <div className="text-right text-2xl font-semibold text-zinc-800 tabular-nums tracking-tight">{display}</div>
         </div>
-
         {scientific && (
-          <div className="px-3 pb-1 grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-4 gap-1.5 px-3 pb-2">
             {sciKeys.flat().map((k) => (
-              <CalcButton key={k} label={k} onClick={() => pressKey(mapKey(k))} variant="sci" />
+              <Key key={k} label={k} onPress={() => pressKey(k)} variant="sci" />
             ))}
           </div>
         )}
-
-        <div className="px-3 pb-3 grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5 p-3 pt-0">
           {basicKeys.flat().map((k) => (
-            <CalcButton
-              key={k}
-              label={k}
-              onClick={() => pressKey(mapKey(k))}
-              variant={['÷', '×', '−', '+'].includes(k) ? 'op' : k === '=' ? 'eq' : k === 'C' || k === '⌫' ? 'fn' : 'num'}
-            />
+            <Key key={k} label={k} onPress={() => pressKey(mapKey(k))} variant={['÷','×','−','+','='].includes(k) ? 'op' : k === 'C' || k === '⌫' ? 'func' : 'num'} />
           ))}
         </div>
       </div>
@@ -160,17 +162,17 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   );
 }
 
-function CalcButton({ label, onClick, variant }: { label: string; onClick: () => void; variant: 'num' | 'op' | 'fn' | 'eq' | 'sci' }) {
-  const styles: Record<string, string> = {
-    num: 'bg-white/50 hover:bg-white/70 text-zinc-800',
-    op: 'bg-zinc-200/60 hover:bg-zinc-300/70 text-zinc-800 font-medium',
-    fn: 'bg-zinc-100/60 hover:bg-zinc-200/70 text-zinc-600',
-    eq: 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium',
-    sci: 'bg-white/30 hover:bg-white/50 text-zinc-600 text-xs',
+function Key({ label, onPress, variant }: { label: string; onPress: () => void; variant: 'num' | 'op' | 'func' | 'sci' }) {
+  const styles = {
+    num: 'bg-white/80 text-zinc-800 hover:bg-white',
+    op: 'bg-zinc-800 text-white hover:bg-zinc-700',
+    func: 'bg-zinc-200/80 text-zinc-700 hover:bg-zinc-300/80',
+    sci: 'bg-zinc-100/80 text-zinc-600 hover:bg-zinc-200/80 text-[11px]',
   };
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={onPress}
       className={`h-12 rounded-2xl text-sm font-medium transition-all ${styles[variant]}`}
     >
       {label}

@@ -75,6 +75,73 @@ export async function deleteMedia(ref: string) {
   }
 }
 
+export async function saveBlob(id: string, blob: Blob): Promise<string> {
+  const db = await idb();
+  if (db) {
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(blob, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+    return `media:${id}`;
+  }
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.readAsDataURL(blob);
+  });
+  return saveMedia(id, dataUrl);
+}
+
+export async function loadBlob(ref: string): Promise<Blob | null> {
+  if (!ref) return null;
+  if (ref.startsWith('blob:') || /^https?:/i.test(ref)) {
+    try {
+      const res = await fetch(ref);
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  }
+  if (ref.startsWith('data:')) {
+    try {
+      const res = await fetch(ref);
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  }
+  const id = ref.startsWith('media:') ? ref.slice(6) : ref;
+  const db = await idb();
+  if (db) {
+    const fromIdb = await new Promise<Blob | string | null>((resolve) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve((req.result as Blob | string) || null);
+      req.onerror = () => resolve(null);
+    });
+    if (fromIdb instanceof Blob) return fromIdb;
+    if (typeof fromIdb === 'string') {
+      try {
+        const res = await fetch(fromIdb);
+        return await res.blob();
+      } catch {
+        return null;
+      }
+    }
+  }
+  const fallback = typeof localStorage !== 'undefined' ? localStorage.getItem(LS_PREFIX + id) : null;
+  if (!fallback) return null;
+  try {
+    const res = await fetch(fallback);
+    return await res.blob();
+  } catch {
+    return null;
+  }
+}
+
 export function compressImage(file: File, maxEdge = 1400, quality = 0.82): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

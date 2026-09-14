@@ -4,7 +4,7 @@ import { motionTransition, overlayPresence, overlayTransition, pageMotion, sheet
 
 export function OverlayScrim({
   onClose,
-  className = 'absolute inset-0',
+  className = 'absolute -inset-[120px]',
   shown = true,
 }: {
   onClose?: () => void;
@@ -32,12 +32,14 @@ export function MotionOverlay({
   onClose,
   children,
   zClass = 'z-50',
+  frameClassName = 'items-center justify-center p-4',
   panelClassName = 'epic-glass-sheet max-h-[88vh] w-full max-w-md overflow-visible p-5',
 }: {
   open: boolean;
   onClose?: () => void;
   children: ReactNode;
   zClass?: string;
+  frameClassName?: string;
   panelClassName?: string;
 }) {
   const reduce = useReducedMotion();
@@ -46,7 +48,7 @@ export function MotionOverlay({
       {open && (
         <motion.div
           key="overlay"
-          className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
+          className={`fixed inset-0 ${zClass} flex ${frameClassName}`}
           initial={false}
           animate={{ opacity: 1 }}
           exit={{ opacity: 1 }}
@@ -58,7 +60,7 @@ export function MotionOverlay({
             initial={reduce ? false : sheetMotion.initial}
             animate={sheetMotion.animate}
             exit={sheetMotion.exit}
-            transition={motionTransition(reduce, 0.22)}
+            transition={motionTransition(reduce, 0.34)}
             onClick={(e) => e.stopPropagation()}
           >
             {children}

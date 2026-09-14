@@ -1,19 +1,19 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { fadeMotion, motionTransition, pageMotion, sheetMotion } from '@/lib/motion';
+import { fadeMotion, motionTransition, overlayTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
-export const scrimOff = { opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' };
-export const scrimOn = { opacity: 1, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' };
+export const scrimOff = { opacity: 0, '--epic-blur': 0 };
+export const scrimOn = { opacity: 1, '--epic-blur': 16 };
 
 export function OverlayScrim({ onClose }: { onClose?: () => void }) {
   const reduce = useReducedMotion();
   return (
     <motion.div
-      className="absolute inset-0 bg-zinc-900/35"
+      className="epic-scrim absolute inset-0 bg-zinc-900/32"
       initial={reduce ? false : scrimOff}
       animate={scrimOn}
       exit={reduce ? scrimOn : scrimOff}
-      transition={motionTransition(reduce, 0.32)}
+      transition={overlayTransition(reduce)}
       onClick={onClose}
     />
   );

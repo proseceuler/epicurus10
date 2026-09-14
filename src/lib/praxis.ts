@@ -226,9 +226,11 @@ export function gradeWeight(subject?: string): 'easy' | 'core' | 'hard' {
 }
 
 export function titleForLevel(level: number) {
-  if (level >= 16) return 'Praxis';
-  if (level >= 12) return 'Craft';
-  if (level >= 8) return 'Discipline';
-  if (level >= 4) return 'Practice';
-  return 'Seed';
+  if (level >= 19) return 'Praxis';
+  if (level >= 16) return 'Telos';
+  if (level >= 13) return 'Arete';
+  if (level >= 10) return 'Techne';
+  if (level >= 7) return 'Ethos';
+  if (level >= 4) return 'Habitus';
+  return 'Attendant';
 }

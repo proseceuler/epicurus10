@@ -8,7 +8,7 @@ import NotesVault from './NotesVault';
 import { findNoteByTitle } from '@/lib/wiki';
 import type { ImportDraft } from '@/lib/vault-import';
 import { FileText, LayoutGrid, Network } from 'lucide-react';
-import { focusFromHash } from '@/lib/routeFocus';
+import { useHashFocus } from '@/lib/routeFocus';
 
 type Tab = 'notes' | 'board' | 'graph';
 
@@ -18,6 +18,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>('note-home');
   const [loading, setLoading] = useState(true);
+  const hashFocus = useHashFocus();
 
   const loadNotes = useCallback(async () => {
     const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false });
@@ -33,16 +34,14 @@ export default function NotesPage() {
   }, [loadNotes]);
   useEffect(() => onDataChanged(() => { void loadNotes(); }), [loadNotes]);
   useEffect(() => {
-    const apply = () => {
-      const focus = focusFromHash();
-      if (!focus) return;
-      if (focus === 'board' || focus === 'graph' || focus === 'notes') setTab(focus);
-      else setSelectedId(focus);
-    };
-    apply();
-    window.addEventListener('hashchange', apply);
-    return () => window.removeEventListener('hashchange', apply);
-  }, []);
+    if (!hashFocus) return;
+    if (hashFocus === 'notes' || hashFocus === 'board' || hashFocus === 'graph') {
+      setTab(hashFocus);
+      return;
+    }
+    setTab('notes');
+    setSelectedId(hashFocus);
+  }, [hashFocus]);
 
   useEffect(() => {
     try {

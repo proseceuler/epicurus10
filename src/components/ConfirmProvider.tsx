@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { registerConfirmImpl, type ConfirmOptions } from '@/lib/confirm';
-import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
 import { OverlayScrim } from '@/components/MotionUI';
 
 type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
@@ -37,10 +37,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
-            initial={reduceMotion ? false : fadeMotion.initial}
-            animate={fadeMotion.animate}
-            exit={fadeMotion.exit}
-            transition={motionTransition(reduceMotion, 0.18)}
+            initial={false}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 1 }}
+            transition={overlayPresence(reduceMotion)}
           >
             <OverlayScrim onClose={() => close(false)} />
             <motion.div

@@ -87,6 +87,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         duration_minutes: sessionType === 'short_break' ? settings?.short_break_duration ?? 5 : settings?.long_break_duration ?? 15,
         session_type: sessionType,
       });
+      setLastCompletedAt(new Date().toISOString());
       setSessionType('focus');
       setTimeLeft(getDuration('focus'));
     }

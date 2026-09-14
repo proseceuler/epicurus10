@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import { MotionSwap } from '@/components/MotionUI';
-import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3 } from 'lucide-react';
+import { AmbientMixer, AMBIENT_LIBRARY, type AmbientId } from '@/lib/ambientSounds';
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers } from 'lucide-react';
 
 type SessionType = 'focus' | 'short_break' | 'long_break';
 
@@ -14,82 +15,50 @@ export default function PomodoroPage() {
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey | ''>('math');
   const [section, setSection] = useState<'timer' | 'analytics'>('timer');
   const [showSettings, setShowSettings] = useState(false);
-  const [soundOn, setSoundOn] = useState(false);
-  const [soundType, setSoundType] = useState<'rain' | 'white' | 'lofi'>('rain');
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const noiseNodeRef = useRef<AudioNode | null>(null);
+  const [mixMode, setMixMode] = useState(false);
+  const [playing, setPlaying] = useState<Partial<Record<AmbientId, boolean>>>({});
+  const [volumes, setVolumes] = useState<Record<AmbientId, number>>(() =>
+    Object.fromEntries(AMBIENT_LIBRARY.map((s) => [s.id, 70])) as Record<AmbientId, number>,
+  );
+  const mixerRef = useRef<AmbientMixer | null>(null);
+  if (!mixerRef.current) mixerRef.current = new AmbientMixer();
+  const soundOn = Object.values(playing).some(Boolean);
 
-  const stopSound = useCallback(() => {
-    if (noiseNodeRef.current) { noiseNodeRef.current.disconnect(); noiseNodeRef.current = null; }
-    if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null; }
-  }, []);
-
-  const startSound = useCallback((type: 'rain' | 'white' | 'lofi') => {
-    stopSound();
-    const ctx = new AudioContext();
-    audioContextRef.current = ctx;
-
-    if (type === 'white') {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 1000;
-      const gain = ctx.createGain(); gain.gain.value = 0.08;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start(); noiseNodeRef.current = noise;
-    } else if (type === 'rain') {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      let lastOut = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        output[i] = (lastOut + 0.02 * white) / 1.02;
-        lastOut = output[i]; output[i] *= 3.5;
-      }
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
-      const gain = ctx.createGain(); gain.gain.value = 0.15;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start(); noiseNodeRef.current = noise;
-    } else {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      let b0 = 0, b1 = 0, b2 = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99 * b0 + white * 0.05;
-        b1 = 0.96 * b1 + white * 0.05;
-        b2 = 0.90 * b2 + white * 0.05;
-        output[i] = (b0 + b1 + b2) * 0.3;
-      }
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 500;
-      const gain = ctx.createGain(); gain.gain.value = 0.1;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start();
-      const osc = ctx.createOscillator();
-      osc.type = 'sine'; osc.frequency.value = 110;
-      const oscGain = ctx.createGain(); oscGain.gain.value = 0.02;
-      osc.connect(oscGain).connect(ctx.destination);
-      osc.start(); noiseNodeRef.current = ctx.destination;
-    }
-  }, [stopSound]);
+  useEffect(() => () => mixerRef.current?.dispose(), []);
 
   useEffect(() => {
-    if (soundOn) startSound(soundType);
-    else stopSound();
-    return () => stopSound();
-  }, [soundOn, soundType, startSound, stopSound]);
+    if (!pomo.lastCompletedAt) return;
+    const mixer = mixerRef.current;
+    if (!mixer || !mixer.playingIds().length) return;
+    void mixer.fadeAllToZero(3000).then(() => setPlaying({}));
+  }, [pomo.lastCompletedAt]);
+
+  const toggleSound = (id: AmbientId) => {
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    if (playing[id]) {
+      mixer.stop(id);
+      setPlaying((cur) => ({ ...cur, [id]: false }));
+      return;
+    }
+    if (!mixMode) {
+      mixer.stopAll();
+      setPlaying({ [id]: true });
+    } else {
+      setPlaying((cur) => ({ ...cur, [id]: true }));
+    }
+    mixer.play(id, (volumes[id] ?? 70) / 100);
+  };
+
+  const changeVolume = (id: AmbientId, next: number) => {
+    setVolumes((cur) => ({ ...cur, [id]: next }));
+    mixerRef.current?.setVolume(id, next / 100);
+  };
+
+  const silenceAll = () => {
+    mixerRef.current?.stopAll();
+    setPlaying({});
+  };
 
   const saveSettings = async (newSettings: Partial<PomodoroSettings>) => {
     if (!pomo.settings) return;
@@ -120,7 +89,7 @@ export default function PomodoroPage() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {section === 'timer' && (
               <>
-                <Button variant="secondary" size="sm" onClick={() => setSoundOn(!soundOn)}>
+                <Button variant="secondary" size="sm" onClick={() => soundOn ? silenceAll() : toggleSound('rain')}>
                   {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                   {soundOn ? 'Sound On' : 'Sound Off'}
                 </Button>
@@ -223,28 +192,68 @@ export default function PomodoroPage() {
 
         <div className="space-y-4">
           <Card className="p-5">
-            <h3 className="font-semibold text-zinc-800 mb-3 flex items-center gap-2">
-              <Volume2 className="w-4 h-4" /> Ambient Sounds
-            </h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-zinc-800 flex items-center gap-2">
+                <Volume2 className="w-4 h-4" /> Ambient Sounds
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setMixMode((on) => {
+                    if (on) {
+                      const keep = AMBIENT_LIBRARY.find((s) => playing[s.id])?.id;
+                      if (keep) {
+                        AMBIENT_LIBRARY.forEach((s) => {
+                          if (s.id !== keep && playing[s.id]) mixerRef.current?.stop(s.id);
+                        });
+                        setPlaying({ [keep]: true });
+                      }
+                    }
+                    return !on;
+                  });
+                }}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium ${
+                  mixMode ? 'bg-zinc-900 text-white' : 'glass text-zinc-600'
+                }`}
+              >
+                <Layers className="h-3 w-3" /> Mix mode
+              </button>
+            </div>
             <div className="space-y-2">
-              {([
-                { id: 'rain', label: 'Rain Sounds', desc: 'Calming rain' },
-                { id: 'white', label: 'White Noise', desc: 'Block distractions' },
-                { id: 'lofi', label: 'Lo-fi Ambient', desc: 'Low-frequency hum' },
-              ] as const).map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => { setSoundType(s.id); setSoundOn(true); }}
-                  className={`w-full text-left p-3 rounded-xl border transition-all ${
-                    soundOn && soundType === s.id
-                      ? 'border-zinc-800 bg-zinc-100/60'
-                      : 'glass border-transparent glass-hover'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-zinc-700">{s.label}</p>
-                  <p className="text-xs text-zinc-400">{s.desc}</p>
-                </button>
-              ))}
+              {AMBIENT_LIBRARY.map((s) => {
+                const active = Boolean(playing[s.id]);
+                return (
+                  <div
+                    key={s.id}
+                    className={`rounded-xl border p-3 transition-all ${
+                      active ? 'border-zinc-800 bg-zinc-100/70' : 'glass border-transparent'
+                    }`}
+                  >
+                    <button type="button" onClick={() => toggleSound(s.id)} className="flex w-full items-start gap-2 text-left">
+                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${active ? 'bg-zinc-900 text-white' : 'bg-white/50 text-zinc-500'}`}>
+                        {active ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-zinc-700">{s.label}</span>
+                        {s.desc ? <span className="block text-xs text-zinc-400">{s.desc}</span> : null}
+                      </span>
+                    </button>
+                    {active && (
+                      <label className="mt-2 flex items-center gap-2 pl-8">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={volumes[s.id] ?? 70}
+                          onChange={(e) => changeVolume(s.id, Number(e.target.value))}
+                          className="h-1.5 w-full accent-zinc-900"
+                        />
+                        <span className="w-8 text-right text-[11px] tabular-nums text-zinc-500">{volumes[s.id] ?? 70}%</span>
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Card>
 

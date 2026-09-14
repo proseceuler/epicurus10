@@ -5,8 +5,8 @@ import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import { MotionSwap } from '@/components/MotionUI';
-import { AmbientMixer, AMBIENT_LIBRARY, type AmbientId } from '@/lib/ambientSounds';
-import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House } from 'lucide-react';
+import { AmbientMixer, AMBIENT_LIBRARY, clearCustomAmbient, hasCustomAmbient, setCustomAmbient, type AmbientId } from '@/lib/ambientSounds';
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House, Plus, X } from 'lucide-react';
 
 const SOUND_ICONS: Record<AmbientId, typeof CloudRain> = {
   rain: CloudRain,
@@ -30,6 +30,7 @@ export default function PomodoroPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [mixMode, setMixMode] = useState(false);
   const [playing, setPlaying] = useState<Partial<Record<AmbientId, boolean>>>({});
+  const [customs, setCustoms] = useState<Partial<Record<AmbientId, boolean>>>({});
   const [volume, setVolume] = useState(70);
   const [selected, setSelected] = useState<AmbientId>('rain');
   const mixerRef = useRef<AmbientMixer | null>(null);
@@ -37,6 +38,14 @@ export default function PomodoroPage() {
   const soundOn = Object.values(playing).some(Boolean);
 
   useEffect(() => () => mixerRef.current?.dispose(), []);
+
+  useEffect(() => {
+    const next: Partial<Record<AmbientId, boolean>> = {};
+    for (const s of AMBIENT_LIBRARY) {
+      if (hasCustomAmbient(s.id)) next[s.id] = true;
+    }
+    setCustoms(next);
+  }, []);
 
   useEffect(() => {
     if (!pomo.lastCompletedAt) return;
@@ -73,6 +82,29 @@ export default function PomodoroPage() {
   const silenceAll = () => {
     mixerRef.current?.stopAll();
     setPlaying({});
+  };
+
+  const assignCustom = async (id: AmbientId, file: File | undefined) => {
+    if (!file) return;
+    try {
+      await setCustomAmbient(id, file);
+      setCustoms((cur) => ({ ...cur, [id]: true }));
+      setSelected(id);
+      if (playing[id]) {
+        mixerRef.current?.stop(id);
+        void mixerRef.current?.play(id, volume / 100);
+      }
+    } catch {
+      /* ignore invalid files */
+    }
+  };
+
+  const removeCustom = async (id: AmbientId) => {
+    const wasOn = Boolean(playing[id]);
+    if (wasOn) mixerRef.current?.stop(id);
+    await clearCustomAmbient(id);
+    setCustoms((cur) => ({ ...cur, [id]: false }));
+    if (wasOn) void mixerRef.current?.play(id, volume / 100);
   };
 
   const saveSettings = async (newSettings: Partial<PomodoroSettings>) => {
@@ -237,19 +269,49 @@ export default function PomodoroPage() {
             <div className="grid grid-cols-5 gap-1">
               {AMBIENT_LIBRARY.map((s) => {
                 const active = Boolean(playing[s.id]);
+                const custom = Boolean(customs[s.id]);
                 const Icon = SOUND_ICONS[s.id];
                 return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => toggleSound(s.id)}
-                    className={`aspect-square rounded-xl border px-0.5 text-center transition-all ${
-                      active ? 'border-zinc-800 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'
-                    }`}
-                  >
-                    <Icon className={`mx-auto h-3.5 w-3.5 ${active ? 'text-white' : 'text-zinc-700'}`} />
-                    <span className="mt-0.5 block truncate text-[9px] font-medium leading-tight">{s.label}</span>
-                  </button>
+                  <div key={s.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleSound(s.id)}
+                      className={`aspect-square w-full rounded-xl border px-0.5 text-center transition-all ${
+                        active ? 'border-zinc-800 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'
+                      }`}
+                    >
+                      <Icon className={`mx-auto h-3.5 w-3.5 ${active ? 'text-white' : 'text-zinc-700'}`} />
+                      <span className="mt-0.5 block truncate text-[9px] font-medium leading-tight">{s.label}</span>
+                    </button>
+                    {custom ? (
+                      <button
+                        type="button"
+                        title="Remove custom sound"
+                        onClick={(e) => { e.stopPropagation(); void removeCustom(s.id); }}
+                        className={`absolute right-0.5 top-0.5 rounded-full p-0.5 ${active ? 'bg-white/20 text-white' : 'bg-zinc-900/70 text-white'}`}
+                      >
+                        <X className="h-2 w-2" />
+                      </button>
+                    ) : (
+                      <label
+                        title="Add custom sound"
+                        className={`absolute right-0.5 top-0.5 cursor-pointer rounded-full p-0.5 ${active ? 'bg-white/20 text-white' : 'bg-zinc-900/60 text-white'}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Plus className="h-2 w-2" />
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            void assignCustom(s.id, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -262,6 +324,7 @@ export default function PomodoroPage() {
                     <PlayerIcon className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700">
                       {AMBIENT_LIBRARY.find((s) => s.id === selected)?.label}
+                      {customs[selected] ? ' · custom' : ''}
                     </span>
                     <button
                       type="button"

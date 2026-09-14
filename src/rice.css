@@ -166,7 +166,8 @@ html, body, #root {
   width: 88px;
   aspect-ratio: 1;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: hidden !important;
+  isolation: isolate;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
@@ -182,6 +183,9 @@ html, body, #root {
   position: relative;
   width: 100%;
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .arrodes-orbit .arrodes-tilt {
   position: absolute;
@@ -197,7 +201,7 @@ html, body, #root {
   pointer-events: none;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: -8%;
+  inset: -4% !important;
 }
 .arrodes-disc {
   position: absolute;
@@ -240,6 +244,9 @@ html, body, #root {
   inset: 0;
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 .arrodes-blob {
   z-index: 1;
@@ -341,4 +348,18 @@ html, body, #root {
 .rice-main { color: #27272a; }
 @media (prefers-reduced-motion: reduce) {
   .film-grain, .hud-cursor { animation: none; display: none; }
+}
+/* Portal: keep blob/glass strictly inside the frame on all devices */
+@media (max-width: 1279px) {
+  .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
+    inset: 0 !important;
+  }
+  .arrodes-stage[data-variant='home'] .arrodes-well {
+    width: min(72vw, 300px);
+    max-width: 300px;
+  }
+  .arrodes-blob {
+    -webkit-mask-size: 100% 100% !important;
+    mask-size: 100% 100% !important;
+  }
 }

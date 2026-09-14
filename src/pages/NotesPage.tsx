@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { supabase, DB_CHANGED } from '@/lib/supabase';
 import { onDataChanged } from '@/lib/assistant/sync';
 import { type Note } from '@/lib/types';
-import Whiteboard from '@/components/board/Whiteboard';
-import NotesGraph from '@/components/notes/NotesGraph';
 import NotesVault from './NotesVault';
 import { findNoteByTitle } from '@/lib/wiki';
 import type { ImportDraft } from '@/lib/vault-import';
 import { FileText, LayoutGrid, Network } from 'lucide-react';
 import { useHashFocus } from '@/lib/routeFocus';
+
+const Whiteboard = lazy(() => import('@/components/board/Whiteboard'));
+const NotesGraph = lazy(() => import('@/components/notes/NotesGraph'));
 
 type Tab = 'notes' | 'board' | 'graph';
 
@@ -162,6 +163,7 @@ export default function NotesPage() {
       )}
       {tab === 'board' && (
         <div className="min-h-0 w-full flex-1 overflow-hidden">
+          <Suspense fallback={<div className="h-full min-h-[12rem]" />}>
           <Whiteboard
             notes={notes}
             openBoardName={openBoardName}
@@ -171,10 +173,12 @@ export default function NotesPage() {
             }}
             onCreateNote={(title) => openOrCreate(title)}
           />
+          </Suspense>
         </div>
       )}
       {tab === 'graph' && (
         <div className="min-h-0 w-full flex-1 overflow-hidden">
+          <Suspense fallback={<div className="h-full min-h-[12rem]" />}>
           <NotesGraph
             notes={notes}
             focusNoteId={selectedId}
@@ -185,6 +189,7 @@ export default function NotesPage() {
             onOpenBoard={openBoard}
             onCreateNote={(title) => openOrCreate(title)}
           />
+          </Suspense>
         </div>
       )}
     </div>

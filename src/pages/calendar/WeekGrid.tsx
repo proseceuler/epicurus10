@@ -96,7 +96,6 @@ export function WeekGrid(p: Props) {
   const gridH = HOURS.length * hourH;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; colorOpen?: boolean } | null>(null);
   const [allDayOpen, setAllDayOpen] = useState(true);
-  const [sb, setSb] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const colCount = p.rangeDays.length;
   const cols = `3.25rem repeat(${colCount}, minmax(0, 1fr))`;
@@ -109,20 +108,6 @@ export function WeekGrid(p: Props) {
     const hour = Math.max(0, now.getHours() - 1);
     el.scrollTop = hour * hourH;
   }, [hourH, p.rangeDays.length]);
-
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const measure = () => setSb(Math.max(0, el.offsetWidth - el.clientWidth));
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener('resize', measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [hourH, p.rangeDays.length, allDayOpen]);
 
   const minutesFromY = (el: HTMLElement, clientY: number) => {
     const rect = el.getBoundingClientRect();
@@ -169,7 +154,7 @@ export function WeekGrid(p: Props) {
   return (
     <div className="overflow-x-auto overscroll-x-contain">
       <div className="min-w-[min(100%,36rem)] sm:min-w-[640px]">
-        <div style={{ display: 'grid', gridTemplateColumns: cols, paddingRight: sb }}>
+        <div className="week-cols" style={{ gridTemplateColumns: cols }}>
           <div />
           {p.rangeDays.map((d) => {
             const dayIso = iso(d);
@@ -183,7 +168,7 @@ export function WeekGrid(p: Props) {
           })}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: cols, paddingRight: sb, minHeight: allDayOpen ? Math.max(28, allDayLanes * 20 + 8) : 28 }}>
+        <div className="week-cols" style={{ gridTemplateColumns: cols, minHeight: allDayOpen ? Math.max(28, allDayLanes * 20 + 8) : 28 }}>
           <button
             type="button"
             onClick={() => setAllDayOpen((v) => !v)}
@@ -230,8 +215,8 @@ export function WeekGrid(p: Props) {
           </div>
         </div>
 
-        <div ref={scrollerRef} className="max-h-[min(32rem,calc(100dvh-16rem))] overflow-y-auto overflow-x-hidden">
-          <div style={{ display: 'grid', gridTemplateColumns: cols }}>
+        <div ref={scrollerRef} className="week-hours max-h-[min(32rem,calc(100dvh-16rem))]">
+          <div className="week-cols" style={{ gridTemplateColumns: cols }}>
           <div className="relative" style={{ height: gridH }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] text-zinc-400" style={{ top: ((h * 60 - GRID_START) / 60) * hourH }}>

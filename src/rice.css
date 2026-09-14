@@ -12,11 +12,10 @@ html, body, #root {
   color: #3f3f46;
   font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
-/* Grayscale on children — never on the full-viewport shell. A filter on
-   .rice-shell makes it a containing block and is what paints the 1px
-   white/black seam when Chrome's tab/address bar is hovered. */
+/* Grayscale on chrome only — never on the full-viewport shell or main column.
+   A filter ancestor kills backdrop-filter, which is the overlay blur+dim. */
 .rice-shell.rice-shell--mono { filter: none; }
-.rice-shell.rice-shell--mono > * { filter: grayscale(1); }
+.rice-shell.rice-shell--mono > :not(.rice-main) { filter: grayscale(1); }
 .rice-shell.rice-shell--mono img,
 .rice-shell.rice-shell--mono video,
 .rice-shell.rice-shell--mono canvas { filter: grayscale(1); }
@@ -62,8 +61,7 @@ html, body, #root {
 .rice-sidebar .rice-nav-label { opacity: 0; width: 0; overflow: hidden; white-space: nowrap; transition: opacity 160ms ease; }
 .rice-sidebar:hover .rice-nav-label,
 .rice-sidebar.w-56 .rice-nav-label { opacity: 1; width: auto; }
-@media (max-width: 1023px) { .rice-sidebar .rice-nav-label { opacity: 1; width: auto; }
-}
+@media (max-width: 1023px) { .rice-sidebar .rice-nav-label { opacity: 1; width: auto; } }
 @media (min-width: 1024px) {
   .rice-main { padding-left: 4.75rem; transition: padding-left 280ms ease, padding-right 280ms ease; }
   .rice-sidebar:hover ~ .rice-main { padding-left: 15.5rem; }

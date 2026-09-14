@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { motionTransition, overlayPresence, overlayTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
@@ -13,7 +14,7 @@ export function OverlayScrim({
 }) {
   const reduce = useReducedMotion();
   const hidden = { opacity: 0, ['--epic-blur' as string]: '0px' };
-  const visible = { opacity: 1, ['--epic-blur' as string]: '18px' };
+  const visible = { opacity: 1, ['--epic-blur' as string]: '22px' };
   return (
     <motion.div
       aria-hidden
@@ -43,7 +44,8 @@ export function MotionOverlay({
   panelClassName?: string;
 }) {
   const reduce = useReducedMotion();
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -67,7 +69,8 @@ export function MotionOverlay({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

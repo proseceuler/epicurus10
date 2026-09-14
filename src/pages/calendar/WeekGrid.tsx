@@ -95,6 +95,7 @@ export function WeekGrid(p: Props) {
   const hourH = p.density === 'compact' ? 40 : 52;
   const gridH = HOURS.length * hourH;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; colorOpen?: boolean } | null>(null);
+  const [allDayOpen, setAllDayOpen] = useState(true);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const colCount = p.rangeDays.length;
   const cols = `3.25rem repeat(${colCount}, minmax(0, 1fr))`;
@@ -167,20 +168,28 @@ export function WeekGrid(p: Props) {
           })}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: cols, minHeight: Math.max(28, allDayLanes * 20 + 8) }}>
-          <div className="flex items-start justify-end pr-2 pt-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">All day</div>
+        <div style={{ display: 'grid', gridTemplateColumns: cols, minHeight: allDayOpen ? Math.max(28, allDayLanes * 20 + 8) : 28 }}>
+          <button
+            type="button"
+            onClick={() => setAllDayOpen((v) => !v)}
+            title={allDayOpen ? 'Hide all-day events' : 'Show all-day events'}
+            className="flex items-start justify-end pr-2 pt-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400 hover:text-zinc-700"
+          >
+            All day
+          </button>
           <div className="relative" style={{ gridColumn: `2 / span ${colCount}` }}>
             <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}>
               {dayIsos.map((dayIso) => (
                 <div
                   key={`all-${dayIso}`}
-                  className="border-l border-zinc-200/80"
+                  className="cursor-pointer border-l border-zinc-200/80"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); void p.dropOn(p.readDrag(e), dayIso); }}
-                  onDoubleClick={() => p.openForm(dayIso)}
+                  onClick={() => p.openForm(dayIso)}
                 />
               ))}
             </div>
+            {allDayOpen && (
             <div
               className="relative grid py-1"
               style={{
@@ -194,7 +203,7 @@ export function WeekGrid(p: Props) {
                   key={bar.id}
                   draggable
                   onDragStart={(ev) => p.writeDrag(ev, bar.drag)}
-                  onClick={bar.onClick}
+                  onClick={(e) => { e.stopPropagation(); bar.onClick?.(); }}
                   className={`z-[1] mx-0.5 cursor-pointer truncate rounded px-1.5 text-[10px] leading-[1.15rem] ${bar.cls}`}
                   style={{ gridColumn: `${bar.startIdx + 1} / span ${bar.span}`, gridRow: bar.lane + 1 }}
                 >
@@ -202,6 +211,7 @@ export function WeekGrid(p: Props) {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       </div>

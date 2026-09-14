@@ -1,21 +1,37 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { fadeMotion, motionTransition, overlayTransition, pageMotion, sheetMotion } from '@/lib/motion';
+import { motionTransition, overlayPresence, overlayTransition, pageMotion, sheetMotion } from '@/lib/motion';
 
-export const scrimOff = { opacity: 0, '--epic-blur': 0 };
-export const scrimOn = { opacity: 1, '--epic-blur': 16 };
-
-export function OverlayScrim({ onClose }: { onClose?: () => void }) {
+export function OverlayScrim({
+  onClose,
+  className = 'absolute inset-0',
+  shown = true,
+}: {
+  onClose?: () => void;
+  className?: string;
+  shown?: boolean;
+}) {
   const reduce = useReducedMotion();
+  const visible = shown ? { opacity: 1 } : { opacity: 0 };
   return (
-    <motion.div
-      className="epic-scrim absolute inset-0 bg-zinc-900/32"
-      initial={reduce ? false : scrimOff}
-      animate={scrimOn}
-      exit={reduce ? scrimOn : scrimOff}
-      transition={overlayTransition(reduce)}
-      onClick={onClose}
-    />
+    <>
+      <motion.div
+        aria-hidden
+        className={`epic-scrim-blur pointer-events-none ${className}`}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={visible}
+        exit={reduce ? { opacity: 1 } : { opacity: 0 }}
+        transition={overlayTransition(reduce, 'blur')}
+      />
+      <motion.div
+        className={`bg-zinc-900/28 ${className}`}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={visible}
+        exit={reduce ? { opacity: 1 } : { opacity: 0 }}
+        transition={overlayTransition(reduce, 'dim')}
+        onClick={onClose}
+      />
+    </>
   );
 }
 
@@ -39,10 +55,10 @@ export function MotionOverlay({
         <motion.div
           key="overlay"
           className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
-          initial={reduce ? false : fadeMotion.initial}
-          animate={fadeMotion.animate}
-          exit={fadeMotion.exit}
-          transition={motionTransition(reduce, 0.22)}
+          initial={false}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 1 }}
+          transition={overlayPresence(reduce)}
         >
           <OverlayScrim onClose={onClose} />
           <motion.div

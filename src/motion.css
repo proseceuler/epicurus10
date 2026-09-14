@@ -39,12 +39,17 @@
   100% { background-position: 0 0; }
 }
 
-.epic-scrim {
-  --epic-blur: 0;
-  -webkit-backdrop-filter: blur(calc(var(--epic-blur) * 1px)) saturate(140%);
-  backdrop-filter: blur(calc(var(--epic-blur) * 1px)) saturate(140%);
-  transform: translateZ(0);
-  will-change: opacity, backdrop-filter;
+@property --epic-blur {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.epic-scrim,
+.epic-scrim-blur {
+  --epic-blur: 18px;
+  -webkit-backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
+  backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
 }
 
 .epic-flip-wrap {
@@ -70,7 +75,7 @@
   flex: 1 1 auto;
   min-height: 0;
   max-height: min(18.5rem, calc(100vh - 2.5rem));
-  overflow-x-hidden;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.35rem;
@@ -78,7 +83,7 @@
 
 .epic-time-col {
   max-height: 12.25rem;
-  overflow-x-hidden;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

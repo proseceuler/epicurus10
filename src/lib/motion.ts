@@ -2,6 +2,7 @@ import type { Transition } from 'motion/react';
 
 export const easeSoft: [number, number, number, number] = [0.32, 0.72, 0, 1];
 export const easeSmooth: [number, number, number, number] = [0.22, 1, 0.36, 1];
+export const easeBlur: [number, number, number, number] = [0.4, 0, 0.2, 1];
 
 export const dur = {
   micro: 0.2,
@@ -39,10 +40,13 @@ export function motionTransition(reduce: boolean | null | undefined, seconds = d
   return { duration: seconds, ease: easeSoft };
 }
 
-export function overlayTransition(reduce: boolean | null | undefined): Transition {
+export function overlayTransition(reduce: boolean | null | undefined, kind: 'blur' | 'dim' = 'dim'): Transition {
   if (reduce) return { duration: 0 };
-  return {
-    opacity: { duration: 0.42, ease: easeSmooth },
-    '--epic-blur': { duration: 0.56, ease: easeSmooth },
-  };
+  if (kind === 'blur') return { duration: 0.56, ease: easeBlur };
+  return { duration: 0.42, ease: easeSmooth };
+}
+
+export function overlayPresence(reduce: boolean | null | undefined): Transition {
+  if (reduce) return { duration: 0 };
+  return { duration: 0.56, ease: easeSmooth };
 }

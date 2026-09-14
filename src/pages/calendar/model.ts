@@ -54,18 +54,17 @@ export const emptyDraft = (date: string) => ({
 export type Draft = ReturnType<typeof emptyDraft> & { color?: string | null };
 
 export const EVENT_COLORS = [
-  '#3b82f6', '#ef4444', '#f97316', '#eab308', '#22c55e',
-  '#14b8a6', '#06b6d4', '#6366f1', '#8b5cf6', '#d946ef',
-  '#f43f5e', '#a16207', '#71717a', '#a8a29e',
+  '#18181b', '#27272a', '#3f3f46', '#52525b',
+  '#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7',
 ];
 
 export function eventFill(kind: string, color?: string | null) {
   if (color) return color;
-  if (kind === 'deadline') return '#f59e0b';
-  if (kind === 'exam') return '#f43f5e';
-  if (kind === 'reminder') return '#0ea5e9';
-  if (kind === 'holiday') return '#10b981';
-  return '#2563eb';
+  if (kind === 'deadline') return '#3f3f46';
+  if (kind === 'exam') return '#18181b';
+  if (kind === 'reminder') return '#52525b';
+  if (kind === 'holiday') return '#71717a';
+  return '#27272a';
 }
 
 export type TimedBlock = {

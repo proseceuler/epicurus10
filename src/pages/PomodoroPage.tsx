@@ -6,7 +6,20 @@ import { Card, PageHeader, Button, Select } from '@/components/kit';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import { MotionSwap } from '@/components/MotionUI';
 import { AmbientMixer, AMBIENT_LIBRARY, type AmbientId } from '@/lib/ambientSounds';
-import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House } from 'lucide-react';
+
+const SOUND_ICONS: Record<AmbientId, typeof CloudRain> = {
+  rain: CloudRain,
+  white: AudioLines,
+  lofi: Music,
+  forest: Trees,
+  ocean: Waves,
+  cafe: Coffee,
+  fire: Flame,
+  thunder: CloudLightning,
+  library: BookOpen,
+  cabin: House,
+};
 
 type SessionType = 'focus' | 'short_break' | 'long_break';
 
@@ -17,9 +30,8 @@ export default function PomodoroPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [mixMode, setMixMode] = useState(false);
   const [playing, setPlaying] = useState<Partial<Record<AmbientId, boolean>>>({});
-  const [volumes, setVolumes] = useState<Record<AmbientId, number>>(() =>
-    Object.fromEntries(AMBIENT_LIBRARY.map((s) => [s.id, 70])) as Record<AmbientId, number>,
-  );
+  const [volume, setVolume] = useState(55);
+  const [selected, setSelected] = useState<AmbientId>('rain');
   const mixerRef = useRef<AmbientMixer | null>(null);
   if (!mixerRef.current) mixerRef.current = new AmbientMixer();
   const soundOn = Object.values(playing).some(Boolean);
@@ -47,12 +59,15 @@ export default function PomodoroPage() {
     } else {
       setPlaying((cur) => ({ ...cur, [id]: true }));
     }
-    mixer.play(id, (volumes[id] ?? 70) / 100);
+    mixer.play(id, volume / 100);
+    setSelected(id);
   };
 
-  const changeVolume = (id: AmbientId, next: number) => {
-    setVolumes((cur) => ({ ...cur, [id]: next }));
-    mixerRef.current?.setVolume(id, next / 100);
+  const changeVolume = (next: number) => {
+    setVolume(next);
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    mixer.playingIds().forEach((id) => mixer.setVolume(id, next / 100));
   };
 
   const silenceAll = () => {
@@ -219,41 +234,55 @@ export default function PomodoroPage() {
                 <Layers className="h-3 w-3" /> Mix mode
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
               {AMBIENT_LIBRARY.map((s) => {
                 const active = Boolean(playing[s.id]);
+                const Icon = SOUND_ICONS[s.id];
                 return (
-                  <div
+                  <button
                     key={s.id}
-                    className={`rounded-xl border p-3 transition-all ${
-                      active ? 'border-zinc-800 bg-zinc-100/70' : 'glass border-transparent'
+                    type="button"
+                    onClick={() => toggleSound(s.id)}
+                    className={`aspect-square rounded-2xl border px-2 py-2 text-center transition-all ${
+                      active ? 'border-zinc-800 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'
                     }`}
                   >
-                    <button type="button" onClick={() => toggleSound(s.id)} className="flex w-full items-start gap-2 text-left">
-                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${active ? 'bg-zinc-900 text-white' : 'bg-white/50 text-zinc-500'}`}>
-                        {active ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-zinc-700">{s.label}</span>
-                        {s.desc ? <span className="block text-xs text-zinc-400">{s.desc}</span> : null}
-                      </span>
-                    </button>
-                    {active && (
-                      <label className="mt-2 flex items-center gap-2 pl-8">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={volumes[s.id] ?? 70}
-                          onChange={(e) => changeVolume(s.id, Number(e.target.value))}
-                          className="h-1.5 w-full accent-zinc-900"
-                        />
-                        <span className="w-8 text-right text-[11px] tabular-nums text-zinc-500">{volumes[s.id] ?? 70}%</span>
-                      </label>
-                    )}
-                  </div>
+                    <Icon className={`mx-auto h-5 w-5 ${active ? 'text-white' : 'text-zinc-700'}`} />
+                    <span className="mt-1.5 block text-[11px] font-medium leading-tight">{s.label}</span>
+                  </button>
                 );
               })}
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-xl glass px-3 py-2">
+              {(() => {
+                const PlayerIcon = SOUND_ICONS[selected];
+                const live = Boolean(playing[selected]);
+                return (
+                  <>
+                    <PlayerIcon className="h-4 w-4 shrink-0 text-zinc-700" />
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700">
+                      {AMBIENT_LIBRARY.find((s) => s.id === selected)?.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSound(selected)}
+                      className="rounded-md p-1 text-zinc-600 hover:bg-white/50"
+                      aria-label={live ? 'Pause' : 'Play'}
+                    >
+                      {live ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={volume}
+                      onChange={(e) => changeVolume(Number(e.target.value))}
+                      className="h-1.5 w-20 accent-zinc-900"
+                    />
+                    <span className="w-8 text-right text-[11px] tabular-nums text-zinc-500">{volume}%</span>
+                  </>
+                );
+              })()}
             </div>
           </Card>
 

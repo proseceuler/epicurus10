@@ -12,26 +12,18 @@ export function OverlayScrim({
   shown?: boolean;
 }) {
   const reduce = useReducedMotion();
-  const visible = shown ? { opacity: 1 } : { opacity: 0 };
+  const hidden = { opacity: 0, ['--epic-blur' as string]: '0px' };
+  const visible = { opacity: 1, ['--epic-blur' as string]: '18px' };
   return (
-    <>
-      <motion.div
-        aria-hidden
-        className={`epic-scrim-blur pointer-events-none ${className}`}
-        initial={reduce ? false : { opacity: 0 }}
-        animate={visible}
-        exit={reduce ? { opacity: 1 } : { opacity: 0 }}
-        transition={overlayTransition(reduce, 'blur')}
-      />
-      <motion.div
-        className={`bg-zinc-900/28 ${className}`}
-        initial={reduce ? false : { opacity: 0 }}
-        animate={visible}
-        exit={reduce ? { opacity: 1 } : { opacity: 0 }}
-        transition={overlayTransition(reduce, 'dim')}
-        onClick={onClose}
-      />
-    </>
+    <motion.div
+      aria-hidden
+      className={`epic-scrim ${className}`}
+      initial={reduce ? false : hidden}
+      animate={shown ? visible : hidden}
+      exit={reduce ? visible : hidden}
+      transition={overlayTransition(reduce)}
+      onClick={onClose}
+    />
   );
 }
 

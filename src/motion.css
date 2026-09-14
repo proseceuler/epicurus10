@@ -48,6 +48,7 @@
 .epic-scrim,
 .epic-scrim-blur {
   --epic-blur: 18px;
+  background: rgba(24, 24, 27, 0.28);
   -webkit-backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
   backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
 }

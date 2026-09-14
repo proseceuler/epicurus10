@@ -13,7 +13,7 @@ export default function BlackHole({
   const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
     <div
-      className={`arrodes-orbit relative flex items-center justify-center bg-transparent ${track ? 'overflow-hidden' : 'overflow-visible'} ${className}`}
+      className={`arrodes-orbit relative flex items-center justify-center bg-transparent overflow-hidden ${className}`}
       data-variant={track ? 'track' : 'home'}
     >
       <AccretionDisc compact={track} />

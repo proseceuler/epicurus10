@@ -8,6 +8,7 @@ import NotesVault from './NotesVault';
 import { findNoteByTitle } from '@/lib/wiki';
 import type { ImportDraft } from '@/lib/vault-import';
 import { FileText, LayoutGrid, Network } from 'lucide-react';
+import { focusFromHash } from '@/lib/routeFocus';
 
 type Tab = 'notes' | 'board' | 'graph';
 
@@ -31,6 +32,17 @@ export default function NotesPage() {
     return () => window.removeEventListener(DB_CHANGED, on);
   }, [loadNotes]);
   useEffect(() => onDataChanged(() => { void loadNotes(); }), [loadNotes]);
+  useEffect(() => {
+    const apply = () => {
+      const focus = focusFromHash();
+      if (!focus) return;
+      if (focus === 'board' || focus === 'graph' || focus === 'notes') setTab(focus);
+      else setSelectedId(focus);
+    };
+    apply();
+    window.addEventListener('hashchange', apply);
+    return () => window.removeEventListener('hashchange', apply);
+  }, []);
 
   useEffect(() => {
     try {

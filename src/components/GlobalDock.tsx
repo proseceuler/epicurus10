@@ -257,9 +257,9 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
             aria-label={open ? 'Close tools' : 'Open tools'}
             className={
               open
-                ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white shadow-lg'
+                ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white'
                 : pomodoro.isRunning
-                  ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white shadow-lg ring-2 ring-zinc-900/15'
+                  ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white ring-2 ring-zinc-900/15'
                   : 'dock-fab relative flex items-center justify-center epic-glass-sheet text-zinc-800'
             }
           >

@@ -150,6 +150,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [currentLabel]);
 
   useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1024) setSidebarOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
     let shortcuts: ShortcutMap = getShortcuts();
     const syncSc = () => { shortcuts = getShortcuts(); };
     const onKey = (e: KeyboardEvent) => {
@@ -214,7 +222,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
           </motion.div>
         )}
       </AnimatePresence>
-      <aside className={`rice-sidebar group/nav fixed bottom-3 left-3 top-3 z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[280px] lg:translate-x-0 w-14 hover:w-56'}`}>
+      <aside className={`rice-sidebar group/nav fixed z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'rice-sidebar-open translate-x-0 w-56' : 'rice-sidebar-collapsed -translate-x-[calc(100%+1.25rem)] lg:translate-x-0 w-14'}`}>
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
             <div
@@ -235,7 +243,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                   const belowSelected = idx > 0 && list[idx - 1].id === page;
                   const badge = item.id === 'todos' ? badgeTodos : item.id === 'kanban' ? badgeKanban : item.id === 'flashcards' ? badgeCards : 0;
                   return (
-                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] transition-colors duration-200 ${belowSelected ? 'epic-press-down' : 'epic-press'} ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                    <button key={item.id} type="button" title={item.label} onClick={() => { navigate(item.id); setSidebarOpen(false); }} className={`relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] transition-colors duration-200 ${belowSelected ? 'epic-press-down' : 'epic-press'} ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
                       {active && <motion.span layoutId={reduceMotion ? undefined : 'rice-nav-active'} className="absolute inset-0 rounded-xl bg-white/15" transition={motionTransition(reduceMotion, 0.22)} />}
                       <span className="relative shrink-0">
                         <Icon className="h-4 w-4" />
@@ -282,7 +290,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-32 pt-3 sm:px-4 lg:px-8">{children}</main>
       </div>
       {(loopOpen || loopReady) && (
         <Suspense fallback={null}>

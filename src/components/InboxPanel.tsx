@@ -26,11 +26,10 @@ export default function InboxPanel({
   detached?: boolean;
   onDetach?: () => void;
   onSnapBack?: () => void;
-  /** Render without fullscreen overlay (inside dock) */
   embedded?: boolean;
 }) {
   const [items, setItems] = useState<InboxItem[]>([]);
-  const [pos, setPos] = useState({ x: 80, y: 80 });
+  const [pos, setPos] = useState({ x: 16, y: 72 });
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
 
@@ -45,7 +44,10 @@ export default function InboxPanel({
     if (!detached) return;
     const onMove = (e: MouseEvent) => {
       if (!dragging.current) return;
-      setPos({ x: e.clientX - offset.current.x, y: e.clientY - offset.current.y });
+      const w = Math.min(352, window.innerWidth - 16);
+      const x = Math.min(window.innerWidth - w - 8, Math.max(8, e.clientX - offset.current.x));
+      const y = Math.min(window.innerHeight - 80, Math.max(8, e.clientY - offset.current.y));
+      setPos({ x, y });
     };
     const onUp = () => {
       dragging.current = false;
@@ -102,7 +104,7 @@ export default function InboxPanel({
           </button>
         </div>
       </div>
-      <div className="max-h-[50vh] overflow-y-auto" style={{ minWidth: embedded ? 320 : undefined }}>
+      <div className="max-h-[50vh] min-w-0 overflow-y-auto">
         {items.length === 0 && <p className="px-4 py-8 text-center text-xs text-zinc-400">No notifications yet</p>}
         {items.map((item) => (
           <button
@@ -139,7 +141,7 @@ export default function InboxPanel({
   }
 
   if (embedded) {
-    return <div className="epic-glass-sheet overflow-hidden">{body}</div>;
+    return <div className="epic-glass-sheet w-full min-w-0 overflow-hidden">{body}</div>;
   }
 
   return (

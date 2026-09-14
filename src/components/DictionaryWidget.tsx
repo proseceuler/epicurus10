@@ -237,8 +237,8 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-[min(16rem,calc(100vw-1.25rem))] sm:w-[min(18rem,calc(100vw-1.5rem))] md:w-[min(22rem,calc(100vw-1.5rem))]'
-    : 'w-full min-w-0 max-w-[min(22rem,calc(100vw-1.5rem))] mx-auto';
+    ? 'fixed z-[70] w-[min(13.5rem,calc(100vw-1.5rem))] sm:w-[min(15rem,calc(100vw-1.5rem))] md:w-[min(18rem,calc(100vw-1.5rem))]'
+    : 'w-full min-w-0 max-w-[min(18rem,calc(100vw-1.5rem))] mx-auto';
   const style = detached ? { left: pos.x, top: pos.y, touchAction: 'none' as const } : undefined;
 
   return (

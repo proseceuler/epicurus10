@@ -2,6 +2,7 @@
 
 import { awardXP, todayIso, type AwardRequest, type AwardResult, type XPType } from '@/lib/xp';
 import { closeRing, getLoop, ringForType, type RingId } from '@/lib/loop';
+import { claimVigilIfReady, titleForLevel } from '@/lib/praxis';
 import { pushInbox, type InboxKind } from '@/lib/inbox';
 
 const FLOOR_TYPES: XPType[] = ['habit_complete', 'todo_complete', 'flashcard_review', 'kanban_done', 'class_attend'];
@@ -58,30 +59,19 @@ export function recordProgress(input: ProgressInput): AwardResult {
   if (result.leveledUp) {
     pushInbox({
       kind: 'xp',
-      title: `Level ${result.level}`,
-      body: `You reached level ${result.level}. Still measured.`,
+      title: `Level ${result.level} · ${titleForLevel(result.level)}`,
+      body: 'Quiet mark. The bar moved.',
       href: 'dashboard',
-      priority: 'normal',
+      priority: 'low',
     });
   }
 
   const loop = getLoop();
-  if (loop.streak > 0 && loop.streak % 7 === 0) {
-    pushInbox({
-      kind: 'streak',
-      title: `${loop.streak}-day streak`,
-      body: loop.freezeReady ? 'Freeze is ready this week.' : 'Keep the floor ring closed tomorrow.',
-      href: 'habits',
-      priority: 'normal',
-    });
+  if (claimVigilIfReady(loop)) {
+    awardXP({ type: 'streak_bonus', key: `vigil:${new Date().toISOString().slice(0, 10)}`, minutes: 8, label: 'Vigil' });
   }
 
   return result;
 }
 
-export function titleForLevel(level: number) {
-  if (level >= 12) return 'Unhurried';
-  if (level >= 8) return 'Exact';
-  if (level >= 4) return 'Consistent';
-  return 'Attendant';
-}
+export { titleForLevel } from '@/lib/praxis';

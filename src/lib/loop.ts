@@ -75,6 +75,24 @@ function counted(day: DayRings | undefined) {
   return !!(day && (day.floor || day.focus || day.school));
 }
 
+function freezeEnabled() {
+  if (!isBrowser()) return true;
+  try {
+    const raw = localStorage.getItem('epicure:praxis:v1');
+    if (!raw) return true;
+    const p = JSON.parse(raw) as { prefs?: { freezeEnabled?: boolean } };
+    return p.prefs?.freezeEnabled !== false;
+  } catch {
+    return true;
+  }
+}
+
+/** Missed days soften the thread instead of wiping it. */
+export function decayStreak(n: number) {
+  if (n <= 1) return 0;
+  return Math.max(0, n - Math.max(1, Math.ceil(n * 0.4)));
+}
+
 function changed(a: LoopState, b: LoopState) {
   return a.streak !== b.streak || a.lastActive !== b.lastActive || a.freezeReady !== b.freezeReady || a.freezeSpentWeek !== b.freezeSpentWeek || a.paused !== b.paused;
 }
@@ -96,8 +114,11 @@ function reconcile(state: LoopState): LoopState {
     weekDays.push(iso);
   }
   const countedThisWeek = weekDays.filter((iso) => iso !== today && counted(state.days[iso])).length;
-  if (!state.freezeReady && state.freezeSpentWeek !== week && countedThisWeek >= 5) {
+  if (freezeEnabled() && !state.freezeReady && state.freezeSpentWeek !== week && countedThisWeek >= 5) {
     state = { ...state, freezeReady: true };
+  }
+  if (!freezeEnabled() && (state.freezeReady || state.freezeSpentWeek)) {
+    state = { ...state, freezeReady: false };
   }
 
   if (!state.lastActive) {
@@ -127,13 +148,13 @@ function reconcile(state: LoopState): LoopState {
       continue;
     }
     const nextWeek = mondayIso(nxt);
-    if (freezeReady && freezeSpentWeek !== nextWeek) {
+    if (freezeEnabled() && freezeReady && freezeSpentWeek !== nextWeek) {
       freezeReady = false;
       freezeSpentWeek = nextWeek;
       cursor = nxt;
       continue;
     }
-    streak = 0;
+    streak = decayStreak(streak);
     paused = true;
     cursor = nxt;
   }
@@ -142,13 +163,13 @@ function reconcile(state: LoopState): LoopState {
     const y = prevIso(today);
     if (cursor < y && !counted(state.days[y])) {
       const yWeek = mondayIso(y);
-      if (freezeReady && freezeSpentWeek !== yWeek) {
+      if (freezeEnabled() && freezeReady && freezeSpentWeek !== yWeek) {
         freezeReady = false;
         freezeSpentWeek = yWeek;
         cursor = y;
         paused = false;
       } else if (cursor < y) {
-        streak = 0;
+        streak = decayStreak(streak);
         paused = true;
       }
     }

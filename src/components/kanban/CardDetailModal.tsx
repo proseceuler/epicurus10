@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { listItemMotion, motionTransition } from '@/lib/motion';
+import { MotionCollapse, MotionOverlay } from '@/components/MotionUI';
 import { SUBJECTS, type Habit, type KanbanAttachment, type KanbanTask, type Note, type SubjectKey, type Todo } from '@/lib/types';
 import {
   COLUMNS, type BoardList, type KanbanStatus as Status, kanbanUid as uid,
@@ -9,7 +12,7 @@ import { compressImage, saveMedia } from '@/lib/mediaStore';
 import { confirmDelete } from '@/lib/confirm';
 import { Button, Input, Select } from '@/components/kit';
 import { DateGrid, TimeField } from '@/components/fields';
-import { ActionChip, MiniSheet, CoverFrame, useResolvedUrl, rememberLink, readRecent } from '@/components/kanban/cardKit';
+import { MiniSheet, CoverFrame, useResolvedUrl, rememberLink, readRecent } from '@/components/kanban/cardKit';
 import {
   Trash2, X, Calendar as CalIcon, Download, CheckSquare, Paperclip,
   MessageSquare, Tag, AlignLeft, Link2, FileText,
@@ -37,6 +40,7 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const previewSrc = useResolvedUrl(preview?.url || null);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     setTitle(task.title);
@@ -142,8 +146,8 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
   );
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-zinc-900/40 p-4" onClick={onClose}>
-      <div className="epic-glass-sheet relative my-6 w-[min(96vw,52rem)] overflow-visible" onClick={(e) => e.stopPropagation()}>
+    <MotionOverlay open onClose={onClose} zClass="z-[70]" panelClassName="epic-glass-sheet max-h-[88vh] w-[min(96vw,52rem)] overflow-y-auto p-0">
+      <div>
         {cover ? <CoverFrame url={cover} name={coverFile?.name} className="mx-auto max-h-52 w-full overflow-hidden rounded-t-[1.25rem] bg-zinc-100" imgClass="mx-auto block max-h-52 w-auto max-w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
         <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
           <Select value={task.status} onChange={(v) => onStatus(v as Status)} className="w-40" options={columns.map((c) => ({ value: c.id, label: c.label }))} />
@@ -156,7 +160,7 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
             <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveBasics} className="w-full bg-transparent text-xl font-semibold outline-none" />
             <div className="flex flex-wrap gap-2">
               <div className="relative">
-                <button type="button" onClick={() => setPanel(panel === 'labels' ? null : 'labels')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><Tag className="h-3.5 w-3.5" /> + Add</button>
+                <button type="button" onClick={() => setPanel(panel === 'labels' ? null : 'labels')} className="epic-glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600"><Tag className="h-3.5 w-3.5" /> + Add</button>
                 <MiniSheet title="Labels" open={panel === 'labels'} onClose={() => setPanel(null)}>
                   <p className="mb-2 text-[11px] text-zinc-500">Pick a subject label for this card.</p>
                   <div className="space-y-1">
@@ -168,7 +172,7 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
                 </MiniSheet>
               </div>
               <div className="relative">
-                <button type="button" onClick={() => setPanel(panel === 'checklist' ? null : 'checklist')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><CheckSquare className="h-3.5 w-3.5" /> Checklist</button>
+                <button type="button" onClick={() => setPanel(panel === 'checklist' ? null : 'checklist')} className="epic-glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600"><CheckSquare className="h-3.5 w-3.5" /> Checklist</button>
                 <MiniSheet title="Checklist" open={panel === 'checklist'} onClose={() => setPanel(null)}>
                   <p className="mb-2 text-[11px] font-medium text-zinc-600">Add an item</p>
                   <Input value={checkText} onChange={setCheckText} placeholder="e.g. Review chapter 4" />
@@ -180,18 +184,30 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
               </div>
               {!dueOn || !due ? (
                 <div className="relative">
-                  <button type="button" onClick={() => setPanel(panel === 'dates' ? null : 'dates')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><CalIcon className="h-3.5 w-3.5" /> Dates</button>
+                  <button type="button" onClick={() => setPanel(panel === 'dates' ? null : 'dates')} className="epic-glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600"><CalIcon className="h-3.5 w-3.5" /> Dates</button>
                   <MiniSheet title="Dates" open={panel === 'dates'} onClose={() => setPanel(null)}>
                     <DatePickerBody />
                   </MiniSheet>
                 </div>
               ) : null}
               <div className="relative">
-                <button type="button" onClick={() => setPanel(panel === 'attach' ? null : 'attach')} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"><Paperclip className="h-3.5 w-3.5" /> Attachment</button>
+                <button type="button" onClick={() => setPanel(panel === 'attach' ? null : 'attach')} className="epic-glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600"><Paperclip className="h-3.5 w-3.5" /> Attachment</button>
                 <MiniSheet title="Attach" open={panel === 'attach'} onClose={() => setPanel(null)}>
                   <AttachBody />
                 </MiniSheet>
               </div>
+              {links && (
+                <div className="relative">
+                  <button type="button" onClick={() => setPanel(panel === 'connect' ? null : 'connect')} className="epic-glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600"><Link2 className="h-3.5 w-3.5" /> Connect</button>
+                  <MiniSheet title="Connect" open={panel === 'connect'} onClose={() => setPanel(null)}>
+                    <div className="space-y-2">
+                      <Select value={task.linked_todo_id || ''} onChange={(v) => onSave({ linked_todo_id: v || null })} options={[{ value: '', label: 'To-do' }, ...links.todos.map((t) => ({ value: t.id, label: t.title }))]} />
+                      <Select value={task.linked_note_id || ''} onChange={(v) => onSave({ linked_note_id: v || null })} options={[{ value: '', label: 'Note' }, ...links.notes.map((n) => ({ value: n.id, label: n.title }))]} />
+                      <Select value={task.linked_habit_id || ''} onChange={(v) => onSave({ linked_habit_id: v || null })} options={[{ value: '', label: 'Habit' }, ...links.habits.map((h) => ({ value: h.id, label: h.name }))]} />
+                    </div>
+                  </MiniSheet>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-medium text-zinc-500">Labels</span>
@@ -214,23 +230,42 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
                 <button type="button" onClick={() => setEditingDesc(true)} className="w-full rounded-xl bg-zinc-100/90 px-3 py-3 text-left text-sm text-zinc-500 hover:bg-zinc-200/70">Add a more detailed description...</button>
               )}
             </section>
-            {checklist.length > 0 && (
+            <MotionCollapse open={checklist.length > 0}>
               <section>
                 <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><CheckSquare className="h-3.5 w-3.5" /> Checklist <span className="font-medium normal-case text-zinc-400">{doneCount}/{checklist.length}</span></h3>
+                <AnimatePresence initial={false}>
                 {checklist.map((item) => (
-                  <div key={item.id} className="flex items-center gap-2 py-1">
-                    <input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} />
-                    <span className={`flex-1 text-sm ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span>
+                  <motion.div
+                    key={item.id}
+                    layout={!reduceMotion}
+                    initial={reduceMotion ? false : listItemMotion.initial}
+                    animate={listItemMotion.animate}
+                    exit={reduceMotion ? listItemMotion.animate : listItemMotion.exit}
+                    transition={motionTransition(reduceMotion, 0.16)}
+                    className="flex items-center gap-2 py-1"
+                  >
+                    <input type="checkbox" checked={item.done} onChange={() => onSave({ checklist: checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) })} className="accent-zinc-900 transition-transform duration-150" />
+                    <span className={`flex-1 text-sm transition-colors duration-150 ${item.done ? 'line-through text-zinc-400' : ''}`}>{item.text}</span>
                     <button type="button" onClick={async () => { if (await confirmDelete(item.text || 'this checklist item')) onSave({ checklist: checklist.filter((i) => i.id !== item.id) }); }}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button>
-                  </div>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
               </section>
-            )}
-            {attachments.length > 0 && (
+            </MotionCollapse>
+            <MotionCollapse open={attachments.length > 0}>
               <section>
                 <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Paperclip className="h-3.5 w-3.5" /> Attachments</h3>
+                <AnimatePresence initial={false}>
                 {attachments.map((file) => (
-                  <div key={file.id} className="mb-2 flex items-center gap-2 rounded-xl border border-zinc-200/60 bg-white/70 p-2">
+                  <motion.div
+                    key={file.id}
+                    layout={!reduceMotion}
+                    initial={reduceMotion ? false : listItemMotion.initial}
+                    animate={listItemMotion.animate}
+                    exit={reduceMotion ? listItemMotion.animate : listItemMotion.exit}
+                    transition={motionTransition(reduceMotion, 0.16)}
+                    className="mb-2 flex items-center gap-2 rounded-xl border border-zinc-200/60 bg-white/40 p-2"
+                  >
                     {isImageUrl(file.url) ? (
                       <CoverFrame url={file.url} name={file.name} className="h-10 w-10 rounded-md" imgClass="h-10 w-10 object-contain" onClick={() => setPreview({ url: file.url, name: file.name })} />
                     ) : (
@@ -241,27 +276,28 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
                       <button type="button" className="text-[10px] text-zinc-500" onClick={() => onSave({ cover_url: cover === file.url ? null : file.url, attachments })}>{cover === file.url ? 'Remove cover' : 'Set cover'}</button>
                     )}
                     <button type="button" onClick={async () => { if (await confirmDelete(file.name || 'this attachment')) onSave({ attachments: attachments.filter((a) => a.id !== file.id), cover_url: task.cover_url === file.url ? null : cover }); }}><Trash2 className="h-3.5 w-3.5 text-zinc-300" /></button>
-                  </div>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
               </section>
-            )}
+            </MotionCollapse>
           </div>
-          <aside className="relative w-full overflow-visible border-t border-zinc-200/50 p-5 lg:w-72 lg:border-l lg:border-t-0">
-            {links && (
-              <div className="relative mb-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Add to card</p>
-                <ActionChip icon={Link2} label="Connect" active={panel === 'connect'} onClick={() => setPanel(panel === 'connect' ? null : 'connect')} />
-                <MiniSheet title="Connect" open={panel === 'connect'} onClose={() => setPanel(null)} align="right">
-                  <div className="space-y-2">
-                    <Select value={task.linked_todo_id || ''} onChange={(v) => onSave({ linked_todo_id: v || null })} options={[{ value: '', label: 'To-do' }, ...links.todos.map((t) => ({ value: t.id, label: t.title }))]} />
-                    <Select value={task.linked_note_id || ''} onChange={(v) => onSave({ linked_note_id: v || null })} options={[{ value: '', label: 'Note' }, ...links.notes.map((n) => ({ value: n.id, label: n.title }))]} />
-                    <Select value={task.linked_habit_id || ''} onChange={(v) => onSave({ linked_habit_id: v || null })} options={[{ value: '', label: 'Habit' }, ...links.habits.map((h) => ({ value: h.id, label: h.name }))]} />
-                  </div>
-                </MiniSheet>
-              </div>
-            )}
+          <aside className="relative w-full overflow-visible p-5 lg:w-72">
             <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> Comments and activity</h3>
-            {comments.map((c) => <div key={c.id} className="mb-2 rounded-lg bg-white/70 px-2.5 py-2 text-xs">{c.text}</div>)}
+            <AnimatePresence initial={false}>
+              {comments.map((c) => (
+                <motion.div
+                  key={c.id}
+                  initial={reduceMotion ? false : listItemMotion.initial}
+                  animate={listItemMotion.animate}
+                  exit={reduceMotion ? listItemMotion.animate : listItemMotion.exit}
+                  transition={motionTransition(reduceMotion, 0.16)}
+                  className="mb-2 rounded-lg bg-white/40 px-2.5 py-2 text-xs"
+                >
+                  {c.text}
+                </motion.div>
+              ))}
+            </AnimatePresence>
             <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={3} placeholder="Write a comment..." className="w-full rounded-xl border border-zinc-200 bg-white/80 px-2.5 py-2 text-xs outline-none" />
             <Button size="sm" className="mt-2 w-full" onClick={() => { const text = commentText.trim(); if (!text) return; onSave({ comments: [...comments, { id: uid(), text, created_at: new Date().toISOString() }] }); setCommentText(''); }}>Save comment</Button>
           </aside>
@@ -280,6 +316,6 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
           </div>
         </div>
       )}
-    </div>
+    </MotionOverlay>
   );
 }

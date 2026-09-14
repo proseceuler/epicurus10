@@ -3,7 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { Sparkles, X, Loader2 } from 'lucide-react';
 import { parseAnnouncement, syncAnnouncement } from '@/lib/announcementImport';
-import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
+import { OverlayScrim } from '@/components/MotionUI';
 
 export default function QuickImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
@@ -36,19 +37,12 @@ export default function QuickImportModal({ open, onClose }: { open: boolean; onC
         <motion.div
           key="import-overlay"
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          initial={reduceMotion ? false : fadeMotion.initial}
-          animate={fadeMotion.animate}
-          exit={fadeMotion.exit}
-          transition={motionTransition(reduceMotion, 0.18)}
+          initial={false}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 1 }}
+          transition={overlayPresence(reduceMotion)}
         >
-          <motion.div
-            className="absolute inset-0 bg-zinc-900/30"
-            onClick={busy ? undefined : onClose}
-            initial={reduceMotion ? false : { opacity: 0, backdropFilter: "blur(0px)", WebkitBackdropFilter: "blur(0px)" }}
-            animate={{ opacity: 1, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
-            exit={{ opacity: 0, backdropFilter: "blur(0px)", WebkitBackdropFilter: "blur(0px)" }}
-            transition={motionTransition(reduceMotion, 0.32)}
-          />
+          <OverlayScrim onClose={busy ? undefined : onClose} />
           <motion.div
             className="epic-glass-sheet relative w-full max-w-xl p-6"
             initial={reduceMotion ? false : sheetMotion.initial}

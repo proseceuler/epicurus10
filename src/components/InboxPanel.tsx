@@ -8,6 +8,7 @@ import {
   INBOX_CHANGED,
 } from '@/lib/inbox';
 import type { PageId } from '@/components/AppLayout';
+import { OverlayScrim } from '@/components/MotionUI';
 import { Bell, CheckCheck, X, GripHorizontal, ExternalLink } from 'lucide-react';
 
 export default function InboxPanel({
@@ -142,8 +143,9 @@ export default function InboxPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center sm:justify-end sm:pr-6 sm:pt-16" onClick={onClose}>
-      <div className="epic-glass-sheet mb-24 max-h-[70vh] w-full max-w-md overflow-hidden sm:mb-0" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center sm:justify-end sm:pr-6 sm:pt-16">
+      <OverlayScrim onClose={onClose} />
+      <div className="epic-glass-sheet relative mb-24 max-h-[70vh] w-full max-w-md overflow-hidden sm:mb-0" onClick={(e) => e.stopPropagation()}>
         {body}
       </div>
     </div>

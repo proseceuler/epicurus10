@@ -47,10 +47,11 @@
 
 .epic-scrim,
 .epic-scrim-blur {
-  --epic-blur: 18px;
-  background: rgba(24, 24, 27, 0.28);
-  -webkit-backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
-  backdrop-filter: blur(var(--epic-blur)) saturate(1.28);
+  --epic-blur: 22px;
+  isolation: isolate;
+  background: rgba(24, 24, 27, 0.46);
+  -webkit-backdrop-filter: blur(var(--epic-blur)) saturate(1.08);
+  backdrop-filter: blur(var(--epic-blur)) saturate(1.08);
 }
 
 .epic-flip-wrap {
@@ -61,15 +62,16 @@
   display: flex;
   flex-direction: column;
   max-height: min(20rem, calc(100vh - 1.5rem));
-  overflow: hidden;
-  isolation: isolate;
-  background: rgba(255, 255, 255, 0.62);
+  overflow: visible;
+  clip-path: inset(0 round 0.9rem);
+  -webkit-clip-path: inset(0 round 0.9rem);
+  background: rgba(255, 255, 255, 0.78);
   background-clip: padding-box;
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 0.9rem;
   outline: none;
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
   box-shadow: 0 24px 64px rgba(24, 24, 27, 0.16);
 }
 
@@ -100,30 +102,38 @@
 }
 
 .epic-popover {
-  isolation: isolate;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.62);
+  overflow: visible;
+  clip-path: inset(0 round 1.25rem);
+  -webkit-clip-path: inset(0 round 1.25rem);
+  background: rgba(255, 255, 255, 0.82);
   background-clip: padding-box;
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 1.25rem;
   outline: none;
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
   box-shadow: 0 16px 40px rgba(24, 24, 27, 0.12);
 }
 
 .epic-sheet,
 .epic-glass-sheet {
-  isolation: isolate;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.62);
+  overflow: visible;
+  clip-path: inset(0 round 1.25rem);
+  -webkit-clip-path: inset(0 round 1.25rem);
+  background: rgba(255, 255, 255, 0.82);
   background-clip: padding-box;
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 1.25rem;
   outline: none;
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
   box-shadow: 0 24px 64px rgba(24, 24, 27, 0.16);
+}
+
+.epic-glass-open {
+  clip-path: none;
+  -webkit-clip-path: none;
+  overflow: visible;
 }
 
 .epic-glass-chip {

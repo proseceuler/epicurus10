@@ -1,11 +1,7 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
 import GlobalDock from '@/components/GlobalDock';
 import GlobalSearch from '@/components/GlobalSearch';
-import GlobalAssistant from '@/components/GlobalAssistant';
-import AtaraxiaPanel from '@/components/AtaraxiaPanel';
 import { motionTransition, overlayPresence } from '@/lib/motion';
 import { OverlayScrim } from '@/components/MotionUI';
 import { xpForNextLevel, XP_CHANGED } from '@/lib/xp';
@@ -18,6 +14,9 @@ import {
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
   Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
 } from 'lucide-react';
+
+const GlobalAssistant = lazy(() => import('@/components/GlobalAssistant'));
+const AtaraxiaPanel = lazy(() => import('@/components/AtaraxiaPanel'));
 
 export type PageId =
   | 'dashboard' | 'grades' | 'forecast' | 'classhub'
@@ -57,7 +56,13 @@ const ALIASES: Partial<Record<PageId, PageId>> = {
 
 const GROUPS = ['Core', 'Work', 'Pulse'];
 
-const FUNCTION_LOGO = katex.renderToString('f', { throwOnError: false, output: 'html' });
+function FunctionLogo() {
+  return (
+    <span className="select-none font-serif text-[20px] font-semibold italic leading-none text-white" aria-hidden>
+      f
+    </span>
+  );
+}
 
 function resolvePage(hash: string): PageId {
   const raw = (pageFromHash(hash) || hash) as PageId;
@@ -92,6 +97,8 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   const [badgeCards, setBadgeCards] = useState(0);
   const [xpProgress, setXpProgress] = useState(() => xpForNextLevel());
   const [searchOpen, setSearchOpen] = useState(false);
+  const [assistantReady, setAssistantReady] = useState(false);
+  const [loopReady, setLoopReady] = useState(false);
   const reduceMotion = useReducedMotion();
   const currentLabel = NAV_ITEMS.find((n) => n.id === page)?.label ?? (page === 'settings' ? 'Settings' : 'Dashboard');
 
@@ -156,6 +163,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       }
       if (matchShortcut(e, shortcuts.assistant)) {
         e.preventDefault();
+        setAssistantReady(true);
         setAssistantOpen((v) => !v);
         setAssistantRail(false);
         setLoopOpen(false);
@@ -180,7 +188,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('epicure-shortcuts-changed', syncSc);
-    const onArrodes = () => { setAssistantOpen(true); setAssistantRail(false); };
+    const onArrodes = () => { setAssistantReady(true); setAssistantOpen(true); setAssistantRail(false); };
     const onSearch = () => setSearchOpen((v) => !v);
     window.addEventListener('epicure-open-arrodes', onArrodes);
     window.addEventListener('epicure-toggle-search', onSearch);
@@ -210,11 +218,12 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center text-white [&_.katex]:text-[18px] [&_.katex]:leading-none"
+              className="flex h-8 w-8 shrink-0 items-center justify-center text-white"
               title="epicure"
               aria-label="epicure"
-              dangerouslySetInnerHTML={{ __html: FUNCTION_LOGO }}
-            />
+            >
+              <FunctionLogo />
+            </div>
           </div>
           <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
             {GROUPS.map((group) => (
@@ -261,22 +270,34 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
               type="button"
               title="Progress"
               aria-label="Open progress"
-              onClick={() => { setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }}
+              onClick={() => { setLoopReady(true); setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }}
               className="relative flex h-10 items-center"
             >
               <span className={`block h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80 ${xpFlash ? 'ring-1 ring-zinc-400/60' : ''}`}>
                 <span className="block h-full rounded-full bg-zinc-800 transition-[width] duration-300" style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
               </span>
             </button>
-            <button type="button" onClick={() => { setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
+            <button type="button" onClick={() => { setAssistantReady(true); setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
               <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
             </button>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-3 lg:px-8">{children}</main>
       </div>
-      <AtaraxiaPanel open={loopOpen} onClose={() => setLoopOpen(false)} navigate={navigate} />
-      <GlobalAssistant open={assistantOpen} rail={assistantRail} page={page} width={assistantWidth} onWidth={(n) => { setAssistantWidth(n); try { localStorage.setItem('epicure-assistant-width', String(n)); } catch { /* ignore */ } }} onClose={() => { setAssistantOpen(false); setAssistantRail(false); }} onRail={() => { setAssistantOpen(false); setAssistantRail(true); setLoopOpen(false); }} navigate={navigate} />
+      {(loopOpen || loopReady) && (
+        <Suspense fallback={null}>
+          <AtaraxiaPanel
+            open={loopOpen}
+            onClose={() => setLoopOpen(false)}
+            navigate={navigate}
+          />
+        </Suspense>
+      )}
+      {(assistantOpen || assistantRail || assistantReady) && (
+        <Suspense fallback={null}>
+          <GlobalAssistant open={assistantOpen} rail={assistantRail} page={page} width={assistantWidth} onWidth={(n) => { setAssistantWidth(n); try { localStorage.setItem('epicure-assistant-width', String(n)); } catch { /* ignore */ } }} onClose={() => { setAssistantOpen(false); setAssistantRail(false); }} onRail={() => { setAssistantOpen(false); setAssistantRail(true); setLoopOpen(false); }} navigate={navigate} />
+        </Suspense>
+      )}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} navigate={navigate} />
       <GlobalDock navigate={navigate} page={page} />
     </div>

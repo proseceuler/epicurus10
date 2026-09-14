@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import AppLayout, { usePageState, type PageId } from '@/components/AppLayout';
@@ -22,40 +22,43 @@ const FlashcardsPage = lazy(() => import('@/pages/FlashcardsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const DrivePage = lazy(() => import('@/pages/DrivePage'));
 
-function registerPwa() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
-registerPwa();
-
-function PageFallback() {
-  return <div className="min-h-[40vh]" aria-hidden />;
-}
 
 function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void }) {
-  const pages: Record<string, ComponentType<{ navigate?: typeof navigate }>> = {
-    dashboard: DashboardPage,
-    grades: GradesPage,
-    forecast: GradesPage,
-    classhub: ClassHubPage,
-    assistant: DashboardPage,
-    todos: TodosPage,
-    kanban: KanbanPage,
-    calendar: CalendarPage,
-    notes: NotesPage,
-    drive: DrivePage,
-    pomodoro: PomodoroPage,
-    analytics: PomodoroPage,
-    habits: HabitsPage,
-    finance: FinancePage,
-    flashcards: FlashcardsPage,
-    settings: SettingsPage,
-  };
-  const Page = pages[page] ?? DashboardPage;
-  if (page === 'dashboard' || page === 'assistant') return <DashboardPage navigate={navigate} />;
-  return <Page />;
+  switch (page) {
+    case 'grades':
+    case 'forecast':
+      return <GradesPage />;
+    case 'classhub':
+      return <ClassHubPage />;
+    case 'todos':
+      return <TodosPage />;
+    case 'kanban':
+      return <KanbanPage />;
+    case 'calendar':
+      return <CalendarPage />;
+    case 'notes':
+      return <NotesPage />;
+    case 'drive':
+      return <DrivePage />;
+    case 'pomodoro':
+    case 'analytics':
+      return <PomodoroPage />;
+    case 'habits':
+      return <HabitsPage />;
+    case 'finance':
+      return <FinancePage />;
+    case 'flashcards':
+      return <FlashcardsPage />;
+    case 'settings':
+      return <SettingsPage />;
+    default:
+      return <DashboardPage navigate={navigate} />;
+  }
 }
 
 function App() {
@@ -65,22 +68,22 @@ function App() {
   return (
     <PomodoroProvider>
       <ConfirmProvider>
-      <AppLayout page={page} navigate={navigate}>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={page}
-            className="min-h-full"
-            initial={reduceMotion ? false : pageMotion.initial}
-            animate={pageMotion.animate}
-            exit={reduceMotion ? pageMotion.animate : pageMotion.exit}
-            transition={motionTransition(reduceMotion, 0.2)}
-          >
-            <Suspense fallback={<PageFallback />}>
-              <ActivePage page={page} navigate={navigate} />
-            </Suspense>
-          </motion.div>
-        </AnimatePresence>
-      </AppLayout>
+        <AppLayout page={page} navigate={navigate}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={page}
+              className="min-h-full"
+              initial={reduceMotion ? false : pageMotion.initial}
+              animate={pageMotion.animate}
+              exit={reduceMotion ? pageMotion.animate : pageMotion.exit}
+              transition={motionTransition(reduceMotion, 0.2)}
+            >
+              <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+                <ActivePage page={page} navigate={navigate} />
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
+        </AppLayout>
       </ConfirmProvider>
     </PomodoroProvider>
   );

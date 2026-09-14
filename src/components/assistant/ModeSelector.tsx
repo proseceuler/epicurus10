@@ -23,7 +23,6 @@ export default function ModeSelector({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Mode pills */}
       <div className="flex flex-wrap gap-2 justify-center">
         {MODES.map((m) => {
           const Icon = m.icon;
@@ -41,7 +40,6 @@ export default function ModeSelector({
         })}
       </div>
 
-      {/* Sub-mode chips for Coding Agent (Dahl → Turing) */}
       {activeDef.hasSubMode && activeDef.subModes && (
         <div className="flex gap-1.5">
           {activeDef.subModes.map((s) => {
@@ -62,7 +60,6 @@ export default function ModeSelector({
         </div>
       )}
 
-      {/* Web search toggle — visually distinct */}
       {searchAllowed && (
         <button
           onClick={onToggleSearch}

@@ -151,7 +151,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
 
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 1024) setSidebarOpen(false);
+      if (window.innerWidth >= 1280) setSidebarOpen(false);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -210,19 +210,19 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
 
   return (
     <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''} ${page === 'notes' ? 'rice-shell--notes' : 'rice-shell--mono'}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
-      <div className="film-grain" aria-hidden />
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div className="film-grain hidden xl:block" aria-hidden />
+      <div className="pointer-events-none fixed inset-0 hidden overflow-hidden xl:block">
         <div className="absolute -left-32 -top-24 h-[22rem] w-[22rem] rounded-full bg-zinc-300/30 blur-[90px]" />
         <div className="absolute -right-24 top-1/3 h-[20rem] w-[20rem] rounded-full bg-white/70 blur-[100px]" />
       </div>
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div key="sidebar-overlay" className="fixed inset-0 z-30 lg:hidden" initial={false} animate={{ opacity: 1 }} exit={{ opacity: 1 }} transition={overlayPresence(reduceMotion)}>
+          <motion.div key="sidebar-overlay" className="fixed inset-0 z-30 xl:hidden" initial={false} animate={{ opacity: 1 }} exit={{ opacity: 1 }} transition={overlayPresence(reduceMotion)}>
             <OverlayScrim onClose={() => setSidebarOpen(false)} />
           </motion.div>
         )}
       </AnimatePresence>
-      <aside className={`rice-sidebar group/nav fixed z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'rice-sidebar-open translate-x-0 w-56' : 'rice-sidebar-collapsed -translate-x-[calc(100%+1.25rem)] lg:translate-x-0 w-14'}`}>
+      <aside className={`rice-sidebar group/nav fixed z-40 transition-[width,transform] duration-300 ease-out ${sidebarOpen ? 'rice-sidebar-open translate-x-0 w-56' : 'rice-sidebar-collapsed -translate-x-[calc(100%+1.25rem)] xl:translate-x-0 w-14'}`}>
         <div className="glass-dark flex h-full flex-col overflow-hidden rounded-[22px]">
           <div className="flex h-14 shrink-0 items-center gap-3 px-3">
             <div
@@ -267,7 +267,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
       </aside>
       <div className="rice-main relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <header className="z-20 flex shrink-0 items-center justify-between px-3 pt-3">
-          <div className="flex h-10 items-center gap-2 rounded-2xl glass px-2 lg:hidden">
+          <div className="flex h-10 items-center gap-2 rounded-2xl glass px-2 xl:hidden">
             <button type="button" onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-lg p-1.5 hover:bg-zinc-200/50" title="Toggle sidebar">
               {sidebarOpen ? <X className="h-4 w-4 text-zinc-700" /> : <Menu className="h-4 w-4 text-zinc-700" />}
             </button>
@@ -290,7 +290,7 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-32 pt-3 sm:px-4 lg:px-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-32 pt-3 sm:px-4 xl:px-8">{children}</main>
       </div>
       {(loopOpen || loopReady) && (
         <Suspense fallback={null}>

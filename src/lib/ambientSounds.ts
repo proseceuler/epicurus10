@@ -1,3 +1,5 @@
+import { deleteMedia, loadBlob, saveBlob } from '@/lib/mediaStore';
+
 export type AmbientId =
   | 'rain'
   | 'white'
@@ -9,6 +11,62 @@ export type AmbientId =
   | 'thunder'
   | 'library'
   | 'cabin';
+
+const CUSTOM_MAP_KEY = 'epicure:ambient-custom:v1';
+const MAX_CUSTOM_BYTES = 8 * 1024 * 1024;
+
+type CustomMap = Partial<Record<AmbientId, string>>;
+
+function readCustomMap(): CustomMap {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(CUSTOM_MAP_KEY);
+    return raw ? (JSON.parse(raw) as CustomMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCustomMap(map: CustomMap) {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(CUSTOM_MAP_KEY, JSON.stringify(map));
+}
+
+export function hasCustomAmbient(id: AmbientId) {
+  return Boolean(readCustomMap()[id]);
+}
+
+export function listCustomAmbients(): AmbientId[] {
+  return (Object.keys(readCustomMap()) as AmbientId[]).filter((id) => Boolean(readCustomMap()[id]));
+}
+
+export async function setCustomAmbient(id: AmbientId, file: File) {
+  if (!file || file.size > MAX_CUSTOM_BYTES) {
+    throw new Error(file && file.size > MAX_CUSTOM_BYTES ? 'File is over 8 MB' : 'No file selected');
+  }
+  if (file.type && !file.type.startsWith('audio/')) {
+    throw new Error('Pick an audio file');
+  }
+  const ref = await saveBlob(`ambient-${id}`, file);
+  const map = readCustomMap();
+  map[id] = ref;
+  writeCustomMap(map);
+  return ref;
+}
+
+export async function clearCustomAmbient(id: AmbientId) {
+  const map = readCustomMap();
+  const ref = map[id];
+  delete map[id];
+  writeCustomMap(map);
+  if (ref) await deleteMedia(ref);
+}
+
+export async function loadCustomAmbient(id: AmbientId): Promise<Blob | null> {
+  const ref = readCustomMap()[id];
+  if (!ref) return null;
+  return loadBlob(ref);
+}
 
 export const AMBIENT_LIBRARY: { id: AmbientId; label: string; desc: string }[] = [
   { id: 'rain', label: 'Rain', desc: 'Calming rain' },
@@ -146,6 +204,11 @@ export class AmbientMixer {
       this.setVolume(id, volume01);
       return;
     }
+    const custom = await loadCustomAmbient(id);
+    if (custom) {
+      await this.playCustom(id, custom, volume01);
+      return;
+    }
     const ctx = this.audio();
     if (ctx.state === 'suspended') await ctx.resume();
     const master = ctx.createGain();
@@ -209,6 +272,52 @@ export class AmbientMixer {
       hg.gain.value = 0.03;
       hum.connect(hg).connect(soft.input);
       stoppers.push(() => hum.stop());
+    }
+
+    master.gain.setTargetAtTime(Math.max(0.12, Math.min(1, volume01)), ctx.currentTime, 0.08);
+    this.voices.set(id, {
+      gain: master,
+      stop: () => {
+        try { stoppers.forEach((fn) => fn()); } catch { /* already stopped */ }
+        try { master.disconnect(); } catch { /* ignore */ }
+      },
+    });
+  }
+
+  private async playCustom(id: AmbientId, blob: Blob, volume01: number) {
+    const ctx = this.audio();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const master = ctx.createGain();
+    master.gain.value = 0;
+    master.connect(ctx.destination);
+    const soft = soften(ctx);
+    soft.output.connect(master);
+    const stoppers: Array<() => void> = [];
+
+    try {
+      const copy = await blob.arrayBuffer();
+      const buffer = await ctx.decodeAudioData(copy);
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.connect(soft.input);
+      src.start();
+      stoppers.push(() => {
+        try { src.stop(); } catch { /* already stopped */ }
+      });
+    } catch {
+      const url = URL.createObjectURL(blob);
+      const el = new Audio(url);
+      el.loop = true;
+      const node = ctx.createMediaElementSource(el);
+      node.connect(soft.input);
+      await el.play();
+      stoppers.push(() => {
+        el.pause();
+        el.src = '';
+        URL.revokeObjectURL(url);
+        try { node.disconnect(); } catch { /* ignore */ }
+      });
     }
 
     master.gain.setTargetAtTime(Math.max(0.12, Math.min(1, volume01)), ctx.currentTime, 0.08);

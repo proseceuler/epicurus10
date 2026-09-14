@@ -18,11 +18,16 @@ import {
   MessageSquare, Tag, AlignLeft, Link2, FileText,
 } from 'lucide-react';
 
-export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDelete, onStatus, onSave }: {
-  task: KanbanTask; lists?: BoardList[]; links?: { todos: Todo[]; notes: Note[]; habits: Habit[] };
+const FALLBACK_TASK: KanbanTask = {
+  id: '', title: '', description: '', subject_key: null, status: 'todo', due_date: null, sort_order: 0,
+};
+
+export function CardDetailModal({ task: raw, lists, links, recentLinks, onClose, onDelete, onStatus, onSave }: {
+  task: KanbanTask | null; lists?: BoardList[]; links?: { todos: Todo[]; notes: Note[]; habits: Habit[] };
   recentLinks?: KanbanAttachment[];
   onClose: () => void; onDelete: () => void; onStatus: (status: Status) => void; onSave: (patch: Partial<KanbanTask>) => void;
 }) {
+  const task = raw ?? FALLBACK_TASK;
   const columns = lists?.length ? lists : COLUMNS.map((c) => ({ ...c }));
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
@@ -146,8 +151,8 @@ export function CardDetailModal({ task, lists, links, recentLinks, onClose, onDe
   );
 
   return (
-    <MotionOverlay open onClose={onClose} zClass="z-[70]" panelClassName="epic-glass-sheet max-h-[88vh] w-[min(96vw,52rem)] overflow-y-auto p-0">
-      <div>
+    <MotionOverlay open={Boolean(raw)} onClose={onClose} zClass="z-[70]" frameClassName="items-start justify-center overflow-y-auto px-4 pt-3 pb-10 sm:pt-4" panelClassName="epic-glass-sheet epic-glass-open mt-0 max-h-[min(92vh,46rem)] w-[min(96vw,52rem)] overflow-visible p-0">
+      <div className="max-h-[min(92vh,46rem)] overflow-y-auto overflow-x-visible">
         {cover ? <CoverFrame url={cover} name={coverFile?.name} className="mx-auto max-h-52 w-full overflow-hidden rounded-t-[1.25rem] bg-zinc-100" imgClass="mx-auto block max-h-52 w-auto max-w-full object-contain" onClick={(e) => { e.stopPropagation(); setPreview({ url: cover, name: coverFile?.name || 'Cover' }); }} /> : null}
         <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
           <Select value={task.status} onChange={(v) => onStatus(v as Status)} className="w-40" options={columns.map((c) => ({ value: c.id, label: c.label }))} />

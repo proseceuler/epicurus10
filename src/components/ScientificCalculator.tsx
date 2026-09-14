@@ -95,8 +95,7 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
 
   return (
     <div className={containerClass} style={style}>
-      <div className="glass glass-shadow-lg rounded-3xl overflow-hidden">
-        {/* Title bar */}
+      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
         <div
           className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
           onMouseDown={onDragStart}
@@ -129,13 +128,11 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
           </div>
         </div>
 
-        {/* Display */}
         <div className="px-4 py-3 bg-white/40">
           <div className="text-right text-[10px] text-zinc-400 h-4 truncate">{expression || '\u00A0'}</div>
           <div className="text-right text-3xl font-light text-zinc-900 tabular-nums truncate">{display}</div>
         </div>
 
-        {/* Scientific keys */}
         {scientific && (
           <div className="px-3 pb-1 grid grid-cols-4 gap-1.5">
             {sciKeys.flat().map((k) => (
@@ -144,7 +141,6 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
           </div>
         )}
 
-        {/* Basic keys */}
         <div className="px-3 pb-3 grid grid-cols-4 gap-1.5">
           {basicKeys.flat().map((k) => (
             <CalcButton

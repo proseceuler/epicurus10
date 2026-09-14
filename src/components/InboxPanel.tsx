@@ -1,35 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  getInbox,
-  markAllRead,
-  markRead,
-  unreadCount,
-  type InboxItem,
-  INBOX_CHANGED,
-} from '@/lib/inbox';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, CheckCheck, ExternalLink, GripHorizontal, X } from 'lucide-react';
+import { getInbox, markRead, markAllRead, unreadCount, INBOX_CHANGED, type InboxItem } from '@/lib/inbox';
 import type { PageId } from '@/components/AppLayout';
-import { OverlayScrim } from '@/components/MotionUI';
-import { Bell, CheckCheck, X, GripHorizontal, ExternalLink } from 'lucide-react';
 
 export default function InboxPanel({
   open = true,
-  onClose,
-  navigate,
+  embedded = false,
   detached = false,
+  navigate,
   onDetach,
   onSnapBack,
-  embedded = false,
+  onClose,
 }: {
   open?: boolean;
-  onClose: () => void;
-  navigate: (p: PageId) => void;
+  embedded?: boolean;
   detached?: boolean;
+  navigate: (p: PageId, focus?: string | null) => void;
   onDetach?: () => void;
   onSnapBack?: () => void;
-  embedded?: boolean;
+  onClose: () => void;
 }) {
   const [items, setItems] = useState<InboxItem[]>([]);
-  const [pos, setPos] = useState({ x: 16, y: 72 });
+  const [pos, setPos] = useState(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    return { x: isMobile ? 8 : 16, y: isMobile ? 56 : 72 };
+  });
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
 
@@ -42,9 +37,9 @@ export default function InboxPanel({
 
   useEffect(() => {
     if (!detached) return;
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!dragging.current) return;
-      const w = Math.min(352, window.innerWidth - 16);
+      const w = Math.min(window.innerWidth < 768 ? 260 : 352, window.innerWidth - 16);
       const x = Math.min(window.innerWidth - w - 8, Math.max(8, e.clientX - offset.current.x));
       const y = Math.min(window.innerHeight - 80, Math.max(8, e.clientY - offset.current.y));
       setPos({ x, y });
@@ -52,11 +47,13 @@ export default function InboxPanel({
     const onUp = () => {
       dragging.current = false;
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [detached]);
 
@@ -67,10 +64,11 @@ export default function InboxPanel({
   const body = (
     <>
       <div
-        className={`flex items-center justify-between border-b border-zinc-200/70 px-3 py-2 ${detached ? 'cursor-move' : ''}`}
-        onMouseDown={
+        className={`flex items-center justify-between border-b border-zinc-200/70 px-3 py-2 ${detached ? 'cursor-move touch-none' : ''}`}
+        onPointerDown={
           detached
             ? (e) => {
+                e.currentTarget.setPointerCapture?.(e.pointerId);
                 dragging.current = true;
                 offset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
               }
@@ -134,22 +132,20 @@ export default function InboxPanel({
 
   if (detached) {
     return (
-      <div className="epic-glass-sheet fixed z-[70] w-[min(100vw-2rem,22rem)] overflow-hidden" style={{ left: pos.x, top: pos.y }}>
+      <div className="epic-glass-sheet fixed z-[70] w-[min(100vw-1.25rem,16rem)] sm:w-[min(100vw-1.5rem,18rem)] md:w-[min(100vw-2rem,22rem)] overflow-hidden" style={{ left: pos.x, top: pos.y, touchAction: 'none' }}>
         {body}
       </div>
     );
   }
 
   if (embedded) {
-    return <div className="epic-glass-sheet w-full min-w-0 overflow-hidden">{body}</div>;
+    return <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">{body}</div>;
   }
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center sm:justify-end sm:pr-6 sm:pt-16">
-      <OverlayScrim onClose={onClose} />
-      <div className="epic-glass-sheet relative mb-24 max-h-[70vh] w-full max-w-md overflow-hidden sm:mb-0" onClick={(e) => e.stopPropagation()}>
-        {body}
-      </div>
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
+      <div className="epic-glass-sheet relative z-10 w-full max-w-md overflow-hidden rounded-3xl">{body}</div>
     </div>
   );
 }

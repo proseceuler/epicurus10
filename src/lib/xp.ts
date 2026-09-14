@@ -20,6 +20,8 @@ export type AwardRequest = {
   minutes?: number;
   date?: string;
   href?: string;
+  intensity?: 'light' | 'full';
+  subject?: string;
 };
 
 export type XPEvent =
@@ -48,6 +50,8 @@ export type LedgerEntry = {
   date: string;
   at: number;
   label: string;
+  minutes?: number;
+  intensity?: 'light' | 'full';
 };
 
 export type XPState = { xp: number; level: number };
@@ -58,16 +62,16 @@ const RATE_KEY = 'epicure:xp-rate:v1';
 export const XP_CHANGED = 'epicure-xp-changed';
 
 const PAYOUT: Record<XPType, number> = {
-  habit_complete: 8,
-  todo_complete: 12,
+  habit_complete: 5,
+  todo_complete: 6,
   focus_session: 0,
-  flashcard_review: 4,
-  grade_log: 10,
-  class_attend: 4,
-  kanban_done: 10,
-  note_write: 6,
-  finance_save: 8,
-  calendar_add: 4,
+  flashcard_review: 2,
+  grade_log: 8,
+  class_attend: 3,
+  kanban_done: 6,
+  note_write: 4,
+  finance_save: 4,
+  calendar_add: 2,
   streak_bonus: 0,
 };
 
@@ -123,7 +127,7 @@ function readLedger(): LedgerEntry[] {
     const raw = localStorage.getItem(LEDGER_KEY);
     const list = raw ? (JSON.parse(raw) as LedgerEntry[]) : [];
     if (!Array.isArray(list)) return [];
-    return list.filter((e) => e && typeof e.key === 'string' && typeof e.delta === 'number' && e.delta > 0 && e.delta <= 50);
+    return list.filter((e) => e && typeof e.key === 'string' && typeof e.delta === 'number' && e.delta > 0 && e.delta <= 80);
   } catch {
     return [];
   }
@@ -153,6 +157,10 @@ export function recentAwards(limit = 5): LedgerEntry[] {
   return readLedger().slice(-limit).reverse();
 }
 
+export function allAwards(): LedgerEntry[] {
+  return readLedger();
+}
+
 function rateOk(now: number) {
   if (!isBrowser()) return false;
   try {
@@ -166,17 +174,27 @@ function rateOk(now: number) {
   }
 }
 
-function payoutFor(type: XPType, minutes?: number): number {
+function gradeCurve(subject?: string) {
+  if (subject === 'math' || subject === 'science' || subject === 'research') return 12;
+  if (subject === 'values' || subject === 'mapeh') return 5;
+  return 8;
+}
+
+function payoutFor(type: XPType, extra?: { minutes?: number; intensity?: 'light' | 'full'; subject?: string }): number {
+  const minutes = extra?.minutes;
   if (type === 'focus_session') {
     const mins = Math.min(MAX_FOCUS_MIN, Math.max(0, Math.round(Number(minutes) || 0)));
     if (mins < MIN_FOCUS_MIN) return 0;
-    return Math.min(40, Math.round(mins / 5) * 3);
+    return Math.min(24, Math.round(mins / 5) * 2);
   }
   if (type === 'streak_bonus') {
     const days = Math.min(60, Math.max(0, Math.round(Number(minutes) || 0)));
-    return Math.min(50, days * 3);
+    return Math.min(24, days * 2);
   }
-  return PAYOUT[type] || 0;
+  if (type === 'grade_log') return gradeCurve(extra?.subject);
+  let base = PAYOUT[type] || 0;
+  if (extra?.intensity === 'light') base = Math.max(1, Math.round(base * 0.6));
+  return base;
 }
 
 export function awardXP(req: AwardRequest | XPEvent): AwardResult {
@@ -207,7 +225,8 @@ export function awardXP(req: AwardRequest | XPEvent): AwardResult {
   if (ledger.some((e) => e.key === key)) return { ...blank, reason: 'duplicate' };
 
   const minutes = extra.minutes ?? extra.days;
-  const delta = payoutFor(type, minutes);
+  const intensity = extra.intensity || (type === 'flashcard_review' || type === 'calendar_add' || type === 'class_attend' ? 'light' : 'full');
+  const delta = payoutFor(type, { minutes, intensity, subject: extra.subject });
   if (delta <= 0) return { ...blank, reason: 'no-payout' };
 
   const today = todayIso();
@@ -226,6 +245,8 @@ export function awardXP(req: AwardRequest | XPEvent): AwardResult {
     date,
     at: Date.now(),
     label: (extra.label || type).slice(0, 80),
+    minutes: type === 'focus_session' ? minutes : undefined,
+    intensity,
   };
   writeLedger([...ledger, entry]);
   const next = getXP();

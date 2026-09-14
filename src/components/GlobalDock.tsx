@@ -145,7 +145,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
         </Suspense>
       )}
 
-      <div data-global-dock className="fixed z-40">
+      <div data-global-dock className="fixed z-40 overflow-visible">
         <AnimatePresence>
           {toolOpen && !calcDetached && !dictDetached && !(activeTab === 'inbox' && inboxDetached) && (
             <motion.div
@@ -154,7 +154,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 28 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="dock-sheet absolute bottom-[4.35rem] right-0 origin-bottom-right"
+              className="dock-sheet epic-glass-sheet absolute bottom-[4.35rem] right-0 origin-bottom-right overflow-hidden"
             >
               <Suspense fallback={null}>
                 {activeTab === 'calculator' && (
@@ -164,7 +164,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
                   <DictionaryWidget detached={false} onDetach={() => setDictDetached(true)} onSnapBack={() => setDictDetached(false)} onClose={closeTab} />
                 )}
                 {activeTab === 'search' && (
-                  <div className="epic-glass-sheet w-full min-w-0 overflow-hidden rounded-2xl">
+                  <div className="w-full min-w-0 overflow-hidden rounded-2xl">
                     <GlobalSearch open mode="dock" navigate={navigate} onClose={() => { setActiveTab('main'); setOpen(false); }} />
                   </div>
                 )}
@@ -172,7 +172,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
                   <InboxPanel open embedded navigate={navigate} onDetach={() => { setInboxDetached(true); setOpen(false); }} onClose={closeTab} />
                 )}
                 {activeTab === 'pomodoro' && (
-                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 px-3 py-2">
                     {pomodoro.isRunning ? (
                       <button type="button" onClick={pomodoro.pause} className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><Pause className="h-4 w-4" /></button>
                     ) : (
@@ -187,7 +187,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
                   </div>
                 )}
                 {activeTab === 'quicktask' && (
-                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 px-3 py-2">
                     <Plus className="h-5 w-5 shrink-0 text-zinc-400" />
                     <input value={quickTask} onChange={(e) => setQuickTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickTask()} placeholder="Quick add task..." className="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
                     <button type="button" onClick={addQuickTask} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Add</button>
@@ -195,7 +195,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
                   </div>
                 )}
                 {activeTab === 'quicknote' && (
-                  <div className="epic-glass-sheet flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 px-3 py-2">
                     <StickyNote className="h-5 w-5 shrink-0 text-amber-500" />
                     <input value={quickNote} onChange={(e) => setQuickNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addQuickNote()} placeholder="Sticky note..." className="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none" autoFocus />
                     <button type="button" onClick={addQuickNote} className="shrink-0 rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-white">Save</button>
@@ -257,10 +257,10 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
             aria-label={open ? 'Close tools' : 'Open tools'}
             className={
               open
-                ? 'relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg'
+                ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white shadow-lg'
                 : pomodoro.isRunning
-                  ? 'relative flex h-14 min-w-[3.5rem] shrink-0 items-center justify-center rounded-full bg-zinc-900 px-2.5 text-white shadow-lg ring-2 ring-zinc-900/15'
-                  : 'relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full epic-glass-sheet text-zinc-800'
+                  ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white shadow-lg ring-2 ring-zinc-900/15'
+                  : 'dock-fab relative flex items-center justify-center epic-glass-sheet text-zinc-800'
             }
           >
             {open ? (
@@ -268,7 +268,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
             ) : pomodoro.isRunning ? (
               <span className="flex flex-col items-center leading-none">
                 <Timer className="mb-0.5 h-3.5 w-3.5 opacity-80" />
-                <span className="text-[11px] font-bold tabular-nums tracking-tight">{timeStr}</span>
+                <span className="text-[10px] font-bold tabular-nums tracking-tight">{timeStr}</span>
               </span>
             ) : (
               <Plus className="h-6 w-6 transition-transform duration-200" />

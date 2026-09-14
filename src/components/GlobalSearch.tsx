@@ -9,7 +9,9 @@ import {
 import { SUBJECTS } from '@/lib/types';
 import { getCalendarEvents } from '@/lib/calendarStore';
 import { hashFor } from '@/lib/routeFocus';
-import { fadeMotion, motionTransition, sheetMotion } from '@/lib/motion';
+import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
+import { OverlayScrim } from '@/components/MotionUI';
+import { formatShortcut, getShortcuts } from '@/lib/shortcuts';
 
 type HitKind = 'page' | 'tab' | 'note' | 'todo' | 'class' | 'event' | 'card' | 'habit' | 'deck' | 'goal';
 
@@ -19,7 +21,7 @@ type Hit = {
   title: string;
   subtitle?: string;
   page: PageId;
-  subject?: string;
+  focus?: string;
 };
 
 const PAGES: { page: PageId; title: string; hint: string; keys: string[] }[] = [
@@ -38,21 +40,23 @@ const PAGES: { page: PageId; title: string; hint: string; keys: string[] }[] = [
   { page: 'settings', title: 'Settings', hint: 'Shortcuts and frame', keys: ['settings', 'keys'] },
 ];
 
-const TABS: { page: PageId; title: string; hint: string; keys: string[] }[] = [
-  { page: 'habits', title: 'Habit Home', hint: 'Rings and today', keys: ['habit home', 'rings'] },
-  { page: 'habits', title: 'Habit Tracker tab', hint: 'Grid and weekly %', keys: ['tracker tab', 'habit grid'] },
-  { page: 'habits', title: 'Habit Insights', hint: 'Trends', keys: ['insights'] },
-  { page: 'classhub', title: 'Class info', hint: 'Teacher, room, links', keys: ['teacher', 'room', 'links'] },
-  { page: 'classhub', title: 'Timetable', hint: 'Weekly class grid', keys: ['timetable', 'schedule'] },
-  { page: 'calendar', title: 'Week view', hint: 'All-day + hours', keys: ['week view'] },
-  { page: 'calendar', title: 'Month view', hint: 'Month grid', keys: ['month view'] },
-  { page: 'grades', title: 'Simulate grades', hint: 'Hypothetical scores', keys: ['simulate'] },
-  { page: 'notes', title: 'Notes vault', hint: 'Markdown notes', keys: ['vault', 'markdown'] },
-  { page: 'notes', title: 'Whiteboard', hint: 'Infinite board', keys: ['whiteboard', 'canvas'] },
-  { page: 'finance', title: 'Baon goals', hint: 'Savings targets', keys: ['goal', 'save'] },
-  { page: 'pomodoro', title: 'Focus timer', hint: 'Pomodoro', keys: ['pomodoro', 'session'] },
-  { page: 'flashcards', title: 'Review cards', hint: 'Due reviews', keys: ['review', 'sm2'] },
-  { page: 'settings', title: 'Shortcuts', hint: 'Hotkeys', keys: ['hotkey', 'shortcut'] },
+const TABS: { page: PageId; title: string; hint: string; keys: string[]; focus: string }[] = [
+  { page: 'habits', title: 'Habit Home', hint: 'Rings and today', keys: ['habit home', 'rings'], focus: 'home' },
+  { page: 'habits', title: 'Habit Tracker tab', hint: 'Grid and weekly %', keys: ['tracker tab', 'habit grid'], focus: 'track' },
+  { page: 'habits', title: 'Habit Insights', hint: 'Trends', keys: ['insights'], focus: 'insights' },
+  { page: 'habits', title: 'Habit Dashboard', hint: 'Monthly dash', keys: ['habit dash'], focus: 'dash' },
+  { page: 'classhub', title: 'Class info', hint: 'Teacher, room, links', keys: ['teacher', 'room', 'links'], focus: 'info' },
+  { page: 'classhub', title: 'Timetable', hint: 'Weekly class grid', keys: ['timetable', 'schedule'], focus: 'timetable' },
+  { page: 'calendar', title: 'Week view', hint: 'All-day + hours', keys: ['week view'], focus: 'week' },
+  { page: 'calendar', title: 'Month view', hint: 'Month grid', keys: ['month view'], focus: 'month' },
+  { page: 'grades', title: 'Simulate grades', hint: 'Hypothetical scores', keys: ['simulate'], focus: 'simulate' },
+  { page: 'notes', title: 'Notes vault', hint: 'Markdown notes', keys: ['vault', 'markdown'], focus: 'notes' },
+  { page: 'notes', title: 'Whiteboard', hint: 'Infinite board', keys: ['whiteboard', 'canvas'], focus: 'board' },
+  { page: 'notes', title: 'Notes graph', hint: 'Linked notes', keys: ['graph'], focus: 'graph' },
+  { page: 'finance', title: 'Baon goals', hint: 'Savings targets', keys: ['goal', 'save'], focus: 'goals' },
+  { page: 'pomodoro', title: 'Focus timer', hint: 'Pomodoro', keys: ['pomodoro', 'session'], focus: '' },
+  { page: 'flashcards', title: 'Review cards', hint: 'Due reviews', keys: ['review', 'sm2'], focus: 'review' },
+  { page: 'settings', title: 'Shortcuts', hint: 'Hotkeys', keys: ['hotkey', 'shortcut'], focus: 'shortcuts' },
 ];
 
 function score(hay: string, q: string) {
@@ -95,18 +99,22 @@ export default function GlobalSearch({
   const [habits, setHabits] = useState<{ id: string; name: string }[]>([]);
   const [decks, setDecks] = useState<{ id: string; name: string }[]>([]);
   const [goals, setGoals] = useState<{ id: string; name: string }[]>([]);
+  const [cardsInDecks, setCardsInDecks] = useState<{ id: string; front: string; deck: string }[]>([]);
+  const [teachers, setTeachers] = useState<{ subject: string; teacher: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [n, t, k, h, d, g] = await Promise.all([
+    const [n, t, k, h, d, g, fc, hubs] = await Promise.all([
       supabase.from('notes').select('id,title,content,folder').limit(200),
       supabase.from('todos').select('id,title,completed').limit(200),
       supabase.from('kanban_tasks').select('id,title,status').limit(200),
       supabase.from('habits').select('id,name').limit(80),
       supabase.from('flashcard_decks').select('id,name').limit(80),
       supabase.from('finance_goals').select('id,name').limit(80),
+      supabase.from('flashcards').select('id,front,deck_id').limit(120),
+      supabase.from('class_hub').select('subject_key,teacher_name').limit(40),
     ]);
     if (n.data) setNotes(n.data as typeof notes);
     if (t.data) setTodos(t.data as typeof todos);
@@ -114,6 +122,17 @@ export default function GlobalSearch({
     if (h.data) setHabits(h.data as typeof habits);
     if (d.data) setDecks(d.data as typeof decks);
     if (g.data) setGoals(g.data as typeof goals);
+    if (fc.data) {
+      const deckName = new Map((d.data || []).map((x: { id: string; name: string }) => [x.id, x.name]));
+      setCardsInDecks((fc.data as { id: string; front: string; deck_id: string }[]).map((c) => ({
+        id: c.id, front: c.front, deck: deckName.get(c.deck_id) || 'Deck',
+      })));
+    }
+    if (hubs.data) {
+      setTeachers((hubs.data as { subject_key: string; teacher_name: string }[])
+        .filter((r) => r.teacher_name)
+        .map((r) => ({ subject: r.subject_key, teacher: r.teacher_name })));
+    }
     setLoading(false);
   }, []);
 
@@ -137,40 +156,50 @@ export default function GlobalSearch({
       push({ id: `page-${p.page}`, kind: 'page', title: p.title, subtitle: p.hint, page: p.page }, `${p.title} ${p.hint} ${p.keys.join(' ')}`);
     }
     for (const t of TABS) {
-      push({ id: `tab-${t.page}-${t.title}`, kind: 'tab', title: t.title, subtitle: t.hint, page: t.page }, `${t.title} ${t.hint} ${t.keys.join(' ')}`);
+      push({ id: `tab-${t.page}-${t.focus || t.title}`, kind: 'tab', title: t.title, subtitle: t.hint, page: t.page, focus: t.focus || undefined }, `${t.title} ${t.hint} ${t.keys.join(' ')}`);
     }
     for (const s of SUBJECTS) {
-      push({ id: `class-${s.key}`, kind: 'class', title: s.name, subtitle: `Class Hub · ${s.shortName}`, page: 'classhub', subject: s.key }, `${s.name} ${s.shortName} ${s.key} class`);
-      push({ id: `grade-${s.key}`, kind: 'tab', title: `${s.shortName} grades`, subtitle: 'Grades tab', page: 'grades', subject: s.key }, `${s.name} ${s.shortName} grade score`);
+      push({ id: `class-${s.key}`, kind: 'class', title: s.name, subtitle: `Class Hub · ${s.shortName}`, page: 'classhub', focus: s.key }, `${s.name} ${s.shortName} ${s.key} class`);
+      push({ id: `grade-${s.key}`, kind: 'tab', title: `${s.shortName} grades`, subtitle: 'Grades subject', page: 'grades', focus: s.key }, `${s.name} ${s.shortName} grade score`);
     }
     for (const n of notes) {
-      push({ id: n.id, kind: 'note', title: n.title || 'Untitled', subtitle: n.folder || 'Note', page: 'notes' }, `${n.title} ${n.content} ${n.folder}`);
+      push({ id: n.id, kind: 'note', title: n.title || 'Untitled', subtitle: n.folder || 'Note', page: 'notes', focus: n.id }, `${n.title} ${n.content} ${n.folder}`);
     }
     for (const t of todos) {
-      push({ id: t.id, kind: 'todo', title: t.title, subtitle: t.completed ? 'Done' : 'Open task', page: 'todos' }, t.title);
+      push({ id: t.id, kind: 'todo', title: t.title, subtitle: t.completed ? 'Done' : 'Open task', page: 'todos', focus: t.id }, t.title);
     }
     for (const c of cards) {
-      push({ id: c.id, kind: 'card', title: c.title, subtitle: c.status || 'Kanban', page: 'kanban' }, `${c.title} ${c.status}`);
+      push({ id: c.id, kind: 'card', title: c.title, subtitle: c.status || 'Kanban', page: 'kanban', focus: c.id }, `${c.title} ${c.status}`);
     }
     for (const e of getCalendarEvents()) {
-      push({ id: e.id, kind: 'event', title: e.title, subtitle: `${e.start_date}${e.end_date !== e.start_date ? ` – ${e.end_date}` : ''}`, page: 'calendar' }, `${e.title} ${e.description || ''} ${e.kind}`);
+      push({ id: e.id, kind: 'event', title: e.title, subtitle: `${e.start_date}${e.end_date !== e.start_date ? ` – ${e.end_date}` : ''}`, page: 'calendar', focus: e.id }, `${e.title} ${e.description || ''} ${e.kind}`);
     }
     for (const h of habits) {
-      push({ id: h.id, kind: 'habit', title: h.name, subtitle: 'Habit', page: 'habits' }, h.name);
+      push({ id: h.id, kind: 'habit', title: h.name, subtitle: 'Habit', page: 'habits', focus: h.id }, h.name);
     }
     for (const d of decks) {
-      push({ id: d.id, kind: 'deck', title: d.name, subtitle: 'Flashcard deck', page: 'flashcards' }, d.name);
+      push({ id: d.id, kind: 'deck', title: d.name, subtitle: 'Flashcard deck', page: 'flashcards', focus: d.id }, d.name);
     }
     for (const g of goals) {
-      push({ id: g.id, kind: 'goal', title: g.name, subtitle: 'Savings goal', page: 'finance' }, g.name);
+      push({ id: g.id, kind: 'goal', title: g.name, subtitle: 'Savings goal', page: 'finance', focus: g.id }, g.name);
+    }
+    for (const c of cardsInDecks) {
+      push({ id: c.id, kind: 'deck', title: c.front, subtitle: c.deck, page: 'flashcards', focus: c.id }, `${c.front} ${c.deck} card`);
+    }
+    for (const teach of teachers) {
+      push({ id: `teacher-${teach.subject}`, kind: 'class', title: teach.teacher, subtitle: 'Teacher · Class Hub', page: 'classhub', focus: teach.subject }, `${teach.teacher} teacher ${teach.subject}`);
     }
 
     return ranked.sort((a, b) => b.s - a.s).slice(0, 50);
-  }, [q, notes, todos, cards, habits, decks, goals]);
+  }, [q, notes, todos, cards, habits, decks, goals, cardsInDecks, teachers]);
 
+  const [active, setActive] = useState(0);
+  const searchKeys = formatShortcut(getShortcuts().search);
+  useEffect(() => { setActive(0); }, [q]);
   const go = (h: Hit) => {
-    window.location.hash = hashFor(h.page, h.subject);
-    navigate(h.page, h.subject);
+    const focus = h.focus || null;
+    window.location.hash = hashFor(h.page, focus);
+    navigate(h.page, focus);
     onClose();
   };
 
@@ -183,13 +212,14 @@ export default function GlobalSearch({
       {!loading && q.trim() && hits.length === 0 && (
         <p className="px-3 py-4 text-center text-xs text-zinc-400">No matches</p>
       )}
-      {hits.map((h) => {
+      {hits.map((h, i) => {
         const Icon = ICONS[h.kind] || Search;
         return (
           <button
             key={`${h.kind}-${h.id}`}
             type="button"
-            className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 hover:bg-white/40"
+            className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ${i === active ? 'bg-white/50' : 'hover:bg-white/40'}`}
+            onMouseEnter={() => setActive(i)}
             onClick={() => go(h)}
           >
             <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
@@ -235,39 +265,34 @@ export default function GlobalSearch({
       {open && (
         <motion.div
           key="search-overlay"
-          className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[10vh]"
-          initial={reduceMotion ? false : fadeMotion.initial}
-          animate={fadeMotion.animate}
-          exit={fadeMotion.exit}
-          transition={motionTransition(reduceMotion, 0.22)}
+          className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[min(18vh,7.5rem)]"
+          initial={false}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 1 }}
+          transition={overlayPresence(reduceMotion)}
         >
+          <OverlayScrim onClose={onClose} />
           <motion.div
-            className="absolute inset-0 bg-zinc-900/30"
-            onClick={onClose}
-            initial={reduceMotion ? false : { opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            animate={{ opacity: 1, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            exit={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            transition={motionTransition(reduceMotion, 0.32)}
-          />
-          <motion.div
-            className="epic-glass-sheet relative w-full max-w-xl overflow-hidden"
+            className="epic-glass-sheet relative w-full max-w-3xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             initial={reduceMotion ? false : sheetMotion.initial}
             animate={sheetMotion.animate}
             exit={sheetMotion.exit}
             transition={motionTransition(reduceMotion, 0.22)}
           >
-            <div className="flex items-center gap-2 border-b border-white/40 px-3 py-2.5">
+            <div className="flex items-center gap-2 border-b border-white/40 px-4 py-3">
               <Search className="h-4 w-4 text-zinc-400" />
               <input
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search pages, tabs, classes, notes, tasks, cards, events…"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
+                className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-zinc-400"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') onClose();
-                  if (e.key === 'Enter' && hits[0]) go(hits[0]);
+                  if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(Math.max(0, hits.length - 1), i + 1)); }
+                  if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(0, i - 1)); }
+                  if (e.key === 'Enter' && (hits[active] || hits[0])) go(hits[active] || hits[0]);
                 }}
               />
               <button type="button" onClick={onClose} className="epic-press rounded-lg p-1 text-zinc-400 hover:bg-white/40">
@@ -275,6 +300,27 @@ export default function GlobalSearch({
               </button>
             </div>
             {list}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/35 px-4 py-2 text-[11px] text-zinc-400">
+              <span className="inline-flex items-center gap-1.5">
+                <kbd className="rounded bg-white/55 px-1 font-sans text-[10px] text-zinc-500">↑</kbd>
+                <kbd className="rounded bg-white/55 px-1 font-sans text-[10px] text-zinc-500">↓</kbd>
+                to navigate
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <kbd className="rounded bg-white/55 px-1 font-sans text-[10px] text-zinc-500">↵</kbd>
+                to open
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <kbd className="rounded bg-white/55 px-1.5 font-sans text-[10px] text-zinc-500">esc</kbd>
+                to dismiss
+              </span>
+              <span className="ml-auto inline-flex items-center gap-1.5">
+                <kbd className="rounded bg-white/55 px-1.5 font-sans text-[10px] text-zinc-500">{searchKeys}</kbd>
+                <span>or</span>
+                <kbd className="rounded bg-white/55 px-1.5 font-sans text-[10px] text-zinc-500">/</kbd>
+                to toggle
+              </span>
+            </div>
           </motion.div>
         </motion.div>
       )}

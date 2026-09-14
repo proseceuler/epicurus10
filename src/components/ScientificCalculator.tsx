@@ -73,8 +73,8 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-[min(20rem,calc(100vw-1.5rem))]'
-    : 'w-full max-w-[min(320px,calc(100vw-1.5rem))] mx-auto';
+    ? 'fixed z-[70] w-[min(22rem,calc(100vw-1.5rem))]'
+    : 'w-full min-w-0';
 
   const style = detached ? { left: pos.x, top: pos.y } : undefined;
 
@@ -99,7 +99,7 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
 
   return (
     <div className={containerClass} style={style}>
-      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
+      <div className={detached ? 'epic-glass-sheet overflow-hidden rounded-3xl' : 'overflow-hidden'}>
         <div
           className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
           onMouseDown={onDragStart}

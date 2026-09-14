@@ -30,7 +30,7 @@ export default function PomodoroPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [mixMode, setMixMode] = useState(false);
   const [playing, setPlaying] = useState<Partial<Record<AmbientId, boolean>>>({});
-  const [volume, setVolume] = useState(55);
+  const [volume, setVolume] = useState(70);
   const [selected, setSelected] = useState<AmbientId>('rain');
   const mixerRef = useRef<AmbientMixer | null>(null);
   if (!mixerRef.current) mixerRef.current = new AmbientMixer();
@@ -59,7 +59,7 @@ export default function PomodoroPage() {
     } else {
       setPlaying((cur) => ({ ...cur, [id]: true }));
     }
-    mixer.play(id, volume / 100);
+    void mixer.play(id, volume / 100);
     setSelected(id);
   };
 
@@ -205,11 +205,11 @@ export default function PomodoroPage() {
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <Card className="p-5">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="font-semibold text-zinc-800 flex items-center gap-2">
-                <Volume2 className="w-4 h-4" /> Ambient Sounds
+        <div className="space-y-3">
+          <Card className="p-3">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-zinc-800 flex items-center gap-1.5 text-sm">
+                <Volume2 className="w-3.5 h-3.5" /> Ambient
               </h3>
               <button
                 type="button"
@@ -227,14 +227,14 @@ export default function PomodoroPage() {
                     return !on;
                   });
                 }}
-                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium ${
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-medium ${
                   mixMode ? 'bg-zinc-900 text-white' : 'glass text-zinc-600'
                 }`}
               >
-                <Layers className="h-3 w-3" /> Mix mode
+                <Layers className="h-3 w-3" /> Mix
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-5 gap-1">
               {AMBIENT_LIBRARY.map((s) => {
                 const active = Boolean(playing[s.id]);
                 const Icon = SOUND_ICONS[s.id];
@@ -243,24 +243,24 @@ export default function PomodoroPage() {
                     key={s.id}
                     type="button"
                     onClick={() => toggleSound(s.id)}
-                    className={`aspect-square rounded-2xl border px-2 py-2 text-center transition-all ${
+                    className={`aspect-square rounded-xl border px-0.5 text-center transition-all ${
                       active ? 'border-zinc-800 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'
                     }`}
                   >
-                    <Icon className={`mx-auto h-5 w-5 ${active ? 'text-white' : 'text-zinc-700'}`} />
-                    <span className="mt-1.5 block text-[11px] font-medium leading-tight">{s.label}</span>
+                    <Icon className={`mx-auto h-3.5 w-3.5 ${active ? 'text-white' : 'text-zinc-700'}`} />
+                    <span className="mt-0.5 block truncate text-[9px] font-medium leading-tight">{s.label}</span>
                   </button>
                 );
               })}
             </div>
-            <div className="mt-3 flex items-center gap-2 rounded-xl glass px-3 py-2">
+            <div className="mt-1.5 flex items-center gap-1.5 rounded-xl glass px-2 py-1">
               {(() => {
                 const PlayerIcon = SOUND_ICONS[selected];
                 const live = Boolean(playing[selected]);
                 return (
                   <>
-                    <PlayerIcon className="h-4 w-4 shrink-0 text-zinc-700" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700">
+                    <PlayerIcon className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700">
                       {AMBIENT_LIBRARY.find((s) => s.id === selected)?.label}
                     </span>
                     <button
@@ -277,9 +277,9 @@ export default function PomodoroPage() {
                       max={100}
                       value={volume}
                       onChange={(e) => changeVolume(Number(e.target.value))}
-                      className="h-1.5 w-20 accent-zinc-900"
+                      className="h-1.5 min-w-0 flex-1 accent-zinc-900"
                     />
-                    <span className="w-8 text-right text-[11px] tabular-nums text-zinc-500">{volume}%</span>
+                    <span className="w-7 text-right text-[10px] tabular-nums text-zinc-500">{volume}%</span>
                   </>
                 );
               })()}
@@ -287,24 +287,24 @@ export default function PomodoroPage() {
           </Card>
 
           {showSettings && pomo.settings && (
-            <Card className="p-5">
-              <h3 className="font-semibold text-zinc-800 mb-3">Timer Settings</h3>
-              <div className="space-y-3">
+            <Card className="p-3">
+              <h3 className="font-semibold text-zinc-800 mb-2 text-sm">Timer Settings</h3>
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: 'focus_duration', label: 'Focus Duration (min)', min: 1, max: 120, def: 25 },
-                  { key: 'short_break_duration', label: 'Short Break (min)', min: 1, max: 60, def: 5 },
-                  { key: 'long_break_duration', label: 'Long Break (min)', min: 1, max: 60, def: 15 },
-                  { key: 'sessions_before_long_break', label: 'Sessions Before Long Break', min: 1, max: 10, def: 4 },
+                  { key: 'focus_duration', label: 'Focus (min)', min: 1, max: 120, def: 25 },
+                  { key: 'short_break_duration', label: 'Short (min)', min: 1, max: 60, def: 5 },
+                  { key: 'long_break_duration', label: 'Long (min)', min: 1, max: 60, def: 15 },
+                  { key: 'sessions_before_long_break', label: 'Sessions', min: 1, max: 10, def: 4 },
                 ].map((field) => (
                   <div key={field.key}>
-                    <label className="text-xs font-medium text-zinc-500 mb-1 block">{field.label}</label>
+                    <label className="text-[10px] font-medium text-zinc-500 mb-0.5 block">{field.label}</label>
                     <input
                       type="number"
                       min={field.min}
                       max={field.max}
                       value={(pomo.settings as PomodoroSettings)[field.key as keyof PomodoroSettings] as number}
                       onChange={(e) => saveSettings({ [field.key]: parseInt(e.target.value) || field.def } as Partial<PomodoroSettings>)}
-                      className="w-full px-3 py-2 glass-input rounded-xl text-sm"
+                      className="w-full px-2 py-1.5 glass-input rounded-xl text-sm"
                     />
                   </div>
                 ))}

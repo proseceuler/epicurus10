@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import AppLayout, { usePageState, type PageId } from '@/components/AppLayout';
@@ -26,6 +26,19 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+}
+
+function useCompactUi() {
+  const [compact, setCompact] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1279px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1279px)');
+    const onChange = () => setCompact(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return compact;
 }
 
 function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void }) {
@@ -64,6 +77,8 @@ function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, fo
 function App() {
   const [page, navigate] = usePageState();
   const reduceMotion = useReducedMotion();
+  const compact = useCompactUi();
+  const quiet = Boolean(reduceMotion || compact);
 
   return (
     <PomodoroProvider>
@@ -73,10 +88,10 @@ function App() {
             <motion.div
               key={page}
               className="min-h-full"
-              initial={reduceMotion ? false : pageMotion.initial}
+              initial={quiet ? false : pageMotion.initial}
               animate={pageMotion.animate}
-              exit={reduceMotion ? pageMotion.animate : pageMotion.exit}
-              transition={motionTransition(reduceMotion, 0.2)}
+              exit={quiet ? pageMotion.animate : pageMotion.exit}
+              transition={motionTransition(quiet, 0.2)}
             >
               <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
                 <ActivePage page={page} navigate={navigate} />

@@ -48,8 +48,9 @@ html, body, #root {
 .rice-shell .hud-term *,
 .rice-shell .hud-fetch,
 .rice-shell .hud-fetch *,
-.rice-shell .hud-cursor {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+.rice-shell .hud-cursor,
+.rice-shell kbd {
+  font-family: "JetBrains Mono", "Iosevka", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 .film-grain {
   pointer-events: none;
@@ -109,20 +110,6 @@ html, body, #root {
 .rice-sidebar.w-56 .rice-nav-label { opacity: 1; width: auto; }
 @media (max-width: 1279px) {
   .rice-sidebar.rice-sidebar-open .rice-nav-label { opacity: 1; width: auto; }
-  .rice-main {
-    padding-left: 0 !important;
-    margin-left: 0 !important;
-    width: 100%;
-    max-width: 100%;
-  }
-  .rice-sidebar.rice-sidebar-collapsed {
-    transform: translateX(calc(-100% - 1.5rem)) !important;
-    pointer-events: none;
-  }
-  .rice-sidebar.rice-sidebar-open {
-    transform: translateX(0) !important;
-    pointer-events: auto;
-  }
 }
 @media (min-width: 1280px) {
   .rice-main { padding-left: 4.75rem; transition: padding-left 280ms ease, padding-right 280ms ease; }
@@ -166,8 +153,7 @@ html, body, #root {
   width: 88px;
   aspect-ratio: 1;
   border-radius: 50%;
-  overflow: hidden !important;
-  isolation: isolate;
+  overflow: hidden;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
@@ -183,9 +169,6 @@ html, body, #root {
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .arrodes-orbit .arrodes-tilt {
   position: absolute;
@@ -198,10 +181,14 @@ html, body, #root {
 .arrodes-disc-stack {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: -4% !important;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
 }
 .arrodes-disc {
   position: absolute;
@@ -244,9 +231,6 @@ html, body, #root {
   inset: 0;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  overflow: hidden;
 }
 .arrodes-blob {
   z-index: 1;
@@ -346,20 +330,51 @@ html, body, #root {
   flex: none;
 }
 .rice-main { color: #27272a; }
+@media (min-width: 1280px) {
+  .rice-shell.assistant-open .rice-main {
+    max-width: calc(100vw - 5.5rem);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .film-grain, .hud-cursor { animation: none; display: none; }
+  .arrodes-stage[data-variant='home'] .arrodes-well,
+  .arrodes-orbit[data-variant='home'],
+  .arrodes-orbit[data-variant='track'] {
+    animation: none !important;
+  }
 }
-/* Portal: keep blob/glass strictly inside the frame on all devices */
+
+/* --- slice-6 additive fixes (do not remove original rules) --- */
+/* Circle FAB: true circle + soft shadow (no old squircle shadow) */
+[data-global-dock] .dock-fab {
+  width: 3.25rem !important;
+  height: 3.25rem !important;
+  min-width: 3.25rem !important;
+  min-height: 3.25rem !important;
+  max-width: 3.25rem;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  flex: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06) !important;
+}
+[data-global-dock] .dock-fab.shadow-lg {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06) !important;
+}
+
+/* Mobile/tablet: prevent left-push from sidebar padding */
 @media (max-width: 1279px) {
-  .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-    inset: 0 !important;
+  .rice-main {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    width: 100%;
+    max-width: 100%;
   }
-  .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: min(72vw, 300px);
-    max-width: 300px;
+  .rice-sidebar.rice-sidebar-collapsed {
+    transform: translateX(calc(-100% - 1.5rem)) !important;
+    pointer-events: none;
   }
-  .arrodes-blob {
-    -webkit-mask-size: 100% 100% !important;
-    mask-size: 100% 100% !important;
+  .rice-sidebar.rice-sidebar-open {
+    transform: translateX(0) !important;
+    pointer-events: auto;
   }
 }

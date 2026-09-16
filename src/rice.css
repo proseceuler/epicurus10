@@ -291,23 +291,21 @@ html, body, #root {
   overflow: visible;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: -18%;
-  width: 136%;
-  height: 136%;
+  inset: -14%;
+  width: 128%;
+  height: 128%;
 }
-.arrodes-disc-stack--back { z-index: 1; }
-.arrodes-disc-stack--front { z-index: 3; }
 .arrodes-orbit[data-variant='home'] {
   overflow: visible;
 }
+.arrodes-disc--back { z-index: 1; }
+.arrodes-disc--front { z-index: 4; }
 .arrodes-disc {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.arrodes-disc--back { z-index: 1; }
-.arrodes-disc--front { z-index: 3; }
 .arrodes-stage[data-variant='home'] {
   width: auto;
   max-width: none;

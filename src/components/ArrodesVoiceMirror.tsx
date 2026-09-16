@@ -203,7 +203,7 @@ export default function ArrodesVoiceMirror({
           src={frameSrc}
           alt=""
           draggable={false}
-          style={{ zIndex: 5, opacity: 1, objectFit: 'fill' }}
+          style={{ zIndex: 5, opacity: 1, objectFit: 'contain' }}
         />
       </div>
     </div>

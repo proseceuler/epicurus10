@@ -1,7 +1,6 @@
-@import './rice-part1.css';
-@import './rice-part2.css';
+/* Full rice from e59ebe3 + mobile portal fixes (WebGL must not get CSS grayscale) */
+@import url('https://raw.githubusercontent.com/proseceuler/epicurus10/e59ebe3130d4e4939b3331278458990a04c8a536/src/rice.css');
 
-/* mobile portal: WebGL must not get CSS grayscale */
 .rice-shell.rice-shell--mono canvas.arrodes-blob,
 .rice-shell.rice-shell--mono canvas.arrodes-disc {
   filter: none !important;

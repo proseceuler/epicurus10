@@ -51,10 +51,6 @@
 .arrodes-blob {
   z-index: 1;
   background: #6e737a;
-  /* mercury sits inside the silver rim (was overshooting the frame) */
-  inset: 6%;
-  width: auto;
-  height: auto;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -65,9 +61,6 @@
 .arrodes-glass {
   z-index: 2;
   pointer-events: none;
-  inset: 6%;
-  width: auto;
-  height: auto;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -87,8 +80,7 @@
 .arrodes-frame {
   z-index: 5;
   pointer-events: none;
-  /* fill the well so frame + masked blob share the same box (contain made frame smaller) */
-  object-fit: fill;
+  object-fit: contain;
   object-position: center;
   opacity: 1;
 }

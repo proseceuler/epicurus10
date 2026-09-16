@@ -40,24 +40,22 @@ function AccretionLayer({ pass, compact = false }: { pass: 'back' | 'front'; com
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
 
-    // Home rings sized to clear the tall frame (back half peeks around top/sides).
-    // Tracker stays tighter against the small mirror.
     const scale = compact ? 0.58 : 1;
+    // Home: tight continuous band just outside the frame silhouette
     const rings = (compact
       ? [0.34, 0.46, 0.58, 0.72]
-      : [0.48, 0.58, 0.70, 0.84]
+      : [0.52, 0.60, 0.70, 0.80]
     ).map((r) => r * scale);
-    // Slightly rounder ellipse so the back arc clears the portal height
-    const yScale = compact ? 0.42 : 0.58;
+    const yScale = compact ? 0.42 : 0.62;
 
-    const dots = Array.from({ length: compact ? 560 : 900 }, (_, i) => {
+    const dots = Array.from({ length: compact ? 560 : 1200 }, (_, i) => {
       const ring = rings[i % rings.length];
       const t = Math.pow(Math.random(), 0.7);
       return {
-        r: ring + (Math.random() - 0.5) * 0.04 * scale + t * 0.02 * scale,
+        r: ring + (Math.random() - 0.5) * 0.035 * scale + t * 0.015 * scale,
         a: Math.random() * Math.PI * 2,
         speed: 0.0018 + Math.random() * 0.0032,
-        s: 0.5 + Math.random() * 1.05,
+        s: 0.45 + Math.random() * 0.95,
         shade: Math.random(),
       };
     });
@@ -86,7 +84,6 @@ function AccretionLayer({ pass, compact = false }: { pass: 'back' | 'front'; com
       const cx = px / 2;
       const cy = px / 2 + px * 0.02;
       for (const d of dots) {
-        // sin > 0 → bottom / near side (front); sin ≤ 0 → top / far side (back)
         const frontDot = Math.sin(d.a) > 0;
         if (pass === 'front' ? !frontDot : frontDot) continue;
 
@@ -114,7 +111,6 @@ function AccretionLayer({ pass, compact = false }: { pass: 'back' | 'front'; com
           }
         }
 
-        // Back dots almost as visible as front so the far arc reads clearly
         const a = ((frontDot ? 0.36 : 0.30) + d.s * 0.36) * side;
         const g = Math.floor(22 + d.shade * 78);
         ctx.fillStyle = `rgba(${g},${g},${g + 2},${a})`;

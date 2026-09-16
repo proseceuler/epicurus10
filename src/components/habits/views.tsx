@@ -1,6 +1,13 @@
-import { useMemo, useState } from 'react';
-import { AreaChart, BarChart, Heatmap, ProgressRing } from '@/components/habits/charts';
+import { Fragment, useEffect, useMemo, useState, type Dispatch, SetStateAction } from 'react';
+import type { Habit, HabitCompletion, Todo } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 import BlackHole from '@/components/habits/BlackHole';
+import {
+  AreaChart,
+  BarChart,
+  Heatmap,
+  ProgressRing,
+} from '@/components/habits/charts';
 import {
   completionRate,
   dayKey,
@@ -14,9 +21,10 @@ import {
   weekdayAvg,
   weekKey,
 } from '@/lib/habit-stats';
-import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 
-type Go = (v: 'home' | 'track' | 'dashboard' | 'insights') => void;
+export type View = 'home' | 'track' | 'dash' | 'insights';
+
+type Go = (v: View) => void;
 
 function AlertRow({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'pending' | 'na' }) {
   const cls =
@@ -65,7 +73,7 @@ export function HomeView({
 
   const links = [
     { label: '+ Update Habit Tracker', view: 'track' as const },
-    { label: '+ Habit Dashboard', view: 'dashboard' as const },
+    { label: '+ Habit Dashboard', view: 'dash' as const },
     { label: '+ Habit Insights', view: 'insights' as const },
   ];
 
@@ -78,6 +86,10 @@ export function HomeView({
     if (empty) return 'na';
     return doneFlag ? 'ok' : 'pending';
   };
+
+  const monthDone = habits.length
+    ? habits.reduce((acc, h) => acc + (isDone(done, h.id, today) ? 1 : 0), 0)
+    : 0;
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
@@ -100,7 +112,7 @@ export function HomeView({
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Completion %</p>
               <p className="mb-1 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
-              <AreaChart values={wave.slice(-12)} labels={waveLabels} height={78} />
+              <AreaChart values={wave.slice(-12)} labels={waveLabels.slice(-12)} height={78} />
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Alerts</p>
@@ -119,28 +131,30 @@ export function HomeView({
                 height={72}
               />
             </div>
-            <div className="min-w-0 col-span-1">
+            <div className="min-w-0">
               <p className="ht-label mb-1">Trend</p>
               <div className="space-y-1 text-[11px]">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
+                  <span>Habit</span><span>MTD %</span><span>MoM %</span><span>12 wk</span>
+                </div>
                 {habits.slice(0, 6).map((h) => {
                   const st = streakFor(h.id, done);
                   return (
-                    <div key={h.id} className="flex items-center justify-between gap-2">
+                    <div key={h.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-2">
                       <span className="truncate text-zinc-700">{h.icon ? `${h.icon} ` : ''}{h.name}</span>
-                      <span className="tabular-nums text-zinc-500">{st.current}d</span>
+                      <span className="tabular-nums text-zinc-500">0%</span>
+                      <span className="tabular-nums text-zinc-500">▲ 0%</span>
+                      <span className="h-1 w-8 rounded bg-zinc-200" />
                     </div>
                   );
                 })}
               </div>
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-1">Progress (month)</p>
-              <div className="flex items-center gap-3">
-                <ProgressRing value={todayScore} size={72} />
-                <div className="text-[11px] text-zinc-500">
-                  <p>{habits.length - todayLeft.length}/{habits.length} habits today</p>
-                  <p className="mt-1">{Math.round(todayScore * 100)}% complete</p>
-                </div>
+              <p className="ht-label mb-1">Progress (Sep)</p>
+              <div className="flex flex-col items-start gap-2">
+                <ProgressRing value={todayScore} size={88} />
+                <p className="text-[10px] text-zinc-500">{monthDone}/{Math.max(habits.length, 1) * 30} Habits Done</p>
               </div>
             </div>
           </div>
@@ -149,72 +163,3 @@ export function HomeView({
     </div>
   );
 }
-
-export function TrackView({
-  habits,
-  completions,
-  onToggle,
-}: {
-  habits: Habit[];
-  completions: HabitCompletion[];
-  onToggle: (habitId: string, date: string) => void;
-}) {
-  const done = useMemo(() => doneSet(completions), [completions]);
-  const today = todayIso();
-  const [month, setMonth] = useState(() => new Date().getMonth());
-  const [year, setYear] = useState(() => new Date().getFullYear());
-  const days = monthDays(year, month);
-
-  return (
-    <div className="h-full w-full overflow-auto p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="ht-label">Tracker</p>
-        <div className="flex items-center gap-2 text-sm">
-          <button type="button" className="rounded-lg px-2 py-1 hover:bg-zinc-100" onClick={() => {
-            if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1);
-          }}>←</button>
-          <span className="tabular-nums text-zinc-700">{year}-{String(month + 1).padStart(2, '0')}</span>
-          <button type="button" className="rounded-lg px-2 py-1 hover:bg-zinc-100" onClick={() => {
-            if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1);
-          }}>→</button>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="ht-table text-left">
-          <thead>
-            <tr>
-              <th className="sticky left-0 bg-[#f5f5f7] px-2 py-1 text-[10px] text-zinc-500">Habit</th>
-              {days.map((d) => (
-                <th key={d} className={`px-1 py-1 text-center text-[9px] tabular-nums ${d === today ? 'text-zinc-900' : 'text-zinc-400'}`}>{d.slice(8)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {habits.map((h) => (
-              <tr key={h.id} className="border-t border-zinc-200/60">
-                <td className="sticky left-0 bg-[#f5f5f7] px-2 py-1.5 text-[12px] text-zinc-800">
-                  {h.icon ? `${h.icon} ` : ''}{h.name}
-                </td>
-                {days.map((d) => {
-                  const on = isDone(done, h.id, d);
-                  return (
-                    <td key={d} className="px-1 py-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onToggle(h.id, d)}
-                        className={`h-5 w-5 rounded ${on ? 'bg-zinc-900' : 'bg-zinc-200/80 hover:bg-zinc-300'}`}
-                        aria-label={`${h.name} ${d}`}
-                      />
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-export { HomeView as default };

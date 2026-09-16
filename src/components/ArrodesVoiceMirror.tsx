@@ -16,7 +16,6 @@ const holeMask = {
 
 function resolveFrameSrc() {
   const override = getArrodesFramePng();
-  // Only accept a real image URL — broken localStorage values hide the silver frame
   if (override && (override.startsWith('data:image/') || override.startsWith('http'))) {
     return override;
   }
@@ -81,54 +80,45 @@ export default function ArrodesVoiceMirror({
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, 'a_pos');
+    const loc = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const uRes = gl.getUniformLocation(prog, 'u_res');
-    const uTime = gl.getUniformLocation(prog, 'u_time');
-    const uMode = gl.getUniformLocation(prog, 'u_mode');
-    const uBands = gl.getUniformLocation(prog, 'u_bands');
-    const uHover = gl.getUniformLocation(prog, 'u_hover');
-    const uHoverPt = gl.getUniformLocation(prog, 'u_hover_pt');
-    const uSplash = gl.getUniformLocation(prog, 'u_splash');
-    let stopMic: (() => void) | null = null;
-    if (active) stopMic = listenMic((b) => { bandsRef.current = b; });
-    startRef.current = performance.now();
+
     const resize = () => {
+      const el = wrapRef.current;
+      if (!el) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-      const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        gl.viewport(0, 0, w, h);
-      }
+      const w = Math.max(1, Math.floor(el.clientWidth * dpr));
+      const h = Math.max(1, Math.floor(el.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     };
-    const modeMap: Record<string, number> = { idle: 0, listening: 1, thinking: 2, speaking: 3 };
-    const loop = (t: number) => {
-      rafRef.current = requestAnimationFrame(loop);
+    startRef.current = performance.now();
+    const tick = (now: number) => {
+      rafRef.current = requestAnimationFrame(tick);
       resize();
-      const sec = (t - startRef.current) / 1000;
-      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.08;
-      hoverPtAmtRef.current.x += (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12;
-      hoverPtAmtRef.current.y += (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12;
-      gl.useProgram(prog);
-      gl.uniform2f(uRes, canvas.width, canvas.height);
-      gl.uniform1f(uTime, sec);
-      gl.uniform1f(uMode, modeMap[modeRef.current] ?? 0);
-      const b = bandsRef.current;
-      gl.uniform4f(uBands, b.bass, b.mid, b.treble, b.level);
-      gl.uniform1f(uHover, hoverAmtRef.current);
-      gl.uniform2f(uHoverPt, hoverPtAmtRef.current.x, hoverPtAmtRef.current.y);
-      gl.uniform3f(uSplash, splashRef.current.t, splashRef.current.x, splashRef.current.y);
-      draw(gl);
+      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.065;
+      hoverPtAmtRef.current = {
+        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12,
+        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12,
+      };
+      draw(
+        gl,
+        prog,
+        canvas,
+        (now - startRef.current) / 1000,
+        modeRef.current,
+        bandsRef.current,
+        hoverAmtRef.current,
+        hoverPtAmtRef.current,
+        splashRef.current,
+      );
     };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      stopMic?.();
-    };
-  }, [active]);
+    rafRef.current = requestAnimationFrame(tick);
+    resize();
+    return () => { cancelAnimationFrame(rafRef.current); gl.deleteProgram(prog); };
+  }, []);
+
+  useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);
 
   useEffect(() => {
     const well = wrapRef.current;

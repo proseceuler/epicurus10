@@ -1,14 +1,16 @@
 /**
- * Cross-device sync for the localStorage DB (todos, habits, notes, …).
- * Self-contained so it does not require supabase helper exports.
+ * Live cross-device sync for the localStorage DB (todos, habits, notes, …).
+ * Polls a shared server snapshot; applies without page reload.
  */
-const STORAGE_KEY = "epicure:db";
-const META_KEY = "epicure:db:meta";
-const DB_CHANGED = "epicure-db-changed";
-const DATA_CHANGED = "epicure-data-changed";
-const ROOM = "default";
+import { hydrateDbFromStorage } from '@/lib/supabase';
+
+const STORAGE_KEY = 'epicure:db';
+const META_KEY = 'epicure:db:meta';
+const DB_CHANGED = 'epicure-db-changed';
+const DATA_CHANGED = 'epicure-data-changed';
+const ROOM = 'default';
 const API = `/api/public/db-sync?room=${ROOM}`;
-const POLL_MS = 2000;
+const POLL_MS = 900;
 
 let lastPushedAt = 0;
 let applyingRemote = false;
@@ -55,6 +57,9 @@ function applyRemote(db: unknown, updatedAt: number) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
     writeMeta(updatedAt);
     (window as unknown as { __epicureDbBust?: boolean }).__epicureDbBust = true;
+    try {
+      hydrateDbFromStorage();
+    } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent(DB_CHANGED, { detail: { at: updatedAt, remote: true } }));
     window.dispatchEvent(new CustomEvent(DATA_CHANGED, { detail: { remote: true } }));
   } finally {
@@ -69,8 +74,8 @@ async function pushLocal() {
   if (snap.updatedAt <= lastPushedAt) return;
   try {
     const res = await fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(snap),
     });
     if (res.ok) lastPushedAt = snap.updatedAt;
@@ -79,13 +84,13 @@ async function pushLocal() {
 
 async function pullRemote() {
   try {
-    const res = await fetch(API, { cache: "no-store" });
+    const res = await fetch(API, { cache: 'no-store' });
     if (!res.ok) return;
     const data = (await res.json()) as {
       snapshot?: { db: unknown; updatedAt: number } | null;
     };
     const remote = data.snapshot;
-    if (!remote || typeof remote.updatedAt !== "number" || !remote.db) return;
+    if (!remote || typeof remote.updatedAt !== 'number' || !remote.db) return;
     const local = getSnapshot();
     const localAt = local?.updatedAt ?? 0;
     if (remote.updatedAt <= localAt || remote.updatedAt <= lastPushedAt) return;
@@ -94,8 +99,9 @@ async function pullRemote() {
   } catch { /* offline */ }
 }
 
+/** Start live bidirectional sync. Safe to call once from App. */
 export function startDbSync() {
-  if (typeof window === "undefined" || started) return;
+  if (typeof window === 'undefined' || started) return;
   started = true;
 
   if (!readMeta() && readDbRaw()) writeMeta(Date.now());
@@ -115,7 +121,7 @@ export function startDbSync() {
   const startPoll = () => {
     if (pollId) return;
     pollId = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== 'visible') return;
       void pullRemote();
     }, POLL_MS);
   };
@@ -125,8 +131,8 @@ export function startDbSync() {
       pollId = null;
     }
   };
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
       void pullRemote();
       startPoll();
     } else stopPoll();

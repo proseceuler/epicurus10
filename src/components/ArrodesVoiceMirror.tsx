@@ -128,7 +128,7 @@ export default function ArrodesVoiceMirror({
       const r = well.getBoundingClientRect();
       return {
         x: (e.clientX - r.left) / Math.max(1, r.width),
-        y: (e.clientY - r.top) / Math.max(1, r.height),
+        y: 1 - (e.clientY - r.top) / Math.max(1, r.height),
       };
     };
     const onEnter = (e: PointerEvent) => {
@@ -175,7 +175,7 @@ export default function ArrodesVoiceMirror({
           src={frameSrc}
           alt=""
           draggable={false}
-          style={{ zIndex: 5, opacity: 1, objectFit: 'fill' }}
+          style={{ zIndex: 5, opacity: 1, objectFit: 'contain' }}
         />
       </div>
     </div>

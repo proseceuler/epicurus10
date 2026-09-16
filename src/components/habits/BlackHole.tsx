@@ -39,19 +39,16 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
     let stop = false;
     const pointer = { x: 0.5, y: 0.5, on: 0 };
 
-    // Shared dot field: each dot is either front or back half of one continuous ring.
-    // Home radii clear the tall frame so the far arc is visible behind the mirror.
+    // Shared dot field — one continuous ring (front over mirror, back under).
     const scale = compact ? 0.58 : 1;
-    const rings = (compact
-      ? [0.34, 0.46, 0.58, 0.72]
-      : [0.42, 0.52, 0.62, 0.74]
-    ).map((r) => r * scale);
-    const yScale = compact ? 0.42 : 0.55;
-    const dots = Array.from({ length: compact ? 560 : 1000 }, (_, i) => {
+    // Keep rings tight around the frame (original e696b76 proportions)
+    const rings = [0.34, 0.46, 0.58, 0.72].map((r) => r * scale);
+    const yScale = 0.42;
+    const dots = Array.from({ length: compact ? 560 : 760 }, (_, i) => {
       const ring = rings[i % rings.length];
       const t = Math.pow(Math.random(), 0.7);
       return {
-        r: ring + (Math.random() - 0.5) * 0.05 * scale + t * 0.02 * scale,
+        r: ring + (Math.random() - 0.5) * 0.04 * scale + t * 0.015 * scale,
         a: Math.random() * Math.PI * 2,
         speed: 0.0018 + Math.random() * 0.0032,
         s: 0.5 + Math.random() * 1.05,
@@ -83,7 +80,6 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
       const cx = px / 2;
       const cy = px / 2 + px * 0.03;
       for (const d of dots) {
-        // sin > 0 → near side (front, over mirror); sin ≤ 0 → far side (back, under mirror)
         const frontDot = Math.sin(d.a) > 0;
         if (pass === 'front' ? !frontDot : frontDot) continue;
         const nx = Math.cos(d.a);

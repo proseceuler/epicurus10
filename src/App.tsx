@@ -46,74 +46,67 @@ function useCompactUi() {
   return compact;
 }
 
-function PageFallback() {
-  return (
-    <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-zinc-400">
-      Loading…
-    </div>
-  );
+function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void }) {
+  switch (page) {
+    case 'grades':
+    case 'forecast':
+      return <GradesPage />;
+    case 'classhub':
+      return <ClassHubPage />;
+    case 'todos':
+      return <TodosPage />;
+    case 'kanban':
+      return <KanbanPage />;
+    case 'calendar':
+      return <CalendarPage />;
+    case 'notes':
+      return <NotesPage />;
+    case 'drive':
+      return <DrivePage />;
+    case 'pomodoro':
+    case 'analytics':
+      return <PomodoroPage />;
+    case 'habits':
+      return <HabitsPage />;
+    case 'finance':
+      return <FinancePage />;
+    case 'flashcards':
+      return <FlashcardsPage />;
+    case 'settings':
+      return <SettingsPage />;
+    default:
+      return <DashboardPage navigate={navigate} />;
+  }
 }
 
-function AppPages() {
-  const { page } = usePageState();
-  const reduce = useReducedMotion();
+function App() {
+  const [page, navigate] = usePageState();
+  const reduceMotion = useReducedMotion();
   const compact = useCompactUi();
+  const quiet = Boolean(reduceMotion || compact);
 
-  const body = (() => {
-    switch (page) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'grades':
-        return <GradesPage />;
-      case 'classhub':
-        return <ClassHubPage />;
-      case 'todos':
-        return <TodosPage />;
-      case 'kanban':
-        return <KanbanPage />;
-      case 'calendar':
-        return <CalendarPage />;
-      case 'pomodoro':
-        return <PomodoroPage />;
-      case 'habits':
-        return <HabitsPage />;
-      case 'finance':
-        return <FinancePage />;
-      case 'notes':
-        return <NotesPage />;
-      case 'flashcards':
-        return <FlashcardsPage />;
-      case 'settings':
-        return <SettingsPage />;
-      case 'drive':
-        return <DrivePage />;
-      default:
-        return <DashboardPage />;
-    }
-  })();
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={page}
-        className="h-full min-h-0"
-        {...(reduce ? {} : pageMotion)}
-        transition={motionTransition}
-      >
-        <Suspense fallback={<PageFallback />}>{body}</Suspense>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-export default function App() {
   return (
     <PomodoroProvider>
       <ConfirmProvider>
-        <AppLayout>
-          <AppPages />
+        <AppLayout page={page} navigate={navigate}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={page}
+              className="min-h-full"
+              initial={quiet ? false : pageMotion.initial}
+              animate={pageMotion.animate}
+              exit={quiet ? pageMotion.animate : pageMotion.exit}
+              transition={motionTransition(quiet, 0.2)}
+            >
+              <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+                <ActivePage page={page} navigate={navigate} />
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
         </AppLayout>
       </ConfirmProvider>
     </PomodoroProvider>
   );
 }
+
+export default App;

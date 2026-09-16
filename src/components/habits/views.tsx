@@ -1,92 +1,77 @@
-import { Fragment, useEffect, useMemo, useState, type Dispatch, SetStateAction } from 'react';
-import type { Habit, HabitCompletion, Todo } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { useMemo, useState } from 'react';
+import { AreaChart, BarChart, Heatmap, ProgressRing } from '@/components/habits/charts';
 import BlackHole from '@/components/habits/BlackHole';
 import {
-  AlertRow, AreaChart, BarRow, Ring, Spark,
-  chunkWeekly, habitWeekSeries, rateOn,
-} from '@/components/habits/widgets';
-import {
-  MONTHS, WEEKDAYS, isDone, lastNDays, monthDays, type DayCell,
+  completionRate,
+  dayKey,
+  doneSet,
+  isDone,
+  monthDays,
+  monthMatrix,
+  scoreSeries,
+  streakFor,
+  todayIso,
+  weekdayAvg,
+  weekKey,
 } from '@/lib/habit-stats';
+import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 
-export type View = 'home' | 'track' | 'dash' | 'insights';
+type Go = (v: 'home' | 'track' | 'dashboard' | 'insights') => void;
 
-function weekPct(habits: Habit[], week: DayCell[], done: Set<string>) {
-  if (!habits.length || !week.length) return 0;
-  const slots = habits.length * week.length;
-  const got = week.reduce((s, d) => s + habits.filter((h) => isDone(done, h.id, d.dateStr)).length, 0);
-  return slots ? got / slots : 0;
-}
-
-function habitPct(h: Habit | undefined, days: { dateStr: string }[], done: Set<string>) {
-  if (!h || !days.length) return 0;
-  return days.filter((d) => isDone(done, h.id, d.dateStr)).length / days.length;
-}
-
-function momDelta(h: Habit, done: Set<string>) {
-  const now = new Date();
-  const tm = monthDays(now.getFullYear(), now.getMonth());
-  const lmMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-  const lmYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-  const lm = monthDays(lmYear, lmMonth);
-  return { mtd: habitPct(h, tm, done), mom: habitPct(h, tm, done) - habitPct(h, lm, done) };
-}
-
-function dayTone(pct: number) {
-  if (pct >= 0.85) return { bg: '#22c55e', fg: '#fff' };
-  if (pct >= 0.7) return { bg: '#84cc16', fg: '#18181b' };
-  if (pct >= 0.5) return { bg: '#eab308', fg: '#18181b' };
-  if (pct >= 0.3) return { bg: '#f97316', fg: '#fff' };
-  if (pct > 0) return { bg: '#ef4444', fg: '#fff' };
-  return { bg: '#f4f4f5', fg: '#a1a1aa' };
+function AlertRow({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'pending' | 'na' }) {
+  const cls =
+    tone === 'ok'
+      ? 'bg-emerald-50 text-emerald-700'
+      : tone === 'pending'
+        ? 'bg-zinc-100 text-zinc-600'
+        : 'bg-zinc-50 text-zinc-400';
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="text-[11px] text-zinc-600">{label}</span>
+      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{value}</span>
+    </div>
+  );
 }
 
 export function HomeView({
-  habits, done, today, todayLeft, dailyScores, onGo,
+  habits,
+  completions,
+  todos,
+  onGo,
 }: {
   habits: Habit[];
-  done: Set<string>;
-  today: string;
-  life: number;
-  todayLeft: Habit[];
-  dailyScores: { date: string; score: number }[];
   completions: HabitCompletion[];
-  onGo: (v: View) => void;
+  todos: Todo[];
+  onGo: Go;
 }) {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  useEffect(() => {
-    void supabase.from('todos').select('*').then(({ data }) => {
-      if (data) setTodos(data as Todo[]);
+  const done = useMemo(() => doneSet(completions), [completions]);
+  const today = todayIso();
+  const todayLeft = habits.filter((h) => !isDone(done, h.id, today));
+  const todayScore = habits.length ? (habits.length - todayLeft.length) / habits.length : 0;
+
+  const wave = useMemo(() => {
+    const days = monthDays(new Date().getFullYear(), new Date().getMonth());
+    return days.map((d) => {
+      if (!habits.length) return 0;
+      const n = habits.filter((h) => isDone(done, h.id, d)).length;
+      return n / habits.length;
     });
+  }, [habits, done]);
+
+  const waveLabels = useMemo(() => {
+    const days = monthDays(new Date().getFullYear(), new Date().getMonth());
+    return days.map((d) => d.slice(8));
   }, []);
 
-  const last84 = lastNDays(84);
-  const weekly = chunkWeekly(habits, done, last84);
-  const daily = dailyScores.map((d) => d.score);
-  const wave = weekly.some((v) => v > 0) ? weekly : daily;
-  const waveLabels = last84.filter((_, i) => i % 7 === 0).map((d) => d.slice(5)).slice(-12);
-  const todayScore = rateOn(habits, today, done);
-  const last7 = lastNDays(7);
-  const dist = last7.map((d) => ({ key: d, value: rateOn(habits, d, done), label: ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(`${d}T00:00:00`).getDay()] }));
-  const monthDaysNow = monthDays(new Date().getFullYear(), new Date().getMonth());
-  const monthDone = habits.reduce((s, h) => s + monthDaysNow.filter((d) => isDone(done, h.id, d.dateStr)).length, 0);
-  const monthSlots = Math.max(1, habits.length * monthDaysNow.length);
-  const monthBars = monthDaysNow.map((d) => ({ key: d.dateStr, value: rateOn(habits, d.dateStr, done), label: String(d.day) }));
-  const monthName = MONTHS[new Date().getMonth()];
-  const links: { label: string; view: View }[] = [
-    { label: '+ Update Habit Tracker', view: 'track' },
-    { label: '+ Habit Dashboard', view: 'dash' },
-    { label: '+ Habit Insights', view: 'insights' },
+  const links = [
+    { label: '+ Update Habit Tracker', view: 'track' as const },
+    { label: '+ Habit Dashboard', view: 'dashboard' as const },
+    { label: '+ Habit Insights', view: 'insights' as const },
   ];
 
-  const priorities = todos.filter((t) => t.priority === 'urgent_important');
-  const top3 = [...todos].sort((a, b) => {
-    const rank = (p: Todo['priority']) =>
-      p === 'urgent_important' ? 0 : p === 'not_urgent_important' ? 1 : p === 'urgent_not_important' ? 2 : 3;
-    return rank(a.priority) - rank(b.priority);
-  }).slice(0, 3);
-  const prioDone = priorities.length ? priorities.every((t) => t.completed) : false;
+  const priorities = todos.filter((t) => t.priority === 'urgent_important' && !t.completed);
+  const prioDone = priorities.length === 0;
+  const top3 = todos.filter((t) => !t.completed).slice(0, 3);
   const top3Done = top3.length ? top3.every((t) => t.completed) : false;
 
   const alertTone = (empty: boolean, doneFlag: boolean): 'ok' | 'pending' | 'na' => {
@@ -95,9 +80,9 @@ export function HomeView({
   };
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden">
+    <div className="flex h-full w-full items-center justify-center overflow-visible">
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center justify-center gap-6 px-3 lg:gap-10">
-        <div className="w-[300px] shrink-0 sm:w-[360px] lg:w-[440px] xl:w-[520px]">
+        <div className="w-[300px] shrink-0 sm:w-[360px] lg:w-[440px] xl:w-[520px] overflow-visible">
           <BlackHole variant="home" className="aspect-square w-full bg-transparent" />
         </div>
         <div className="min-w-0 max-w-[860px] flex-1">
@@ -128,34 +113,35 @@ export function HomeView({
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-1">Daily Score Distribution</p>
-              <BarRow items={dist} height={84} showValue />
+              <BarChart
+                values={weekdayAvg(habits, done).map((v) => Math.round(v * 100))}
+                labels={['F', 'S', 'S', 'M', 'T', 'W', 'T']}
+                height={72}
+              />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 col-span-1">
               <p className="ht-label mb-1">Trend</p>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 gap-y-1 text-[11px]">
-                <span className="text-[8px] uppercase tracking-wider text-zinc-500">Habit</span>
-                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MTD %</span>
-                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MoM %</span>
-                <span className="text-[8px] uppercase tracking-wider text-zinc-500">12 Wk</span>
-                {habits.map((h) => {
-                  const { mtd, mom } = momDelta(h, done);
-                  const up = mom >= 0;
+              <div className="space-y-1 text-[11px]">
+                {habits.slice(0, 6).map((h) => {
+                  const st = streakFor(h.id, done);
                   return (
-                    <Fragment key={h.id}>
-                      <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
-                      <span className="tabular-nums text-zinc-600">{Math.round(mtd * 100)}%</span>
-                      <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(mom * 100))}%</span>
-                      <span><Spark values={habitWeekSeries(h.id, done)} width={48} /></span>
-                    </Fragment>
+                    <div key={h.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate text-zinc-700">{h.icon ? `${h.icon} ` : ''}{h.name}</span>
+                      <span className="tabular-nums text-zinc-500">{st.current}d</span>
+                    </div>
                   );
                 })}
               </div>
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-1">Progress ({monthName.slice(0, 3)})</p>
-              <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
-              <p className="ht-label mt-1.5 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
-              <BarRow items={monthBars} height={44} labelEvery={5} />
+              <p className="ht-label mb-1">Progress (month)</p>
+              <div className="flex items-center gap-3">
+                <ProgressRing value={todayScore} size={72} />
+                <div className="text-[11px] text-zinc-500">
+                  <p>{habits.length - todayLeft.length}/{habits.length} habits today</p>
+                  <p className="mt-1">{Math.round(todayScore * 100)}% complete</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -163,3 +149,72 @@ export function HomeView({
     </div>
   );
 }
+
+export function TrackView({
+  habits,
+  completions,
+  onToggle,
+}: {
+  habits: Habit[];
+  completions: HabitCompletion[];
+  onToggle: (habitId: string, date: string) => void;
+}) {
+  const done = useMemo(() => doneSet(completions), [completions]);
+  const today = todayIso();
+  const [month, setMonth] = useState(() => new Date().getMonth());
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const days = monthDays(year, month);
+
+  return (
+    <div className="h-full w-full overflow-auto p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <p className="ht-label">Tracker</p>
+        <div className="flex items-center gap-2 text-sm">
+          <button type="button" className="rounded-lg px-2 py-1 hover:bg-zinc-100" onClick={() => {
+            if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1);
+          }}>←</button>
+          <span className="tabular-nums text-zinc-700">{year}-{String(month + 1).padStart(2, '0')}</span>
+          <button type="button" className="rounded-lg px-2 py-1 hover:bg-zinc-100" onClick={() => {
+            if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1);
+          }}>→</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="ht-table text-left">
+          <thead>
+            <tr>
+              <th className="sticky left-0 bg-[#f5f5f7] px-2 py-1 text-[10px] text-zinc-500">Habit</th>
+              {days.map((d) => (
+                <th key={d} className={`px-1 py-1 text-center text-[9px] tabular-nums ${d === today ? 'text-zinc-900' : 'text-zinc-400'}`}>{d.slice(8)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {habits.map((h) => (
+              <tr key={h.id} className="border-t border-zinc-200/60">
+                <td className="sticky left-0 bg-[#f5f5f7] px-2 py-1.5 text-[12px] text-zinc-800">
+                  {h.icon ? `${h.icon} ` : ''}{h.name}
+                </td>
+                {days.map((d) => {
+                  const on = isDone(done, h.id, d);
+                  return (
+                    <td key={d} className="px-1 py-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onToggle(h.id, d)}
+                        className={`h-5 w-5 rounded ${on ? 'bg-zinc-900' : 'bg-zinc-200/80 hover:bg-zinc-300'}`}
+                        aria-label={`${h.name} ${d}`}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export { HomeView as default };

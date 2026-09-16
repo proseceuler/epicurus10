@@ -52,6 +52,13 @@ html, body, #root {
 .rice-shell kbd {
   font-family: "JetBrains Mono", "Iosevka", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+.ht-label { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a; }
+.ht-shell { color: #18181b; }
+.ht-pane { min-width: 0; }
+.ht-card { border: 1px solid #e4e4e7; background: #fff; }
+.ht-flat { background: transparent; }
+.ht-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ht-hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .film-grain {
   pointer-events: none;
   position: fixed;
@@ -100,6 +107,30 @@ html, body, #root {
 @keyframes hud-blink {
   50% { opacity: 0; }
 }
+.hud-panel { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.hud-clock { line-height: 1.1; }
+.hud-clock-time {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: #18181b;
+  font-variant-numeric: tabular-nums;
+}
+.hud-clock-date {
+  font-size: 0.7rem;
+  color: #71717a;
+  text-transform: lowercase;
+}
+.hud-fetch { font-size: 0.7rem; line-height: 1.55; color: #3f3f46; }
+.hud-k { color: #a1a1aa; display: inline-block; min-width: 4.25rem; }
+.hud-link { color: #52525b; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.hud-link:hover { color: #18181b; }
+.hud-rule { border: 0; border-top: 1px solid #e4e4e7; margin: 0.4rem 0; }
+.hud-dot { width: 4px; height: 4px; border-radius: 999px; background: #18181b; display: inline-block; }
+.hud-dot-mid { background: #a1a1aa; }
+.hud-dot-dim { background: #d4d4d8; }
+.hud-awake { color: #18181b; }
+.dock-rail-item { display: flex; align-items: center; justify-content: center; }
 .rice-sidebar {
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   left: max(0.75rem, env(safe-area-inset-left));
@@ -280,27 +311,26 @@ html, body, #root {
   0% { width: 156px; opacity: 1; }
   100% { width: 88px; opacity: 0; }
 }
-.week-cols {
-  display: grid;
-}
+.week-cols { display: grid; }
 .week-hours {
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.week-hours::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
+.week-hours::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .rice-shell [data-global-dock] {
   right: max(1rem, env(safe-area-inset-right));
   bottom: max(1rem, env(safe-area-inset-bottom));
   overflow: visible;
   transition: right 280ms ease, left 280ms ease, bottom 280ms ease;
 }
-.rice-shell.assistant-open [data-global-dock] { right: calc(var(--assistant-w, 340px) + 1.5rem); left: auto; bottom: max(1rem, env(safe-area-inset-bottom)); transform: none; }
+.rice-shell.assistant-open [data-global-dock] {
+  right: calc(var(--assistant-w, 340px) + 1.5rem);
+  left: auto;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: none;
+}
 [data-global-dock] .dock-sheet {
   width: min(22rem, calc(100vw - 1.5rem));
   min-width: min(20rem, calc(100vw - 1.5rem));
@@ -309,14 +339,10 @@ html, body, #root {
   scrollbar-width: none !important;
 }
 [data-global-dock] .dock-sheet,
-[data-global-dock] .dock-sheet * {
-  scrollbar-width: none;
-}
+[data-global-dock] .dock-sheet * { scrollbar-width: none; }
 [data-global-dock] .dock-sheet::-webkit-scrollbar,
 [data-global-dock] .dock-sheet *::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  display: none; width: 0; height: 0;
 }
 [data-global-dock] .dock-rail::-webkit-scrollbar { display: none; width: 0; height: 0; }
 [data-global-dock] .dock-fab {
@@ -331,9 +357,7 @@ html, body, #root {
 }
 .rice-main { color: #27272a; }
 @media (min-width: 1280px) {
-  .rice-shell.assistant-open .rice-main {
-    max-width: calc(100vw - 5.5rem);
-  }
+  .rice-shell.assistant-open .rice-main { max-width: calc(100vw - 5.5rem); }
 }
 @media (prefers-reduced-motion: reduce) {
   .film-grain, .hud-cursor { animation: none; display: none; }
@@ -344,81 +368,7 @@ html, body, #root {
   }
 }
 
-/* Habit tracker + dashboard HUD (restored — was missing from truncated CSS) */
-.ht-shell { color: #27272a; }
-.ht-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #71717a;
-}
-.ht-pane {
-  border-radius: 1rem;
-  border: 1px solid rgba(24, 24, 27, 0.06);
-  background: rgba(255, 255, 255, 0.55);
-}
-.ht-card {
-  border-radius: 0.875rem;
-  border: 1px solid rgba(24, 24, 27, 0.06);
-  background: #fff;
-}
-.ht-flat { background: transparent; border: 0; }
-.ht-table { width: 100%; border-collapse: collapse; }
-.ht-hscroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-.hud-panel {
-  border-radius: 1rem;
-  border: 1px solid rgba(24, 24, 27, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(12px);
-}
-.hud-clock { font-variant-numeric: tabular-nums; }
-.hud-clock-time {
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #18181b;
-}
-.hud-clock-date {
-  font-size: 0.7rem;
-  color: #71717a;
-  text-transform: lowercase;
-}
-.hud-fetch { font-size: 0.75rem; line-height: 1.55; color: #3f3f46; }
-.hud-k { color: #a1a1aa; min-width: 4.5rem; display: inline-block; }
-.hud-link {
-  color: #52525b;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.hud-link:hover { color: #18181b; }
-.hud-rule {
-  border: 0;
-  border-top: 1px solid rgba(24, 24, 27, 0.08);
-  margin: 0.5rem 0;
-}
-.hud-dot {
-  display: inline-block;
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: #18181b;
-}
-.hud-dot-mid { background: #a1a1aa; }
-.hud-dot-dim { background: #d4d4d8; }
-.hud-awake { color: #18181b; }
-.dock-rail-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* --- slice-6 additive fixes --- */
+/* --- slice-6 additive --- */
 [data-global-dock] .dock-fab {
   width: 3.25rem !important;
   height: 3.25rem !important;

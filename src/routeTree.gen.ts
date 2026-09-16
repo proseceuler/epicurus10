@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicDictionaryRouteImport } from './routes/api/public/dictionary'
 import { Route as ApiPublicPomodoroLiveRouteImport } from './routes/api/public/pomodoro-live'
+import { Route as ApiPublicDbSyncRouteImport } from './routes/api/public/db-sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const ApiPublicPomodoroLiveRoute = ApiPublicPomodoroLiveRouteImport.update({
   path: '/api/public/pomodoro-live',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDbSyncRoute = ApiPublicDbSyncRouteImport.update({
+  id: '/api/public/db-sync',
+  path: '/api/public/db-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/public/dictionary': typeof ApiPublicDictionaryRoute
   '/api/public/pomodoro-live': typeof ApiPublicPomodoroLiveRoute
+  '/api/public/db-sync': typeof ApiPublicDbSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/public/dictionary': typeof ApiPublicDictionaryRoute
   '/api/public/pomodoro-live': typeof ApiPublicPomodoroLiveRoute
+  '/api/public/db-sync': typeof ApiPublicDbSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/public/dictionary': typeof ApiPublicDictionaryRoute
   '/api/public/pomodoro-live': typeof ApiPublicPomodoroLiveRoute
+  '/api/public/db-sync': typeof ApiPublicDbSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/dictionary' | '/api/public/pomodoro-live'
+  fullPaths: '/' | '/api/public/dictionary' | '/api/public/pomodoro-live' | '/api/public/db-sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/dictionary' | '/api/public/pomodoro-live'
-  id: '__root__' | '/' | '/api/public/dictionary' | '/api/public/pomodoro-live'
+  to: '/' | '/api/public/dictionary' | '/api/public/pomodoro-live' | '/api/public/db-sync'
+  id: '__root__' | '/' | '/api/public/dictionary' | '/api/public/pomodoro-live' | '/api/public/db-sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiPublicDictionaryRoute: typeof ApiPublicDictionaryRoute
   ApiPublicPomodoroLiveRoute: typeof ApiPublicPomodoroLiveRoute
+  ApiPublicDbSyncRoute: typeof ApiPublicDbSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPomodoroLiveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/db-sync': {
+      id: '/api/public/db-sync'
+      path: '/api/public/db-sync'
+      fullPath: '/api/public/db-sync'
+      preLoaderRoute: typeof ApiPublicDbSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiPublicDictionaryRoute: ApiPublicDictionaryRoute,
   ApiPublicPomodoroLiveRoute: ApiPublicPomodoroLiveRoute,
+  ApiPublicDbSyncRoute: ApiPublicDbSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

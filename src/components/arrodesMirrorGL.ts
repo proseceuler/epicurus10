@@ -19,6 +19,9 @@ export function draw(
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  // Ensure full canvas is drawn (avoids stale half-frame / diagonal leftover)
+  gl.clearColor(0.43, 0.45, 0.48, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
   gl.uniform2f(gl.getUniformLocation(prog, 'uRes'), canvas.width, canvas.height);
   gl.uniform1f(gl.getUniformLocation(prog, 'uTime'), time);
   const modeId = mode === 'listening' ? 1 : mode === 'thinking' ? 2 : mode === 'speaking' ? 3 : 0;
@@ -32,7 +35,7 @@ export function draw(
   gl.uniform2f(gl.getUniformLocation(prog, 'uHoverOrigin'), hoverPt.x, hoverPt.y);
   gl.uniform1f(gl.getUniformLocation(prog, 'uSplash'), time - splash.t);
   gl.uniform2f(gl.getUniformLocation(prog, 'uSplashOrigin'), splash.x, splash.y);
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 function proceduralPulse(t: number, mode: ArrodesVoiceMode) {
@@ -78,7 +81,9 @@ export function listenMic(mode: ArrodesVoiceMode, onBands: (b: Bands) => void) {
         onBands(bandsFromAnalyser(freq, time));
       };
       tick();
-    } catch { onBands(EMPTY); }
+    } catch {
+      onBands(EMPTY);
+    }
   };
   void run();
   return () => {
@@ -86,37 +91,40 @@ export function listenMic(mode: ArrodesVoiceMode, onBands: (b: Bands) => void) {
     cancelAnimationFrame(raf);
     stream?.getTracks().forEach((t) => t.stop());
     void ctx?.close();
-    onBands(EMPTY);
   };
 }
 
 function bandsFromAnalyser(freq: Uint8Array, time: Uint8Array): Bands {
-  let rms = 0;
-  for (let i = 0; i < time.length; i++) {
-    const v = (time[i] - 128) / 128;
-    rms += v * v;
-  }
-  rms = Math.sqrt(rms / time.length);
-  const slice = (from: number, to: number) => {
-    let s = 0;
-    const a = Math.max(0, from);
-    const b = Math.min(freq.length, to);
-    for (let i = a; i < b; i++) s += freq[i];
-    return b > a ? s / ((b - a) * 255) : 0;
+  let sum = 0;
+  for (let i = 0; i < time.length; i++) sum += Math.abs(time[i] - 128);
+  const amp = Math.min(1, (sum / time.length) / 40);
+  const bin = (lo: number, hi: number) => {
+    let s = 0, n = 0;
+    for (let i = lo; i < hi && i < freq.length; i++) { s += freq[i]; n++; }
+    return n ? s / n / 255 : 0;
   };
-  return { amp: clamp01(rms * 3.2), bass: clamp01(slice(1, 6) * 1.6), mid: clamp01(slice(6, 24) * 1.8), treble: clamp01(slice(24, 80) * 2.1) };
+  return {
+    amp,
+    bass: bin(1, 6),
+    mid: bin(6, 24),
+    treble: bin(24, 64),
+  };
 }
+
+function clamp01(v: number) { return Math.max(0, Math.min(1, v)); }
 
 export function compile(gl: WebGLRenderingContext, type: number, src: string) {
   const sh = gl.createShader(type);
   if (!sh) return null;
   gl.shaderSource(sh, src);
   gl.compileShader(sh);
-  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { gl.deleteShader(sh); return null; }
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    console.warn(gl.getShaderInfoLog(sh));
+    gl.deleteShader(sh);
+    return null;
+  }
   return sh;
 }
-
-function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
 
 export const VERT = `
 attribute vec2 aPos;

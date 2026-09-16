@@ -92,12 +92,12 @@ export function HomeView({
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <div className="mx-auto flex h-full w-full max-w-[1440px] items-center justify-center gap-6 px-3 lg:gap-10">
-        <div className="w-[300px] shrink-0 sm:w-[360px] lg:w-[440px] xl:w-[520px] overflow-visible">
+      <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col items-center justify-center gap-6 px-3 md:flex-row lg:gap-10">
+        <div className="w-[min(72vw,280px)] shrink-0 overflow-visible sm:w-[320px] md:w-[300px] lg:w-[440px] xl:w-[520px]">
           <BlackHole variant="home" className="aspect-square w-full bg-transparent" />
         </div>
-        <div className="min-w-0 max-w-[860px] flex-1">
-          <div className="grid grid-cols-3 items-start gap-x-6 gap-y-5 lg:gap-x-8 lg:gap-y-6">
+        <div className="min-w-0 w-full max-w-[860px] flex-1">
+          <div className="grid grid-cols-2 items-start gap-x-4 gap-y-4 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-5 lg:gap-x-8 lg:gap-y-6">
             <div className="min-w-0">
               <p className="ht-label mb-2">Quick Actions</p>
               <ul className="space-y-1.5 text-[13px] leading-snug text-zinc-700">

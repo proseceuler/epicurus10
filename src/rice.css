@@ -53,12 +53,6 @@ html, body, #root {
   font-family: "JetBrains Mono", "Iosevka", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 .ht-label { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a; }
-.ht-shell { color: #18181b; }
-.ht-pane { min-width: 0; }
-.ht-card { border: 1px solid #e4e4e7; background: #fff; }
-.ht-flat { background: transparent; }
-.ht-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.ht-hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .film-grain {
   pointer-events: none;
   position: fixed;
@@ -107,30 +101,110 @@ html, body, #root {
 @keyframes hud-blink {
   50% { opacity: 0; }
 }
-.hud-panel { font-family: "JetBrains Mono", ui-monospace, monospace; }
-.hud-clock { line-height: 1.1; }
+.hud-sigil { color: #27272a; transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease; }
+.hud-sigil-frame { width: auto; min-height: 0; display: flex; align-items: center; }
+.hud-sigil-frame pre { width: auto; white-space: pre; }
+.hud-awake .hud-sigil { color: #18181b; text-shadow: 0 0 24px rgba(24, 24, 27, 0.18); }
+.hud-term {
+  overflow: hidden;
+  border: 1px solid #c4c4c8;
+  border-radius: 8px;
+  background: #f3f3f5;
+  box-shadow: 0 0 0 1px rgba(24,24,27,0.04);
+  font-family: "JetBrains Mono", "Iosevka", ui-monospace, monospace;
+}
+.hud-term-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #d4d4d8;
+  background: #ececef;
+  color: #71717a;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.hud-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #a1a1aa;
+  flex: none;
+}
+.hud-dot-mid { background: #c4c4c8; }
+.hud-dot-dim { background: #d4d4d8; }
+.hud-term-title { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-term-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+@media (min-width: 1280px) {
+  .hud-term-body {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+}
+.hud-term-art { flex: none; padding-right: 8px; }
+.hud-term-div {
+  display: none;
+  margin: 0 16px;
+  padding: 0;
+  color: #d4d4d8;
+  font-size: 13px;
+  line-height: 1.15;
+  user-select: none;
+}
+@media (min-width: 1280px) {
+  .hud-term-div { display: block; }
+}
+.hud-fetch {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #52525b;
+}
+.hud-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px;
+}
 .hud-clock-time {
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
   color: #18181b;
   font-variant-numeric: tabular-nums;
 }
 .hud-clock-date {
-  font-size: 0.7rem;
-  color: #71717a;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: lowercase;
+  color: #71717a;
 }
-.hud-fetch { font-size: 0.7rem; line-height: 1.55; color: #3f3f46; }
-.hud-k { color: #a1a1aa; display: inline-block; min-width: 4.25rem; }
-.hud-link { color: #52525b; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.hud-rule {
+  margin: 0 0 2px;
+  letter-spacing: -0.08em;
+  color: #a1a1aa;
+}
+.hud-k {
+  display: inline-block;
+  width: 7.5rem;
+  letter-spacing: 0.12em;
+  color: #71717a;
+}
+.hud-link {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #52525b;
+}
 .hud-link:hover { color: #18181b; }
-.hud-rule { border: 0; border-top: 1px solid #e4e4e7; margin: 0.4rem 0; }
-.hud-dot { width: 4px; height: 4px; border-radius: 999px; background: #18181b; display: inline-block; }
-.hud-dot-mid { background: #a1a1aa; }
-.hud-dot-dim { background: #d4d4d8; }
-.hud-awake { color: #18181b; }
-.dock-rail-item { display: flex; align-items: center; justify-content: center; }
 .rice-sidebar {
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   left: max(0.75rem, env(safe-area-inset-left));

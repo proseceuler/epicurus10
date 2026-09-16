@@ -91,6 +91,11 @@ async function pullRemote() {
     if (remote.updatedAt <= localAt || remote.updatedAt <= lastPushedAt) return;
     applyRemote(remote.db, remote.updatedAt);
     lastPushedAt = remote.updatedAt;
+    // Drop in-memory caches so UI reflects the remote DB
+    if (sessionStorage.getItem("epicure:synced-at") !== String(remote.updatedAt)) {
+      sessionStorage.setItem("epicure:synced-at", String(remote.updatedAt));
+      location.reload();
+    }
   } catch { /* offline */ }
 }
 
@@ -107,7 +112,7 @@ export function startDbSync() {
 
   window.addEventListener(DB_CHANGED, ((e: CustomEvent) => {
     if (e.detail?.remote) return;
-    if (!readMeta()) writeMeta(Date.now());
+    writeMeta(Date.now());
     void pushLocal();
   }) as EventListener);
 

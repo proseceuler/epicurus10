@@ -253,7 +253,6 @@ html, body, #root {
   width: 108px;
   aspect-ratio: 420 / 520;
   overflow: hidden;
-  contain: paint;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }
@@ -291,9 +290,9 @@ html, body, #root {
   overflow: visible;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: -14%;
-  width: 128%;
-  height: 128%;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
 }
 .arrodes-orbit[data-variant='home'] {
   overflow: visible;
@@ -372,7 +371,7 @@ html, body, #root {
 .arrodes-frame {
   z-index: 5;
   pointer-events: none;
-  object-fit: fill;
+  object-fit: contain;
   object-position: center;
   opacity: 1;
 }

@@ -372,10 +372,11 @@ html, body, #root {
     linear-gradient(165deg, rgba(70, 74, 80, 0.08) 0%, rgba(32, 33, 38, 0.14) 100%);
 }
 .arrodes-frame {
-  z-index: 3;
+  z-index: 5;
   pointer-events: none;
-  object-fit: contain;
+  object-fit: fill;
   object-position: center;
+  opacity: 1;
 }
 .arrodes-stage[data-exit='1'] { pointer-events: none; }
 @keyframes arrodes-float {

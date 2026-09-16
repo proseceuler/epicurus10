@@ -14,10 +14,19 @@ const holeMask = {
   maskMode: 'luminance' as const,
 };
 
+function resolveFrameSrc() {
+  const override = getArrodesFramePng();
+  // Only accept a real image URL — broken localStorage values hide the silver frame
+  if (override && (override.startsWith('data:image/') || override.startsWith('http'))) {
+    return override;
+  }
+  return ARRODES_FRAME;
+}
+
 function useFrameSrc() {
-  const [src, setSrc] = useState(() => getArrodesFramePng() || ARRODES_FRAME);
+  const [src, setSrc] = useState(resolveFrameSrc);
   useEffect(() => {
-    const read = () => setSrc(getArrodesFramePng() || ARRODES_FRAME);
+    const read = () => setSrc(resolveFrameSrc());
     const onStorage = (e: StorageEvent) => {
       if (!e.key || e.key === ARRODES_FRAME_PNG) read();
     };
@@ -68,47 +77,58 @@ export default function ArrodesVoiceMirror({
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, 'aPos');
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a_pos');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const resize = () => {
-      const el = wrapRef.current;
-      if (!el) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.floor(el.clientWidth * dpr));
-      const h = Math.max(1, Math.floor(el.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-    };
+    const uRes = gl.getUniformLocation(prog, 'u_res');
+    const uTime = gl.getUniformLocation(prog, 'u_time');
+    const uMode = gl.getUniformLocation(prog, 'u_mode');
+    const uBands = gl.getUniformLocation(prog, 'u_bands');
+    const uHover = gl.getUniformLocation(prog, 'u_hover');
+    const uHoverPt = gl.getUniformLocation(prog, 'u_hover_pt');
+    const uSplash = gl.getUniformLocation(prog, 'u_splash');
+    let stopMic: (() => void) | null = null;
+    if (active) stopMic = listenMic((b) => { bandsRef.current = b; });
     startRef.current = performance.now();
-    const tick = (now: number) => {
-      rafRef.current = requestAnimationFrame(tick);
-      resize();
-      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.065;
-      hoverPtAmtRef.current = {
-        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12,
-        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12,
-      };
-      draw(
-        gl,
-        prog,
-        canvas,
-        (now - startRef.current) / 1000,
-        modeRef.current,
-        bandsRef.current,
-        hoverAmtRef.current,
-        hoverPtAmtRef.current,
-        splashRef.current,
-      );
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        gl.viewport(0, 0, w, h);
+      }
     };
-    rafRef.current = requestAnimationFrame(tick);
-    resize();
-    return () => { cancelAnimationFrame(rafRef.current); gl.deleteProgram(prog); };
-  }, []);
-
-  useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);
+    const modeMap: Record<string, number> = { idle: 0, listening: 1, thinking: 2, speaking: 3 };
+    const loop = (t: number) => {
+      rafRef.current = requestAnimationFrame(loop);
+      resize();
+      const sec = (t - startRef.current) / 1000;
+      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.08;
+      hoverPtAmtRef.current.x += (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12;
+      hoverPtAmtRef.current.y += (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12;
+      gl.useProgram(prog);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, sec);
+      gl.uniform1f(uMode, modeMap[modeRef.current] ?? 0);
+      const b = bandsRef.current;
+      gl.uniform4f(uBands, b.bass, b.mid, b.treble, b.level);
+      gl.uniform1f(uHover, hoverAmtRef.current);
+      gl.uniform2f(uHoverPt, hoverPtAmtRef.current.x, hoverPtAmtRef.current.y);
+      gl.uniform3f(uSplash, splashRef.current.t, splashRef.current.x, splashRef.current.y);
+      draw(gl);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      stopMic?.();
+    };
+  }, [active]);
 
   useEffect(() => {
     const well = wrapRef.current;
@@ -118,7 +138,7 @@ export default function ArrodesVoiceMirror({
       const r = well.getBoundingClientRect();
       return {
         x: (e.clientX - r.left) / Math.max(1, r.width),
-        y: 1 - (e.clientY - r.top) / Math.max(1, r.height),
+        y: (e.clientY - r.top) / Math.max(1, r.height),
       };
     };
     const onEnter = (e: PointerEvent) => {
@@ -160,7 +180,13 @@ export default function ArrodesVoiceMirror({
       <div ref={wrapRef} className="arrodes-well" role="button" tabIndex={0} title="Hover the glass. Click for a puddle.">
         <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
         <div className="arrodes-glass" aria-hidden style={holeMask} />
-        <img className="arrodes-frame" src={frameSrc} alt="" draggable={false} />
+        <img
+          className="arrodes-frame"
+          src={frameSrc}
+          alt=""
+          draggable={false}
+          style={{ zIndex: 5, opacity: 1, objectFit: 'fill' }}
+        />
       </div>
     </div>
   );

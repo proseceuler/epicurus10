@@ -3,78 +3,81 @@ import type { Habit, HabitCompletion, Todo } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import BlackHole from '@/components/habits/BlackHole';
 import {
-  AreaChart,
-  BarChart,
-  Heatmap,
-  ProgressRing,
-} from '@/components/habits/charts';
+  AlertRow, AreaChart, BarRow, Ring, Spark,
+  chunkWeekly, habitWeekSeries, rateOn,
+} from '@/components/habits/widgets';
 import {
-  completionRate,
-  dayKey,
-  doneSet,
-  isDone,
-  monthDays,
-  monthMatrix,
-  scoreSeries,
-  streakFor,
-  todayIso,
-  weekdayAvg,
-  weekKey,
+  MONTHS, WEEKDAYS, isDone, lastNDays, monthDays, type DayCell,
 } from '@/lib/habit-stats';
 
 export type View = 'home' | 'track' | 'dash' | 'insights';
 
-type Go = (v: View) => void;
+function weekPct(habits: Habit[], week: DayCell[], done: Set<string>) {
+  if (!habits.length || !week.length) return 0;
+  const slots = habits.length * week.length;
+  const got = week.reduce((s, d) => s + habits.filter((h) => isDone(done, h.id, d.dateStr)).length, 0);
+  return slots ? got / slots : 0;
+}
 
-function AlertRow({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'pending' | 'na' }) {
-  const cls =
-    tone === 'ok'
-      ? 'bg-emerald-50 text-emerald-700'
-      : tone === 'pending'
-        ? 'bg-zinc-100 text-zinc-600'
-        : 'bg-zinc-50 text-zinc-400';
-  return (
-    <div className="flex items-center justify-between gap-2 py-0.5">
-      <span className="text-[11px] text-zinc-600">{label}</span>
-      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{value}</span>
-    </div>
-  );
+function habitPct(h: Habit | undefined, days: { dateStr: string }[], done: Set<string>) {
+  if (!h || !days.length) return 0;
+  return days.filter((d) => isDone(done, h.id, d.dateStr)).length / days.length;
+}
+
+function momDelta(h: Habit, done: Set<string>) {
+  const now = new Date();
+  const tm = monthDays(now.getFullYear(), now.getMonth());
+  const lmMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+  const lmYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const lm = monthDays(lmYear, lmMonth);
+  return { mtd: habitPct(h, tm, done), mom: habitPct(h, tm, done) - habitPct(h, lm, done) };
+}
+
+function dayTone(pct: number) {
+  if (pct >= 0.85) return { bg: '#22c55e', fg: '#fff' };
+  if (pct >= 0.7) return { bg: '#84cc16', fg: '#18181b' };
+  if (pct >= 0.5) return { bg: '#eab308', fg: '#18181b' };
+  if (pct >= 0.3) return { bg: '#f97316', fg: '#fff' };
+  if (pct > 0) return { bg: '#ef4444', fg: '#fff' };
+  return { bg: '#f4f4f5', fg: '#a1a1aa' };
 }
 
 export function HomeView({
-  habits,
-  completions,
-  todos,
-  onGo,
+  habits, done, today, todayLeft, dailyScores, onGo,
 }: {
   habits: Habit[];
+  done: Set<string>;
+  today: string;
+  life: number;
+  todayLeft: Habit[];
+  dailyScores: { date: string; score: number }[];
   completions: HabitCompletion[];
-  todos: Todo[];
-  onGo: Go;
+  onGo: (v: View) => void;
 }) {
-  const done = useMemo(() => doneSet(completions), [completions]);
-  const today = todayIso();
-  const todayLeft = habits.filter((h) => !isDone(done, h.id, today));
-  const todayScore = habits.length ? (habits.length - todayLeft.length) / habits.length : 0;
-
-  const wave = useMemo(() => {
-    const days = monthDays(new Date().getFullYear(), new Date().getMonth());
-    return days.map((d) => {
-      if (!habits.length) return 0;
-      const n = habits.filter((h) => isDone(done, h.id, d)).length;
-      return n / habits.length;
+  const [todos, setTodos] = useState<Todo[]>([]);
+  useEffect(() => {
+    void supabase.from('todos').select('*').then(({ data }) => {
+      if (data) setTodos(data as Todo[]);
     });
-  }, [habits, done]);
-
-  const waveLabels = useMemo(() => {
-    const days = monthDays(new Date().getFullYear(), new Date().getMonth());
-    return days.map((d) => d.slice(8));
   }, []);
 
-  const links = [
-    { label: '+ Update Habit Tracker', view: 'track' as const },
-    { label: '+ Habit Dashboard', view: 'dash' as const },
-    { label: '+ Habit Insights', view: 'insights' as const },
+  const last84 = lastNDays(84);
+  const weekly = chunkWeekly(habits, done, last84);
+  const daily = dailyScores.map((d) => d.score);
+  const wave = weekly.some((v) => v > 0) ? weekly : daily;
+  const waveLabels = last84.filter((_, i) => i % 7 === 0).map((d) => d.slice(5)).slice(-12);
+  const todayScore = rateOn(habits, today, done);
+  const last7 = lastNDays(7);
+  const dist = last7.map((d) => ({ key: d, value: rateOn(habits, d, done), label: ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(`${d}T00:00:00`).getDay()] }));
+  const monthDaysNow = monthDays(new Date().getFullYear(), new Date().getMonth());
+  const monthDone = habits.reduce((s, h) => s + monthDaysNow.filter((d) => isDone(done, h.id, d.dateStr)).length, 0);
+  const monthSlots = Math.max(1, habits.length * monthDaysNow.length);
+  const monthBars = monthDaysNow.map((d) => ({ key: d.dateStr, value: rateOn(habits, d.dateStr, done), label: String(d.day) }));
+  const monthName = MONTHS[new Date().getMonth()];
+  const links: { label: string; view: View }[] = [
+    { label: '+ Update Habit Tracker', view: 'track' },
+    { label: '+ Habit Dashboard', view: 'dash' },
+    { label: '+ Habit Insights', view: 'insights' },
   ];
 
   const priorities = todos.filter((t) => t.priority === 'urgent_important' && !t.completed);
@@ -86,10 +89,6 @@ export function HomeView({
     if (empty) return 'na';
     return doneFlag ? 'ok' : 'pending';
   };
-
-  const monthDone = habits.length
-    ? habits.reduce((acc, h) => acc + (isDone(done, h.id, today) ? 1 : 0), 0)
-    : 0;
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
@@ -112,7 +111,7 @@ export function HomeView({
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Completion %</p>
               <p className="mb-1 text-[9px] text-zinc-500">Last 12 Weeks Completion</p>
-              <AreaChart values={wave.slice(-12)} labels={waveLabels.slice(-12)} height={78} />
+              <AreaChart values={wave.slice(-12)} labels={waveLabels} height={78} />
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-0.5">Alerts</p>
@@ -125,37 +124,34 @@ export function HomeView({
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-1">Daily Score Distribution</p>
-              <BarChart
-                values={weekdayAvg(habits, done).map((v) => Math.round(v * 100))}
-                labels={['F', 'S', 'S', 'M', 'T', 'W', 'T']}
-                height={72}
-              />
+              <BarRow items={dist} height={84} showValue />
             </div>
             <div className="min-w-0">
               <p className="ht-label mb-1">Trend</p>
-              <div className="space-y-1 text-[11px]">
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
-                  <span>Habit</span><span>MTD %</span><span>MoM %</span><span>12 wk</span>
-                </div>
-                {habits.slice(0, 6).map((h) => {
-                  const st = streakFor(h.id, done);
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 gap-y-1 text-[11px]">
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">Habit</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MTD %</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">MoM %</span>
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500">12 Wk</span>
+                {habits.map((h) => {
+                  const { mtd, mom } = momDelta(h, done);
+                  const up = mom >= 0;
                   return (
-                    <div key={h.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-2">
-                      <span className="truncate text-zinc-700">{h.icon ? `${h.icon} ` : ''}{h.name}</span>
-                      <span className="tabular-nums text-zinc-500">0%</span>
-                      <span className="tabular-nums text-zinc-500">▲ 0%</span>
-                      <span className="h-1 w-8 rounded bg-zinc-200" />
-                    </div>
+                    <Fragment key={h.id}>
+                      <span className="truncate text-zinc-700">{h.emoji} {h.name}</span>
+                      <span className="tabular-nums text-zinc-600">{Math.round(mtd * 100)}%</span>
+                      <span className={`tabular-nums ${up ? 'text-emerald-600' : 'text-red-500'}`}>{up ? '▲' : '▼'} {Math.abs(Math.round(mom * 100))}%</span>
+                      <span><Spark values={habitWeekSeries(h.id, done)} width={48} /></span>
+                    </Fragment>
                   );
                 })}
               </div>
             </div>
             <div className="min-w-0">
-              <p className="ht-label mb-1">Progress (Sep)</p>
-              <div className="flex flex-col items-start gap-2">
-                <ProgressRing value={todayScore} size={88} />
-                <p className="text-[10px] text-zinc-500">{monthDone}/{Math.max(habits.length, 1) * 30} Habits Done</p>
-              </div>
+              <p className="ht-label mb-1">Progress ({monthName.slice(0, 3)})</p>
+              <Ring value={(monthDone / monthSlots) * 100} caption={`${monthDone}/${monthSlots} Habits Done`} />
+              <p className="ht-label mt-1.5 mb-0.5">{monthName.slice(0, 3)}'s Daily Performance % Trend</p>
+              <BarRow items={monthBars} height={44} labelEvery={5} />
             </div>
           </div>
         </div>

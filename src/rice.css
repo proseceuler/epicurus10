@@ -1,8 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap");
 
-/* Apple-quiet monochrome shell — original zinc base, ASCII stays grayscale */
-/* vercel rebuild 2026-09-13 04:55 — bff8977 home disc, compact tracker */
-
 html, body, #root {
   background: #f5f5f7;
   overflow-x: clip;
@@ -98,9 +95,7 @@ html, body, #root {
   vertical-align: -0.12em;
   animation: hud-blink 1.05s steps(1) infinite;
 }
-@keyframes hud-blink {
-  50% { opacity: 0; }
-}
+@keyframes hud-blink { 50% { opacity: 0; } }
 .hud-sigil { color: #27272a; transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease; }
 .hud-sigil-frame { width: auto; min-height: 0; display: flex; align-items: center; }
 .hud-sigil-frame pre { width: auto; white-space: pre; }
@@ -276,12 +271,14 @@ html, body, #root {
   height: 100%;
   perspective: 820px;
   cursor: pointer;
+  overflow: visible;
 }
 .arrodes-orbit .arrodes-tilt {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  z-index: 2;
   transform: rotateX(18deg) rotateZ(-9deg);
   transform-style: preserve-3d;
+  pointer-events: none;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-tilt { transform: rotateX(18deg) rotateZ(-9deg); }
 .arrodes-orbit[data-variant='track'] .arrodes-tilt { transform: rotateX(16deg) rotateZ(-8deg); }
@@ -291,11 +288,16 @@ html, body, #root {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  overflow: visible;
 }
 .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-  inset: -6%;
-  width: 112%;
-  height: 112%;
+  inset: -18%;
+  width: 136%;
+  height: 136%;
+  z-index: 0;
+}
+.arrodes-orbit[data-variant='home'] {
+  overflow: visible;
 }
 .arrodes-disc {
   position: absolute;

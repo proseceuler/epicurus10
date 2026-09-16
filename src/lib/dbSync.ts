@@ -2,8 +2,6 @@
  * Live cross-device sync for the localStorage DB (todos, habits, notes, …).
  * Polls a shared server snapshot; applies without page reload.
  */
-import { hydrateDbFromStorage } from '@/lib/supabase';
-
 const STORAGE_KEY = 'epicure:db';
 const META_KEY = 'epicure:db:meta';
 const DB_CHANGED = 'epicure-db-changed';
@@ -56,10 +54,8 @@ function applyRemote(db: unknown, updatedAt: number) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
     writeMeta(updatedAt);
+    // Next supabase.from() re-reads localStorage (load() checks this flag)
     (window as unknown as { __epicureDbBust?: boolean }).__epicureDbBust = true;
-    try {
-      hydrateDbFromStorage();
-    } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent(DB_CHANGED, { detail: { at: updatedAt, remote: true } }));
     window.dispatchEvent(new CustomEvent(DATA_CHANGED, { detail: { remote: true } }));
   } finally {

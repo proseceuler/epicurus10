@@ -65,7 +65,12 @@ export default function ArrodesVoiceMirror({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true });
+    const gl = canvas.getContext('webgl', {
+      alpha: true,
+      premultipliedAlpha: false,
+      antialias: true,
+      powerPreference: 'default',
+    }) as WebGLRenderingContext | null;
     if (!gl) return;
     const vs = compile(gl, gl.VERTEX_SHADER, VERT);
     const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
@@ -79,7 +84,6 @@ export default function ArrodesVoiceMirror({
     gl.useProgram(prog);
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    // Two triangles covering the full clip space (unambiguous full-canvas coverage)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       -1, -1,  1, -1,  -1, 1,
       -1,  1,  1, -1,   1, 1,
@@ -92,13 +96,19 @@ export default function ArrodesVoiceMirror({
       const el = wrapRef.current;
       if (!el) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.floor(el.clientWidth * dpr));
-      const h = Math.max(1, Math.floor(el.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      const cw = el.clientWidth || el.getBoundingClientRect().width;
+      const ch = el.clientHeight || el.getBoundingClientRect().height;
+      const w = Math.max(1, Math.floor(cw * dpr));
+      const h = Math.max(1, Math.floor(ch * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
     };
     startRef.current = performance.now();
     const tick = (now: number) => {
       rafRef.current = requestAnimationFrame(tick);
+      if (gl.isContextLost()) return;
       resize();
       hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.065;
       hoverPtAmtRef.current = {
@@ -119,7 +129,21 @@ export default function ArrodesVoiceMirror({
     };
     rafRef.current = requestAnimationFrame(tick);
     resize();
-    return () => { cancelAnimationFrame(rafRef.current); gl.deleteProgram(prog); };
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => resize())
+      : null;
+    if (wrapRef.current && ro) ro.observe(wrapRef.current);
+    const onLost = (e: Event) => { e.preventDefault(); };
+    const onRestored = () => { resize(); };
+    canvas.addEventListener('webglcontextlost', onLost, false);
+    canvas.addEventListener('webglcontextrestored', onRestored, false);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      ro?.disconnect();
+      canvas.removeEventListener('webglcontextlost', onLost);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+      gl.deleteProgram(prog);
+    };
   }, []);
 
   useEffect(() => listenMic(mode, (bands) => { bandsRef.current = bands; }), [mode]);

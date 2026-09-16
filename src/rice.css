@@ -1,1 +1,19 @@
-PLACEHOLDER
+@import './rice-part1.css';
+@import './rice-part2.css';
+
+/* mobile portal: WebGL must not get CSS grayscale */
+.rice-shell.rice-shell--mono canvas.arrodes-blob,
+.rice-shell.rice-shell--mono canvas.arrodes-disc {
+  filter: none !important;
+}
+.arrodes-blob { display: block; }
+@media (max-width: 1023px) {
+  .arrodes-stage[data-variant='home'] .arrodes-well {
+    width: min(72vw, 280px);
+    max-width: 280px;
+  }
+  .arrodes-orbit[data-variant='home'] { overflow: visible; }
+  .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
+    inset: -8%; width: 116%; height: 116%;
+  }
+}

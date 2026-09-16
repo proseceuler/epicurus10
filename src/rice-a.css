@@ -1,0 +1,122 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap");
+
+html, body, #root {
+  background: #f5f5f7;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+.rice-shell {
+  --rice-bg: #f5f5f7;
+  --rice-accent: #18181b;
+  --assistant-w: 340px;
+  color: #3f3f46;
+  font-family: Outfit, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  max-width: 100vw;
+  overflow: hidden;
+}
+.rice-shell.rice-shell--mono { filter: none; }
+.rice-shell.rice-shell--mono .rice-sidebar,
+.rice-shell.rice-shell--mono .rice-main,
+.rice-shell.rice-shell--mono [data-global-dock],
+.rice-shell.rice-shell--mono .film-grain {
+  filter: grayscale(1);
+}
+.rice-shell.rice-shell--mono img,
+.rice-shell.rice-shell--mono video,
+.rice-shell.rice-shell--mono canvas { filter: grayscale(1); }
+.rice-shell.rice-shell--notes { filter: none; }
+.rice-shell.rice-shell--notes .rice-sidebar,
+.rice-shell.rice-shell--notes .rice-chrome,
+.rice-shell.rice-shell--notes [data-global-dock] { filter: grayscale(1); }
+.rice-shell .chrome-badge,
+.rice-shell [data-chrome-badge],
+.rice-shell--notes .chrome-badge,
+.rice-shell--notes [data-chrome-badge],
+.rice-shell--notes .rice-sidebar .chrome-badge,
+.rice-shell--notes [data-global-dock] .chrome-badge {
+  background: #3f3f46 !important;
+  color: #fff !important;
+  filter: grayscale(1) !important;
+}
+.rice-shell .font-mono,
+.rice-shell .hud-sigil,
+.rice-shell .hud-term,
+.rice-shell .hud-term *,
+.rice-shell .hud-fetch,
+.rice-shell .hud-fetch *,
+.rice-shell .hud-cursor,
+.rice-shell kbd {
+  font-family: "JetBrains Mono", "Iosevka", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.ht-label { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a; }
+.film-grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+.glass-dark {
+  background: rgba(24, 24, 27, 0.92);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+.epic-glass-sheet {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02), 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+.glass-input {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(24, 24, 27, 0.08);
+}
+.epic-press { transition: transform 120ms ease; }
+.epic-press:active { transform: scale(0.97); }
+.epic-press-down { transition: transform 120ms ease; }
+.epic-press-down:active { transform: scale(0.97) translateY(1px); }
+.hud-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  background: #18181b;
+  vertical-align: -0.12em;
+  animation: hud-blink 1.05s steps(1) infinite;
+}
+@keyframes hud-blink { 50% { opacity: 0; } }
+.hud-sigil { color: #27272a; transition: color 700ms ease, text-shadow 700ms ease, filter 700ms ease; }
+.hud-sigil-frame { width: auto; min-height: 0; display: flex; align-items: center; }
+.hud-sigil-frame pre { width: auto; white-space: pre; }
+.hud-awake .hud-sigil { color: #18181b; text-shadow: 0 0 24px rgba(24, 24, 27, 0.18); }
+.hud-term {
+  overflow: hidden;
+  border: 1px solid #c4c4c8;
+  border-radius: 8px;
+  background: #f3f3f5;
+  box-shadow: 0 0 0 1px rgba(24,24,27,0.04);
+  font-family: "JetBrains Mono", "Iosevka", ui-monospace, monospace;
+}
+.hud-term-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #d4d4d8;
+  background: #ececef;
+  color: #71717a;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}

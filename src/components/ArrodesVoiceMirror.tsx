@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ARRODES_FRAME, ARRODES_HOLE_MASK } from '@/components/arrodesFrame';
-import { CUSTOM_FRAME_HOLE_FALLBACK, holeMaskFromFrame } from '@/components/arrodesHoleMask';
 import { compile, draw, listenMic, EMPTY, VERT, type Bands } from '@/components/arrodesMirrorGL';
 import { FRAG } from '@/components/arrodesMirrorFrag';
 import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
@@ -8,14 +7,12 @@ import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
 export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type ArrodesVariant = 'dock' | 'home' | 'track';
 
-function holeMaskStyle(url: string) {
-  return {
-    WebkitMaskImage: `url("${url}")`,
-    maskImage: `url("${url}")`,
-    WebkitMaskMode: 'luminance' as const,
-    maskMode: 'luminance' as const,
-  };
-}
+const holeMask = {
+  WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`,
+  maskImage: `url("${ARRODES_HOLE_MASK}")`,
+  WebkitMaskMode: 'luminance' as const,
+  maskMode: 'luminance' as const,
+};
 
 function resolveFrameSrc() {
   const override = getArrodesFramePng();
@@ -64,23 +61,7 @@ export default function ArrodesVoiceMirror({
   const startRef = useRef(0);
   const frameSrc = useFrameSrc();
   const customFrame = frameSrc !== ARRODES_FRAME;
-  const [holeUrl, setHoleUrl] = useState(customFrame ? CUSTOM_FRAME_HOLE_FALLBACK : ARRODES_HOLE_MASK);
   modeRef.current = mode;
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!customFrame) {
-      setHoleUrl(ARRODES_HOLE_MASK);
-      return;
-    }
-    setHoleUrl(CUSTOM_FRAME_HOLE_FALLBACK);
-    void holeMaskFromFrame(frameSrc).then((url) => {
-      if (!cancelled && url) setHoleUrl(url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [frameSrc, customFrame]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -222,8 +203,6 @@ export default function ArrodesVoiceMirror({
     };
   }, []);
 
-  const mask = holeMaskStyle(holeUrl);
-
   return (
     <div
       className="arrodes-stage"
@@ -244,8 +223,8 @@ export default function ArrodesVoiceMirror({
           ['--arrodes-frame-src' as string]: `url("${frameSrc}")`,
         }}
       >
-        <canvas ref={canvasRef} className="arrodes-blob" style={mask} />
-        <div className="arrodes-glass" aria-hidden style={mask} />
+        <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
+        <div className="arrodes-glass" aria-hidden style={holeMask} />
         <img
           className="arrodes-frame"
           src={frameSrc}

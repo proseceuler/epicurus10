@@ -60,7 +60,6 @@ export default function ArrodesVoiceMirror({
   const rafRef = useRef(0);
   const startRef = useRef(0);
   const frameSrc = useFrameSrc();
-  const customFrame = frameSrc !== ARRODES_FRAME;
   modeRef.current = mode;
 
   useEffect(() => {
@@ -215,7 +214,6 @@ export default function ArrodesVoiceMirror({
       <div
         ref={wrapRef}
         className="arrodes-well"
-        data-custom-frame={customFrame ? '1' : '0'}
         role="button"
         tabIndex={0}
         title="Hover the glass. Click for a puddle."

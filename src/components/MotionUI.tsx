@@ -11,7 +11,7 @@ export function BodyPortal({ children }: { children: ReactNode }) {
 
 export function OverlayScrim({
   onClose,
-  className = 'absolute -inset-[120px]',
+  className = 'absolute inset-0 epic-scrim-expand',
   shown = true,
 }: {
   onClose?: () => void;

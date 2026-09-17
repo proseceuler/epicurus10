@@ -12,12 +12,6 @@ const holeMask = {
   maskImage: `url("${ARRODES_HOLE_MASK}")`,
   WebkitMaskMode: 'luminance' as const,
   maskMode: 'luminance' as const,
-  WebkitMaskSize: 'contain',
-  maskSize: 'contain',
-  WebkitMaskRepeat: 'no-repeat',
-  maskRepeat: 'no-repeat',
-  WebkitMaskPosition: 'center',
-  maskPosition: 'center',
 };
 
 function resolveFrameSrc() {

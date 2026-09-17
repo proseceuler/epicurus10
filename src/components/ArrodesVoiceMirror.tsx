@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ARRODES_FRAME, ARRODES_HOLE_MASK } from '@/components/arrodesFrame';
+import { CUSTOM_FRAME_HOLE_FALLBACK, holeMaskFromFrame } from '@/components/arrodesHoleMask';
 import { compile, draw, listenMic, EMPTY, VERT, type Bands } from '@/components/arrodesMirrorGL';
 import { FRAG } from '@/components/arrodesMirrorFrag';
 import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
@@ -7,12 +8,14 @@ import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
 export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type ArrodesVariant = 'dock' | 'home' | 'track';
 
-const holeMask = {
-  WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`,
-  maskImage: `url("${ARRODES_HOLE_MASK}")`,
-  WebkitMaskMode: 'luminance' as const,
-  maskMode: 'luminance' as const,
-};
+function holeMaskStyle(url: string) {
+  return {
+    WebkitMaskImage: `url("${url}")`,
+    maskImage: `url("${url}")`,
+    WebkitMaskMode: 'luminance' as const,
+    maskMode: 'luminance' as const,
+  };
+}
 
 function resolveFrameSrc() {
   const override = getArrodesFramePng();
@@ -60,7 +63,24 @@ export default function ArrodesVoiceMirror({
   const rafRef = useRef(0);
   const startRef = useRef(0);
   const frameSrc = useFrameSrc();
+  const customFrame = frameSrc !== ARRODES_FRAME;
+  const [holeUrl, setHoleUrl] = useState(customFrame ? CUSTOM_FRAME_HOLE_FALLBACK : ARRODES_HOLE_MASK);
   modeRef.current = mode;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!customFrame) {
+      setHoleUrl(ARRODES_HOLE_MASK);
+      return;
+    }
+    setHoleUrl(CUSTOM_FRAME_HOLE_FALLBACK);
+    void holeMaskFromFrame(frameSrc).then((url) => {
+      if (!cancelled && url) setHoleUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [frameSrc, customFrame]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -110,10 +130,10 @@ export default function ArrodesVoiceMirror({
       rafRef.current = requestAnimationFrame(tick);
       if (gl.isContextLost()) return;
       resize();
-      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.065;
+      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.045;
       hoverPtAmtRef.current = {
-        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12,
-        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12,
+        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.085,
+        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.085,
       };
       draw(
         gl,
@@ -159,20 +179,36 @@ export default function ArrodesVoiceMirror({
         y: 1 - (e.clientY - r.top) / Math.max(1, r.height),
       };
     };
+    const paintHover = (on: boolean, e?: PointerEvent) => {
+      well.style.setProperty('--arrodes-hover', on ? '1' : '0');
+      if (e) {
+        const r = well.getBoundingClientRect();
+        const hx = ((e.clientX - r.left) / Math.max(1, r.width)) * 100;
+        const hy = ((e.clientY - r.top) / Math.max(1, r.height)) * 100;
+        well.style.setProperty('--arrodes-hx', `${hx}%`);
+        well.style.setProperty('--arrodes-hy', `${hy}%`);
+      }
+    };
     const onEnter = (e: PointerEvent) => {
       hoverGoalRef.current = 1;
       hoverPtGoalRef.current = point(e);
+      paintHover(true, e);
     };
     const onMove = (e: PointerEvent) => {
       hoverGoalRef.current = 1;
       hoverPtGoalRef.current = point(e);
+      paintHover(true, e);
     };
-    const onLeave = () => { hoverGoalRef.current = 0; };
+    const onLeave = () => {
+      hoverGoalRef.current = 0;
+      paintHover(false);
+    };
     const onDown = (e: PointerEvent) => {
       e.preventDefault();
       const pt = point(e);
       splashRef.current = { t: (performance.now() - startRef.current) / 1000, x: pt.x, y: pt.y };
       hoverGoalRef.current = 1;
+      paintHover(true, e);
     };
     host.addEventListener('pointerenter', onEnter);
     host.addEventListener('pointermove', onMove);
@@ -186,6 +222,8 @@ export default function ArrodesVoiceMirror({
     };
   }, []);
 
+  const mask = holeMaskStyle(holeUrl);
+
   return (
     <div
       className="arrodes-stage"
@@ -195,9 +233,19 @@ export default function ArrodesVoiceMirror({
       data-variant={variant}
       data-exit={exiting ? '1' : '0'}
     >
-      <div ref={wrapRef} className="arrodes-well" role="button" tabIndex={0} title="Hover the glass. Click for a puddle.">
-        <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
-        <div className="arrodes-glass" aria-hidden style={holeMask} />
+      <div
+        ref={wrapRef}
+        className="arrodes-well"
+        data-custom-frame={customFrame ? '1' : '0'}
+        role="button"
+        tabIndex={0}
+        title="Hover the glass. Click for a puddle."
+        style={{
+          ['--arrodes-frame-src' as string]: `url("${frameSrc}")`,
+        }}
+      >
+        <canvas ref={canvasRef} className="arrodes-blob" style={mask} />
+        <div className="arrodes-glass" aria-hidden style={mask} />
         <img
           className="arrodes-frame"
           src={frameSrc}
@@ -205,6 +253,7 @@ export default function ArrodesVoiceMirror({
           draggable={false}
           style={{ zIndex: 5, opacity: 1, objectFit: 'contain' }}
         />
+        <div className="arrodes-frame-shine" aria-hidden />
       </div>
     </div>
   );

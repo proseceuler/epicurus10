@@ -12,40 +12,29 @@
   height: 100%;
 }
 .arrodes-stage[data-variant='home'] {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: none;
   margin: 0;
 }
 .arrodes-orbit[data-variant='home'] {
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  aspect-ratio: 486 / 600;
   overflow: visible;
 }
 .arrodes-stage[data-variant='home'] .arrodes-well {
-  width: min(100%, 280px);
-  max-width: 100%;
+  /* explicit px — % of an auto-sized stage collapses the portal to 0 */
+  width: 340px;
+  max-width: 340px;
   aspect-ratio: 486 / 600;
   animation-duration: 6.4s;
 }
-@media (min-width: 1024px) {
-  .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: min(100%, 340px);
-  }
-}
 .arrodes-orbit[data-variant='track'] {
-  width: min(176px, 100%);
-  height: auto;
-  aspect-ratio: 1 / 1;
-  max-width: 176px;
+  width: 176px;
+  height: 176px;
 }
 .arrodes-stage[data-variant='track'] {
   width: auto;
-  max-width: 100%;
 }
 .arrodes-stage[data-variant='track'] .arrodes-well {
-  width: min(78px, 44%);
+  width: 78px;
   max-width: 78px;
   aspect-ratio: 486 / 600;
   animation-duration: 5.6s;
@@ -65,8 +54,8 @@
 .arrodes-blob {
   z-index: 1;
   background: #6e737a;
-  -webkit-mask-size: contain;
-  mask-size: contain;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -75,8 +64,8 @@
 .arrodes-glass {
   z-index: 2;
   pointer-events: none;
-  -webkit-mask-size: contain;
-  mask-size: contain;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -203,55 +192,19 @@
   filter: none !important;
 }
 
-/* habit Home/Tracker: keep mercury + frame inside the column on tablet/phone */
-.ht-arrodes-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: min(280px, 72vw);
-  min-width: 0;
-}
-.ht-arrodes-col .arrodes-orbit,
-.ht-arrodes-col .arrodes-stage,
-.ht-arrodes-col .arrodes-tilt {
-  max-width: 100%;
-}
-.arrodes-blob,
-.arrodes-glass,
-.arrodes-frame {
-  max-width: 100%;
-  max-height: 100%;
-}
+/* tablet/phone: shrink the explicit well so it stays inside the orbit/frame */
 @media (max-width: 1023px) {
-  .arrodes-orbit[data-variant='home'] .arrodes-disc-stack {
-    inset: -3%;
-    width: 106%;
-    height: 106%;
-  }
-  .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: min(100%, 220px);
-  }
   .ht-shell {
     overflow-x: hidden;
   }
-  .ht-arrodes-col {
-    max-width: min(220px, 58vw);
+  .arrodes-stage[data-variant='home'] .arrodes-well {
+    width: 240px;
+    max-width: 240px;
   }
 }
 @media (max-width: 639px) {
   .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: min(100%, 176px);
-  }
-  .ht-arrodes-col {
-    max-width: min(176px, 64vw);
-  }
-  .arrodes-orbit[data-variant='track'] {
-    width: min(148px, 46vw);
-    max-width: 148px;
-  }
-  .arrodes-stage[data-variant='track'] .arrodes-well {
-    width: min(64px, 22vw);
-    max-width: 64px;
+    width: 200px;
+    max-width: 200px;
   }
 }

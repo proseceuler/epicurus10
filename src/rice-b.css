@@ -131,7 +131,6 @@
   width: 108px;
   aspect-ratio: 486 / 600;
   overflow: hidden;
-  isolation: isolate;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }

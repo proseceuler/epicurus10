@@ -100,7 +100,7 @@
 }
 .week-cols { display: grid; }
 .week-hours {
-  overflow-x-hidden;
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;

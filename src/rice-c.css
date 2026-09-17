@@ -49,12 +49,6 @@
   width: 100%;
   height: 100%;
 }
-.arrodes-well[data-custom-frame='1'] .arrodes-blob,
-.arrodes-well[data-custom-frame='1'] .arrodes-glass {
-  inset: 2.5% 11.5% 3.5% 11.5%;
-  width: auto;
-  height: auto;
-}
 .arrodes-blob {
   z-index: 1;
   background: #6e737a;

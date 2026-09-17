@@ -159,36 +159,20 @@ export default function ArrodesVoiceMirror({
         y: 1 - (e.clientY - r.top) / Math.max(1, r.height),
       };
     };
-    const paintHover = (on: boolean, e?: PointerEvent) => {
-      well.style.setProperty('--arrodes-hover', on ? '1' : '0');
-      if (e) {
-        const r = well.getBoundingClientRect();
-        const hx = ((e.clientX - r.left) / Math.max(1, r.width)) * 100;
-        const hy = ((e.clientY - r.top) / Math.max(1, r.height)) * 100;
-        well.style.setProperty('--arrodes-hx', `${hx}%`);
-        well.style.setProperty('--arrodes-hy', `${hy}%`);
-      }
-    };
     const onEnter = (e: PointerEvent) => {
       hoverGoalRef.current = 1;
       hoverPtGoalRef.current = point(e);
-      paintHover(true, e);
     };
     const onMove = (e: PointerEvent) => {
       hoverGoalRef.current = 1;
       hoverPtGoalRef.current = point(e);
-      paintHover(true, e);
     };
-    const onLeave = () => {
-      hoverGoalRef.current = 0;
-      paintHover(false);
-    };
+    const onLeave = () => { hoverGoalRef.current = 0; };
     const onDown = (e: PointerEvent) => {
       e.preventDefault();
       const pt = point(e);
       splashRef.current = { t: (performance.now() - startRef.current) / 1000, x: pt.x, y: pt.y };
       hoverGoalRef.current = 1;
-      paintHover(true, e);
     };
     host.addEventListener('pointerenter', onEnter);
     host.addEventListener('pointermove', onMove);
@@ -211,16 +195,7 @@ export default function ArrodesVoiceMirror({
       data-variant={variant}
       data-exit={exiting ? '1' : '0'}
     >
-      <div
-        ref={wrapRef}
-        className="arrodes-well"
-        role="button"
-        tabIndex={0}
-        title="Hover the glass. Click for a puddle."
-        style={{
-          ['--arrodes-frame-src' as string]: `url("${frameSrc}")`,
-        }}
-      >
+      <div ref={wrapRef} className="arrodes-well" role="button" tabIndex={0} title="Hover the glass. Click for a puddle.">
         <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
         <div className="arrodes-glass" aria-hidden style={holeMask} />
         <img
@@ -230,7 +205,6 @@ export default function ArrodesVoiceMirror({
           draggable={false}
           style={{ zIndex: 5, opacity: 1, objectFit: 'contain' }}
         />
-        <div className="arrodes-frame-shine" aria-hidden />
       </div>
     </div>
   );

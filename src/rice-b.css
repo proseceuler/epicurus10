@@ -130,7 +130,7 @@
   position: relative;
   width: 108px;
   aspect-ratio: 420 / 520;
-  overflow: hidden;
+  overflow: visible;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }
 .arrodes-stage[data-expanded='1'] .arrodes-well { width: 156px; }

@@ -218,3 +218,55 @@ select.glass-input,
   from { opacity: 0; transform: scale(0.6); }
   to { opacity: 0.8; transform: scale(1); }
 }
+
+/* Mobile/tablet: backdrop-filter + oversized dim layers are expensive. */
+.epic-scrim,
+.epic-scrim-blur {
+  contain: paint;
+  inset: 0;
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .epic-scrim.epic-scrim-expand {
+    inset: -80px;
+  }
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  .epic-scrim,
+  .epic-scrim-blur {
+    --epic-blur: 0px;
+    background: rgba(24, 24, 27, 0.48);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .epic-menu,
+  .epic-popover,
+  .epic-sheet,
+  .epic-glass-sheet,
+  .epic-glass-chip {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .epic-menu,
+  .epic-popover,
+  .epic-sheet,
+  .epic-glass-sheet {
+    background: rgba(255, 255, 255, 0.94);
+  }
+  .epic-glass-chip {
+    background: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .epic-scrim,
+  .epic-scrim-blur,
+  .epic-menu,
+  .epic-popover,
+  .epic-sheet,
+  .epic-glass-sheet,
+  .epic-glass-chip {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

@@ -12,6 +12,12 @@ const holeMask = {
   maskImage: `url("${ARRODES_HOLE_MASK}")`,
   WebkitMaskMode: 'luminance' as const,
   maskMode: 'luminance' as const,
+  WebkitMaskSize: 'contain',
+  maskSize: 'contain',
+  WebkitMaskRepeat: 'no-repeat',
+  maskRepeat: 'no-repeat',
+  WebkitMaskPosition: 'center',
+  maskPosition: 'center',
 };
 
 function resolveFrameSrc() {
@@ -95,7 +101,8 @@ export default function ArrodesVoiceMirror({
     const resize = () => {
       const el = wrapRef.current;
       if (!el) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const lite = window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;
+      const dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 2);
       const cw = el.clientWidth || el.getBoundingClientRect().width;
       const ch = el.clientHeight || el.getBoundingClientRect().height;
       const w = Math.max(1, Math.floor(cw * dpr));

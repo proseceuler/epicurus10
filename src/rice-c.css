@@ -3,6 +3,9 @@
   width: 112%;
   height: 112%;
 }
+.arrodes-orbit[data-variant='home'] {
+  overflow: visible;
+}
 .arrodes-disc--back { z-index: 1; }
 .arrodes-disc--front { z-index: 4; }
 .arrodes-disc {
@@ -16,14 +19,9 @@
   max-width: none;
   margin: 0;
 }
-.arrodes-orbit[data-variant='home'] {
-  overflow: visible;
-}
 .arrodes-stage[data-variant='home'] .arrodes-well {
-  /* explicit px — % of an auto-sized stage collapses the portal to 0 */
-  width: 340px;
+  width: min(68vw, 340px);
   max-width: 340px;
-  aspect-ratio: 486 / 600;
   animation-duration: 6.4s;
 }
 .arrodes-orbit[data-variant='track'] {
@@ -36,7 +34,6 @@
 .arrodes-stage[data-variant='track'] .arrodes-well {
   width: 78px;
   max-width: 78px;
-  aspect-ratio: 486 / 600;
   animation-duration: 5.6s;
 }
 .arrodes-well:hover,
@@ -190,21 +187,4 @@
 .rice-shell.rice-shell--mono canvas.arrodes-blob,
 .rice-shell.rice-shell--mono canvas.arrodes-disc {
   filter: none !important;
-}
-
-/* tablet/phone: shrink the explicit well so it stays inside the orbit/frame */
-@media (max-width: 1023px) {
-  .ht-shell {
-    overflow-x: hidden;
-  }
-  .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: 240px;
-    max-width: 240px;
-  }
-}
-@media (max-width: 639px) {
-  .arrodes-stage[data-variant='home'] .arrodes-well {
-    width: 200px;
-    max-width: 200px;
-  }
 }

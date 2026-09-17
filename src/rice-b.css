@@ -129,7 +129,7 @@
 .arrodes-well {
   position: relative;
   width: 108px;
-  aspect-ratio: 486 / 600;
+  aspect-ratio: 420 / 520;
   overflow: hidden;
   animation: arrodes-float 4.8s ease-in-out infinite;
 }

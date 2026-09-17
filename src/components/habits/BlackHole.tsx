@@ -13,7 +13,7 @@ export default function BlackHole({
   const track = variant === 'track' || (!variant && (className.includes('w-[176') || className.includes('w-44')));
   return (
     <div
-      className={`arrodes-orbit relative flex items-center justify-center bg-transparent ${className}`}
+      className={`arrodes-orbit relative flex items-center justify-center bg-transparent ${track ? 'overflow-hidden' : 'overflow-visible'} ${className}`}
       data-variant={track ? 'track' : 'home'}
     >
       <AccretionDisc compact={track} />
@@ -41,12 +41,10 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
 
     // Shared dot field — one continuous ring (front over mirror, back under).
     const scale = compact ? 0.58 : 1;
-    const lite = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;
     // Keep rings tight around the frame (original e696b76 proportions)
     const rings = [0.34, 0.46, 0.58, 0.72].map((r) => r * scale);
     const yScale = 0.42;
-    const dotCount = compact ? (lite ? 220 : 560) : (lite ? 280 : 760);
-    const dots = Array.from({ length: dotCount }, (_, i) => {
+    const dots = Array.from({ length: compact ? 560 : 760 }, (_, i) => {
       const ring = rings[i % rings.length];
       const t = Math.pow(Math.random(), 0.7);
       return {
@@ -70,7 +68,7 @@ function AccretionDisc({ compact = false }: { compact?: boolean }) {
 
     const paint = (canvas: HTMLCanvasElement, pass: 'back' | 'front') => {
       const size = Math.max(host.clientWidth || 160, host.clientHeight || 160);
-      const dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const px = Math.max(1, Math.floor(size * dpr));
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px;

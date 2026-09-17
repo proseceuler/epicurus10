@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ARRODES_FRAME, ARRODES_HOLE_MASK, ARRODES_INNER_MASK } from '@/components/arrodesFrame';
+import { ARRODES_FRAME, ARRODES_HOLE_MASK } from '@/components/arrodesFrame';
 import { compile, draw, listenMic, EMPTY, VERT, type Bands } from '@/components/arrodesMirrorGL';
 import { FRAG } from '@/components/arrodesMirrorFrag';
 import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
@@ -7,21 +7,12 @@ import { ARRODES_FRAME_PNG, getArrodesFramePng } from '@/lib/apiKeys';
 export type ArrodesVoiceMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type ArrodesVariant = 'dock' | 'home' | 'track';
 
-function holeMaskStyle(custom: boolean) {
-  const src = custom ? ARRODES_INNER_MASK : ARRODES_HOLE_MASK;
-  return {
-    WebkitMaskImage: `url("${src}")`,
-    maskImage: `url("${src}")`,
-    WebkitMaskMode: 'luminance' as const,
-    maskMode: 'luminance' as const,
-    WebkitMaskRepeat: 'no-repeat',
-    maskRepeat: 'no-repeat',
-    WebkitMaskPosition: 'center',
-    maskPosition: 'center',
-    WebkitMaskSize: custom ? '78% 88%' : '100% 100%',
-    maskSize: custom ? '78% 88%' : '100% 100%',
-  };
-}
+const holeMask = {
+  WebkitMaskImage: `url("${ARRODES_HOLE_MASK}")`,
+  maskImage: `url("${ARRODES_HOLE_MASK}")`,
+  WebkitMaskMode: 'luminance' as const,
+  maskMode: 'luminance' as const,
+};
 
 function resolveFrameSrc() {
   const override = getArrodesFramePng();
@@ -69,8 +60,6 @@ export default function ArrodesVoiceMirror({
   const rafRef = useRef(0);
   const startRef = useRef(0);
   const frameSrc = useFrameSrc();
-  const customFrame = frameSrc !== ARRODES_FRAME;
-  const holeMask = holeMaskStyle(customFrame);
   modeRef.current = mode;
 
   useEffect(() => {
@@ -205,32 +194,16 @@ export default function ArrodesVoiceMirror({
       data-expanded={expanded ? '1' : '0'}
       data-variant={variant}
       data-exit={exiting ? '1' : '0'}
-      data-custom-frame={customFrame ? '1' : '0'}
     >
       <div ref={wrapRef} className="arrodes-well" role="button" tabIndex={0} title="Hover the glass. Click for a puddle.">
         <canvas ref={canvasRef} className="arrodes-blob" style={holeMask} />
         <div className="arrodes-glass" aria-hidden style={holeMask} />
-        <div className="arrodes-shine" aria-hidden style={holeMask} />
         <img
           className="arrodes-frame"
           src={frameSrc}
           alt=""
           draggable={false}
           style={{ zIndex: 5, opacity: 1, objectFit: 'contain' }}
-        />
-        <div
-          className="arrodes-frame-sheen"
-          aria-hidden
-          style={{
-            WebkitMaskImage: `url("${frameSrc}")`,
-            maskImage: `url("${frameSrc}")`,
-            WebkitMaskSize: 'contain',
-            maskSize: 'contain',
-            WebkitMaskRepeat: 'no-repeat',
-            maskRepeat: 'no-repeat',
-            WebkitMaskPosition: 'center',
-            maskPosition: 'center',
-          }}
         />
       </div>
     </div>

@@ -110,10 +110,10 @@ export default function ArrodesVoiceMirror({
       rafRef.current = requestAnimationFrame(tick);
       if (gl.isContextLost()) return;
       resize();
-      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.045;
+      hoverAmtRef.current += (hoverGoalRef.current - hoverAmtRef.current) * 0.065;
       hoverPtAmtRef.current = {
-        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.085,
-        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.085,
+        x: hoverPtAmtRef.current.x + (hoverPtGoalRef.current.x - hoverPtAmtRef.current.x) * 0.12,
+        y: hoverPtAmtRef.current.y + (hoverPtGoalRef.current.y - hoverPtAmtRef.current.y) * 0.12,
       };
       draw(
         gl,

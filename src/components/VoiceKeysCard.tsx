@@ -130,7 +130,7 @@ export function VoiceKeysCard() {
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-600">Mirror frame</label>
           <p className="mb-2 text-xs text-zinc-400">
-            Attach a PNG of the gothic frame. The glass hole still uses the built-in SVG mask so mercury stays in the opening.
+            Attach a PNG of the gothic frame. The glass pane is cut from that image's inner opening so side ornaments stay clear.
           </p>
           <div className="flex items-center gap-3">
             <div className="flex h-16 w-14 items-center justify-center overflow-hidden rounded-md bg-zinc-100 ring-1 ring-zinc-200">

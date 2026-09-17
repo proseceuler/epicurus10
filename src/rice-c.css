@@ -51,8 +51,8 @@
 .arrodes-blob {
   z-index: 1;
   background: #6e737a;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
+  -webkit-mask-size: 124% 100%;
+  mask-size: 124% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -61,11 +61,12 @@
 .arrodes-glass {
   z-index: 2;
   pointer-events: none;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
+  -webkit-mask-size: 124% 100%;
+  mask-size: 124% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
+  mask-position: center;
   background:
     radial-gradient(ellipse at 38% 22%, rgba(92, 96, 104, 0.10) 0%, rgba(36, 37, 42, 0.0) 55%),
     linear-gradient(180deg, rgba(47, 49, 54, 0.12) 0%, rgba(32, 33, 38, 0.18) 100%);
@@ -99,7 +100,7 @@
 }
 .week-cols { display: grid; }
 .week-hours {
-  overflow-x: hidden;
+  overflow-x-hidden;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;

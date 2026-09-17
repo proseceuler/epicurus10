@@ -51,8 +51,8 @@
 .arrodes-blob {
   z-index: 1;
   background: #6e737a;
-  -webkit-mask-size: 124% 100%;
-  mask-size: 124% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -61,8 +61,8 @@
 .arrodes-glass {
   z-index: 2;
   pointer-events: none;
-  -webkit-mask-size: 124% 100%;
-  mask-size: 124% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;

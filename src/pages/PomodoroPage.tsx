@@ -1,92 +1,111 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePomodoro } from '@/context/PomodoroContext';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, type PomodoroSettings, type SubjectKey } from '@/lib/types';
 import { Card, PageHeader, Button, Select } from '@/components/kit';
-import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain } from 'lucide-react';
+import AnalyticsPage from '@/pages/AnalyticsPage';
+import { MotionCollapse, MotionSwap } from '@/components/MotionUI';
+import { AmbientMixer, AMBIENT_LIBRARY, clearCustomAmbient, hasCustomAmbient, setCustomAmbient, type AmbientId } from '@/lib/ambientSounds';
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House, Plus, X } from 'lucide-react';
+
+const SOUND_ICONS: Record<AmbientId, typeof CloudRain> = {
+  rain: CloudRain,
+  white: AudioLines,
+  lofi: Music,
+  forest: Trees,
+  ocean: Waves,
+  cafe: Coffee,
+  fire: Flame,
+  thunder: CloudLightning,
+  library: BookOpen,
+  cabin: House,
+};
 
 type SessionType = 'focus' | 'short_break' | 'long_break';
 
 export default function PomodoroPage() {
   const pomo = usePomodoro();
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey | ''>('math');
+  const [section, setSection] = useState<'timer' | 'analytics'>('timer');
   const [showSettings, setShowSettings] = useState(false);
-  const [soundOn, setSoundOn] = useState(false);
-  const [soundType, setSoundType] = useState<'rain' | 'white' | 'lofi'>('rain');
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const noiseNodeRef = useRef<AudioNode | null>(null);
+  const [mixMode, setMixMode] = useState(false);
+  const [playing, setPlaying] = useState<Partial<Record<AmbientId, boolean>>>({});
+  const [customs, setCustoms] = useState<Partial<Record<AmbientId, boolean>>>({});
+  const [volume, setVolume] = useState(70);
+  const [selected, setSelected] = useState<AmbientId>('rain');
+  const mixerRef = useRef<AmbientMixer | null>(null);
+  if (!mixerRef.current) mixerRef.current = new AmbientMixer();
+  const soundOn = Object.values(playing).some(Boolean);
 
-  const stopSound = useCallback(() => {
-    if (noiseNodeRef.current) { noiseNodeRef.current.disconnect(); noiseNodeRef.current = null; }
-    if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null; }
-  }, []);
-
-  const startSound = useCallback((type: 'rain' | 'white' | 'lofi') => {
-    stopSound();
-    const ctx = new AudioContext();
-    audioContextRef.current = ctx;
-
-    if (type === 'white') {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 1000;
-      const gain = ctx.createGain(); gain.gain.value = 0.08;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start(); noiseNodeRef.current = noise;
-    } else if (type === 'rain') {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      let lastOut = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        output[i] = (lastOut + 0.02 * white) / 1.02;
-        lastOut = output[i]; output[i] *= 3.5;
-      }
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
-      const gain = ctx.createGain(); gain.gain.value = 0.15;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start(); noiseNodeRef.current = noise;
-    } else {
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      let b0 = 0, b1 = 0, b2 = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99 * b0 + white * 0.05;
-        b1 = 0.96 * b1 + white * 0.05;
-        b2 = 0.90 * b2 + white * 0.05;
-        output[i] = (b0 + b1 + b2) * 0.3;
-      }
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer; noise.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass'; filter.frequency.value = 500;
-      const gain = ctx.createGain(); gain.gain.value = 0.1;
-      noise.connect(filter).connect(gain).connect(ctx.destination);
-      noise.start();
-      const osc = ctx.createOscillator();
-      osc.type = 'sine'; osc.frequency.value = 110;
-      const oscGain = ctx.createGain(); oscGain.gain.value = 0.02;
-      osc.connect(oscGain).connect(ctx.destination);
-      osc.start(); noiseNodeRef.current = ctx.destination;
-    }
-  }, [stopSound]);
+  useEffect(() => () => mixerRef.current?.dispose(), []);
 
   useEffect(() => {
-    if (soundOn) startSound(soundType);
-    else stopSound();
-    return () => stopSound();
-  }, [soundOn, soundType, startSound, stopSound]);
+    const next: Partial<Record<AmbientId, boolean>> = {};
+    for (const s of AMBIENT_LIBRARY) {
+      if (hasCustomAmbient(s.id)) next[s.id] = true;
+    }
+    setCustoms(next);
+  }, []);
+
+  useEffect(() => {
+    if (!pomo.lastCompletedAt) return;
+    const mixer = mixerRef.current;
+    if (!mixer || !mixer.playingIds().length) return;
+    void mixer.fadeAllToZero(3000).then(() => setPlaying({}));
+  }, [pomo.lastCompletedAt]);
+
+  const toggleSound = (id: AmbientId) => {
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    if (playing[id]) {
+      mixer.stop(id);
+      setPlaying((cur) => ({ ...cur, [id]: false }));
+      return;
+    }
+    if (!mixMode) {
+      mixer.stopAll();
+      setPlaying({ [id]: true });
+    } else {
+      setPlaying((cur) => ({ ...cur, [id]: true }));
+    }
+    void mixer.play(id, volume / 100);
+    setSelected(id);
+  };
+
+  const changeVolume = (next: number) => {
+    setVolume(next);
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    mixer.playingIds().forEach((id) => mixer.setVolume(id, next / 100));
+  };
+
+  const silenceAll = () => {
+    mixerRef.current?.stopAll();
+    setPlaying({});
+  };
+
+  const assignCustom = async (id: AmbientId, file: File | undefined) => {
+    if (!file) return;
+    try {
+      await setCustomAmbient(id, file);
+      setCustoms((cur) => ({ ...cur, [id]: true }));
+      setSelected(id);
+      if (playing[id]) {
+        mixerRef.current?.stop(id);
+        void mixerRef.current?.play(id, volume / 100);
+      }
+    } catch {
+      /* ignore invalid files */
+    }
+  };
+
+  const removeCustom = async (id: AmbientId) => {
+    const wasOn = Boolean(playing[id]);
+    if (wasOn) mixerRef.current?.stop(id);
+    await clearCustomAmbient(id);
+    setCustoms((cur) => ({ ...cur, [id]: false }));
+    if (wasOn) void mixerRef.current?.play(id, volume / 100);
+  };
 
   const saveSettings = async (newSettings: Partial<PomodoroSettings>) => {
     if (!pomo.settings) return;
@@ -112,20 +131,34 @@ export default function PomodoroPage() {
   return (
     <div>
       <PageHeader
-        title="Focus Timer"
-        subtitle="Structure your study sessions with the Pomodoro Technique"
+        title="Focus"
         action={
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setSoundOn(!soundOn)}>
-              {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              {soundOn ? 'Sound On' : 'Sound Off'}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowSettings(!showSettings)}>
-              <Settings className="w-4 h-4" /> Settings
-            </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {section === 'timer' && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => soundOn ? silenceAll() : toggleSound('rain')}>
+                  {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  {soundOn ? 'Sound On' : 'Sound Off'}
+                </Button>
+                <Button variant={showSettings ? 'primary' : 'secondary'} size="sm" onClick={() => setShowSettings(!showSettings)}>
+                  <Settings className="w-4 h-4" /> Settings
+                </Button>
+              </>
+            )}
+            <div className="flex gap-1 rounded-xl p-1 glass">
+              <button type="button" onClick={() => setSection('timer')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'timer' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <Brain className="h-3.5 w-3.5" /> Timer
+              </button>
+              <button type="button" onClick={() => setSection('analytics')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${section === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-800'}`}>
+                <BarChart3 className="h-3.5 w-3.5" /> Analytics
+              </button>
+            </div>
           </div>
         }
       />
+      <MotionSwap id={section}>
+      {section === 'analytics' ? <AnalyticsPage embedded /> : null}
+      {section === 'timer' && (
 
       <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
         <div className="lg:col-span-2">
@@ -204,60 +237,149 @@ export default function PomodoroPage() {
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <Card className="p-5">
-            <h3 className="font-semibold text-zinc-800 mb-3 flex items-center gap-2">
-              <Volume2 className="w-4 h-4" /> Ambient Sounds
-            </h3>
-            <div className="space-y-2">
-              {([
-                { id: 'rain', label: 'Rain Sounds', desc: 'Calming rain' },
-                { id: 'white', label: 'White Noise', desc: 'Block distractions' },
-                { id: 'lofi', label: 'Lo-fi Ambient', desc: 'Low-frequency hum' },
-              ] as const).map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => { setSoundType(s.id); setSoundOn(true); }}
-                  className={`w-full text-left p-3 rounded-xl border transition-all ${
-                    soundOn && soundType === s.id
-                      ? 'border-zinc-800 bg-zinc-100/60'
-                      : 'glass border-transparent glass-hover'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-zinc-700">{s.label}</p>
-                  <p className="text-xs text-zinc-400">{s.desc}</p>
-                </button>
-              ))}
+        <div className="space-y-3">
+          <Card className="p-3">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-zinc-800 flex items-center gap-1.5 text-sm">
+                <Volume2 className="w-3.5 h-3.5" /> Ambient
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setMixMode((on) => {
+                    if (on) {
+                      const keep = AMBIENT_LIBRARY.find((s) => playing[s.id])?.id;
+                      if (keep) {
+                        AMBIENT_LIBRARY.forEach((s) => {
+                          if (s.id !== keep && playing[s.id]) mixerRef.current?.stop(s.id);
+                        });
+                        setPlaying({ [keep]: true });
+                      }
+                    }
+                    return !on;
+                  });
+                }}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-medium ${
+                  mixMode ? 'bg-zinc-900 text-white' : 'glass text-zinc-600'
+                }`}
+              >
+                <Layers className="h-3 w-3" /> Mix
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-1">
+              {AMBIENT_LIBRARY.map((s) => {
+                const active = Boolean(playing[s.id]);
+                const custom = Boolean(customs[s.id]);
+                const Icon = SOUND_ICONS[s.id];
+                return (
+                  <div key={s.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleSound(s.id)}
+                      className={`aspect-square w-full rounded-xl border px-0.5 text-center transition-all ${
+                        active ? 'border-zinc-800 bg-zinc-900 text-white' : 'glass border-transparent text-zinc-600'
+                      }`}
+                    >
+                      <Icon className={`mx-auto h-3.5 w-3.5 ${active ? 'text-white' : 'text-zinc-700'}`} />
+                      <span className="mt-0.5 block truncate text-[9px] font-medium leading-tight">{s.label}</span>
+                    </button>
+                    {custom ? (
+                      <button
+                        type="button"
+                        title="Remove custom sound"
+                        onClick={(e) => { e.stopPropagation(); void removeCustom(s.id); }}
+                        className={`absolute right-0.5 top-0.5 rounded-full p-0.5 ${active ? 'bg-white/20 text-white' : 'bg-zinc-900/70 text-white'}`}
+                      >
+                        <X className="h-2 w-2" />
+                      </button>
+                    ) : (
+                      <label
+                        title="Add custom sound"
+                        className={`absolute right-0.5 top-0.5 cursor-pointer rounded-full p-0.5 ${active ? 'bg-white/20 text-white' : 'bg-zinc-900/60 text-white'}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Plus className="h-2 w-2" />
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            void assignCustom(s.id, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5 rounded-xl glass px-2 py-1">
+              {(() => {
+                const PlayerIcon = SOUND_ICONS[selected];
+                const live = Boolean(playing[selected]);
+                return (
+                  <>
+                    <PlayerIcon className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700">
+                      {AMBIENT_LIBRARY.find((s) => s.id === selected)?.label}
+                      {customs[selected] ? ' · custom' : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSound(selected)}
+                      className="rounded-md p-1 text-zinc-600 hover:bg-white/50"
+                      aria-label={live ? 'Pause' : 'Play'}
+                    >
+                      {live ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={volume}
+                      onChange={(e) => changeVolume(Number(e.target.value))}
+                      className="h-1.5 min-w-0 flex-1 accent-zinc-900"
+                    />
+                    <span className="w-7 text-right text-[10px] tabular-nums text-zinc-500">{volume}%</span>
+                  </>
+                );
+              })()}
             </div>
           </Card>
 
-          {showSettings && pomo.settings && (
-            <Card className="p-5">
-              <h3 className="font-semibold text-zinc-800 mb-3">Timer Settings</h3>
-              <div className="space-y-3">
-                {[
-                  { key: 'focus_duration', label: 'Focus Duration (min)', min: 1, max: 120, def: 25 },
-                  { key: 'short_break_duration', label: 'Short Break (min)', min: 1, max: 60, def: 5 },
-                  { key: 'long_break_duration', label: 'Long Break (min)', min: 1, max: 60, def: 15 },
-                  { key: 'sessions_before_long_break', label: 'Sessions Before Long Break', min: 1, max: 10, def: 4 },
-                ].map((field) => (
-                  <div key={field.key}>
-                    <label className="text-xs font-medium text-zinc-500 mb-1 block">{field.label}</label>
-                    <input
-                      type="number"
-                      min={field.min}
-                      max={field.max}
-                      value={(pomo.settings as PomodoroSettings)[field.key as keyof PomodoroSettings] as number}
-                      onChange={(e) => saveSettings({ [field.key]: parseInt(e.target.value) || field.def } as Partial<PomodoroSettings>)}
-                      className="w-full px-3 py-2 glass-input rounded-xl text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <MotionCollapse open={showSettings && Boolean(pomo.settings)}>
+            {pomo.settings && (
+              <Card className="mt-3 p-3">
+                <h3 className="mb-2 text-sm font-semibold text-zinc-800">Timer Settings</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'focus_duration', label: 'Focus (min)', min: 1, max: 120, def: 25 },
+                    { key: 'short_break_duration', label: 'Short (min)', min: 1, max: 60, def: 5 },
+                    { key: 'long_break_duration', label: 'Long (min)', min: 1, max: 60, def: 15 },
+                    { key: 'sessions_before_long_break', label: 'Sessions', min: 1, max: 10, def: 4 },
+                  ].map((field) => (
+                    <div key={field.key}>
+                      <label className="mb-0.5 block text-[10px] font-medium text-zinc-500">{field.label}</label>
+                      <input
+                        type="number"
+                        min={field.min}
+                        max={field.max}
+                        value={(pomo.settings as PomodoroSettings)[field.key as keyof PomodoroSettings] as number}
+                        onChange={(e) => saveSettings({ [field.key]: parseInt(e.target.value) || field.def } as Partial<PomodoroSettings>)}
+                        className="w-full rounded-xl px-2 py-1.5 text-sm glass-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </MotionCollapse>
         </div>
       </div>
+      )}
+      </MotionSwap>
     </div>
   );
 }

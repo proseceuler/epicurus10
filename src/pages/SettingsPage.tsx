@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, PageHeader, Button, Input, Select } from '@/components/kit';
-import { Key, Database, Download, Check, Cpu, Smartphone } from 'lucide-react';
-import { OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, getOpenRouterKey, getMwKey, getTavilyKey, getDefaultModel, saveKey } from '@/lib/apiKeys';
+import { Key, Database, Download, Check, Cpu, Smartphone, Keyboard } from 'lucide-react';
+import {
+  OPENROUTER_KEY, MW_KEY, MODEL_KEY, TAVILY_KEY, PINECONE_KEY, PINECONE_HOST,
+  getOpenRouterKey, getMwKey, getTavilyKey, getPineconeKey, getPineconeHost,
+  getDefaultModel, saveKey,
+} from '@/lib/apiKeys';
+import { ingestEpicure } from '@/lib/assistant/rag';
+import { VoiceKeysCard } from '@/components/VoiceKeysCard';
+import {
+  getShortcuts, setShortcut, resetShortcuts, formatShortcut,
+  SHORTCUT_LABELS, type ShortcutId, type ShortcutMap,
+} from '@/lib/shortcuts';
+import { getWeatherKey, setWeatherKey, getWeatherCity, setWeatherCity } from '@/lib/weather';
 
 const AI_MODELS = [
   { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B — strongest (free)' },
@@ -16,17 +27,57 @@ export default function SettingsPage() {
   const [openRouterKey, setOpenRouterKey] = useState(() => getOpenRouterKey());
   const [mwKey, setMwKey] = useState(() => getMwKey());
   const [tavilyKey, setTavilyKey] = useState(() => getTavilyKey());
+  const [pineconeKey, setPineconeKey] = useState(() => getPineconeKey());
+  const [pineconeHost, setPineconeHost] = useState(() => getPineconeHost());
+  const [indexMsg, setIndexMsg] = useState('');
+  const [indexing, setIndexing] = useState(false);
   const [defaultModel, setDefaultModel] = useState(() => getDefaultModel() || AI_MODELS[0].value);
   const [saved, setSaved] = useState(false);
+  const [shortcuts, setShortcuts] = useState<ShortcutMap>(() => getShortcuts());
+  const [listening, setListening] = useState<ShortcutId | null>(null);
+  const [owKey, setOwKey] = useState(() => getWeatherKey());
+  const [wCity, setWCity] = useState(() => getWeatherCity());
   const [sigil, setSigil] = useState(() => {
     try { return localStorage.getItem('epicure-ascii-sigil') || ''; } catch { return ''; }
   });
 
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1500); };
+
+  useEffect(() => {
+    const sync = () => setShortcuts(getShortcuts());
+    window.addEventListener('epicure-shortcuts-changed', sync);
+    return () => window.removeEventListener('epicure-shortcuts-changed', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!listening) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) return;
+      setShortcut(listening, { mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, key: e.key.toLowerCase() });
+      setListening(null);
+      flash();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [listening]);
+
   const updateOpenRouter = (v: string) => { setOpenRouterKey(v); saveKey(OPENROUTER_KEY, v.trim()); };
   const updateMw = (v: string) => { setMwKey(v); saveKey(MW_KEY, v.trim()); };
   const updateTavily = (v: string) => { setTavilyKey(v); saveKey(TAVILY_KEY, v.trim()); };
+  const updatePineconeKey = (v: string) => { setPineconeKey(v); saveKey(PINECONE_KEY, v.trim()); };
+  const updatePineconeHost = (v: string) => { setPineconeHost(v); saveKey(PINECONE_HOST, v.trim()); };
   const updateModel = (v: string) => { setDefaultModel(v); saveKey(MODEL_KEY, v); };
+
+  const reindex = async () => {
+    setIndexing(true);
+    setIndexMsg('');
+    const result = await ingestEpicure();
+    setIndexing(false);
+    setIndexMsg(result.ok ? `Indexed ${result.upserted} chunks.` : (result.error || 'Index failed.'));
+    flash();
+  };
 
   const exportData = async () => {
     const tables = ['assessments', 'class_hub', 'class_hub_links', 'todos', 'kanban_tasks',
@@ -50,18 +101,38 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader title="Settings" subtitle="API keys, AI model and your data" action={
+      <PageHeader title="Settings" action={
         <Button variant="secondary" onClick={flash}>{saved ? <><Check className="w-4 h-4" /> Saved</> : 'Saved automatically'}</Button>
       } />
       <div className="space-y-4">
         <InstallTip />
         <Card className="p-6">
           <div className="mb-3">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">DASHBOARD SIGIL</h3>
-            <p className="mt-1 text-xs text-[#6f747c]">Original ASCII glyph only. Shown next to the neofetch readout.</p>
+            <h3 className="font-mono text-[11px] tracking-[0.22em] text-zinc-500">DASHBOARD SIGIL</h3>
+            <p className="mt-1 text-xs text-zinc-500">Original ASCII glyph only. Shown next to the neofetch readout.</p>
           </div>
-          <textarea value={sigil} onChange={(e) => { setSigil(e.target.value); try { localStorage.setItem('epicure-ascii-sigil', e.target.value); } catch { /* ignore */ } flash(); }} rows={8} placeholder="paste or draw an original glyph…" className="w-full rounded-lg bg-white/4 p-3 font-mono text-[11px] leading-[1.2] text-[#9aa8ab] outline-none" />
+          <textarea value={sigil} onChange={(e) => { setSigil(e.target.value); try { localStorage.setItem('epicure-ascii-sigil', e.target.value); } catch { /* ignore */ } flash(); }} rows={8} placeholder="paste or draw an original glyph…" className="w-full rounded-lg bg-white p-3 font-mono text-[11px] leading-[1.2] text-zinc-800 outline-none ring-1 ring-zinc-200" />
         </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm font-semibold text-zinc-800">Weather</span>
+          </div>
+          <p className="mb-3 text-xs text-zinc-400">
+            OpenWeatherMap key for the dashboard clock card. Free at openweathermap.org.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-600">API key</label>
+              <Input type="password" value={owKey} onChange={(v) => { setOwKey(v); setWeatherKey(v); flash(); }} placeholder="OpenWeatherMap API key" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-600">City</label>
+              <Input value={wCity} onChange={(v) => { setWCity(v); setWeatherCity(v); flash(); }} placeholder="Manila" />
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Key className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">API Keys</h3></div>
           <div className="space-y-4">
@@ -78,10 +149,24 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm font-medium text-zinc-600 mb-1 block">Tavily Search API Key</label>
               <Input type="password" value={tavilyKey} onChange={updateTavily} placeholder="tvly-..." />
-              <p className="text-xs text-zinc-400 mt-1">Enables live web search in Study Assistant and Coding Agent modes. Get a free key at tavily.com — saved as you type.</p>
+              <p className="text-xs text-zinc-400 mt-1">Enables live web search in Study Assistant. Get a free key at tavily.com — saved as you type.</p>
             </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 mb-1 block">Pinecone API Key</label>
+              <Input type="password" value={pineconeKey} onChange={updatePineconeKey} placeholder="pcsk_..." />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 mb-1 block">Pinecone index host</label>
+              <Input value={pineconeHost} onChange={updatePineconeHost} placeholder="epicure-xxxx.svc.aped-4627-b74a.pinecone.io" />
+              <p className="text-xs text-zinc-400 mt-1">Starter index named epicure, model llama-text-embed-v2, dimension 1024, region us-east-1. If the browser blocks Pinecone, Arrodes still searches notes locally.</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => void reindex()} disabled={indexing}>
+              {indexing ? 'Indexing…' : 'Reindex help + notes'}
+            </Button>
+            {indexMsg && <p className="text-xs text-zinc-500">{indexMsg}</p>}
           </div>
         </Card>
+        <VoiceKeysCard />
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Cpu className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">Study Assistant</h3></div>
           <div>
@@ -89,6 +174,39 @@ export default function SettingsPage() {
             <Select value={defaultModel} onChange={updateModel} options={AI_MODELS} />
           </div>
         </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Keyboard className="h-5 w-5 text-zinc-400" />
+            <h3 className="font-semibold text-zinc-800">Keyboard shortcuts</h3>
+          </div>
+          <p className="mb-4 text-xs text-zinc-400">Click a row, then press the new key combo (e.g. Ctrl+K).</p>
+          <div className="space-y-2">
+            {(Object.keys(SHORTCUT_LABELS) as ShortcutId[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setListening(id)}
+                className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  listening === id ? 'border-zinc-900 bg-zinc-100' : 'border-zinc-200/80 bg-white/60 hover:bg-white'
+                }`}
+              >
+                <span className="text-sm text-zinc-700">{SHORTCUT_LABELS[id]}</span>
+                <kbd className="rounded-md bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-800">
+                  {listening === id ? 'Press keys…' : formatShortcut(shortcuts[id])}
+                </kbd>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => { resetShortcuts(); setShortcuts(getShortcuts()); flash(); }}
+            className="mt-3 text-xs text-zinc-500 underline hover:text-zinc-800"
+          >
+            Reset to defaults
+          </button>
+        </Card>
+
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4"><Database className="w-5 h-5 text-zinc-400" /><h3 className="font-semibold text-zinc-800">Data</h3></div>
           <div className="flex items-center justify-between p-3 rounded-xl glass">

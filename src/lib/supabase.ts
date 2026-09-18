@@ -70,164 +70,7 @@ function seed(): Database {
         linked_board_ids: ['board-study'],
         created_at: today,
         updated_at: today,
-        content: `# Home
-
-Welcome to **epicure** — a study vault in the spirit of Obsidian, with a Microsoft Whiteboard-style board beside it.
-
-## Jump in
-- [[How to use notes]]
-- [[How to use the Board]]
-- [[Cell structure]]
-- [[Quadratic formula]]
-
-## Today
-- Open [[${date}]] for a daily note
-- Sketch on [[Board: Study sketch]]
-
-> Use \`[[Note title]]\` to link anything. Hover a link, follow it, and watch backlinks appear on the right.
-`,
-      },
-      {
-        id: 'note-howto',
-        title: 'How to use notes',
-        folder: 'Vault',
-        tags: ['guide'],
-        pinned: false,
-        linked_subject: 'english',
-        linked_board_ids: [],
-        created_at: today,
-        updated_at: today,
-        content: `# How to use notes
-
-This vault is modelled after **Obsidian**.
-
-## Wiki-links
-Type \`[[Cell structure]]\` to link another note. Click a red (missing) link to create it.
-
-Board links use a prefix: \`[[Board: Study sketch]]\`.
-
-Embed a note with \`![[Quadratic formula]]\`.
-
-## Folders & tags
-Notes live in nested folders (\`Science/Biology\`). Tags like #guide sit in the left rail.
-
-## Graph
-Open the **Graph** view to see how ideas connect — notes as circles, boards as diamonds.
-
-## Markdown
-**Bold**, *italic*, \`code\`, lists, tables and $\\text{math}$ all work.
-
-| Shortcut | Action |
-| --- | --- |
-| \`[[\` | Link a note |
-| Ctrl/Cmd + S | Save (also autosaves) |
-| Graph button | See connections |
-`,
-      },
-      {
-        id: 'note-board-guide',
-        title: 'How to use the Board',
-        folder: 'Vault',
-        tags: ['guide', 'board'],
-        pinned: false,
-        linked_subject: null,
-        linked_board_ids: ['board-study'],
-        created_at: today,
-        updated_at: today,
-        content: `# How to use the Board
-
-Scratchpad + whiteboard live in **one infinite canvas**.
-
-## Draw
-- **Pen, pencil, marker, highlighter, calligraphy** — each has its own feel
-- **Eraser** punches holes in ink (it does not paint white)
-- Open the **RGB graph** to mix any colour: saturation-value plane, hue, and R/G/B bars
-
-## Objects
-Place **text**, **sticky notes**, **shapes**, **arrows**, **tables**, **pie / bar / line charts**, and **note cards** that open this vault.
-
-## Paper
-Switch backgrounds: dots, grid, lined, graph, isometric, Cornell, blueprint, kraft…
-
-## Connected notes
-Drop a note card onto the board, or write \`[[Board: Study sketch]]\` in a note.
-
-Try the seeded board: [[Board: Study sketch]].
-`,
-      },
-      {
-        id: 'note-cells',
-        title: 'Cell structure',
-        folder: 'Science/Biology',
-        tags: ['science', 'biology'],
-        pinned: false,
-        linked_subject: 'science',
-        linked_board_ids: ['board-study'],
-        created_at: today,
-        updated_at: today,
-        content: `# Cell structure
-
-Linked from [[Home]] and pinned on [[Board: Study sketch]].
-
-## Organelles
-- **Nucleus** — DNA, control centre
-- **Mitochondria** — respiration, ATP
-- **Ribosomes** — protein synthesis
-- **Chloroplasts** (plants) — photosynthesis
-
-See the pie chart on the board for a time-split of a lesson.
-
-Related: [[Quadratic formula]] (yes, even biology students sit math).
-`,
-      },
-      {
-        id: 'note-quadratic',
-        title: 'Quadratic formula',
-        folder: 'Math',
-        tags: ['math', 'algebra'],
-        pinned: false,
-        linked_subject: 'math',
-        linked_board_ids: ['board-study'],
-        created_at: today,
-        updated_at: today,
-        content: `# Quadratic formula
-
-For $ax^2 + bx + c = 0$:
-
-$$
-x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
-$$
-
-## Checklist
-- Discriminant $D = b^2 - 4ac$
-- $D > 0$ two real roots
-- $D = 0$ one real root
-- $D < 0$ no real roots
-
-Practice table is on [[Board: Study sketch]]. Back to [[Home]].
-`,
-      },
-      {
-        id: `note-daily-${date}`,
-        title: date,
-        folder: 'Daily',
-        tags: ['daily'],
-        pinned: false,
-        linked_subject: null,
-        linked_board_ids: [],
-        created_at: today,
-        updated_at: today,
-        content: `# ${date}
-
-## Focus
-- 
-
-## Captured
-- 
-
-## Links
-- [[Home]]
-`,
+        content: `# Home\n\nWelcome to **epicure**.\n`,
       },
     ],
     timetable_entries: [],
@@ -245,6 +88,10 @@ Practice table is on [[Board: Study sketch]]. Back to [[Home]].
 let memory: Database | null = null;
 
 function load(): Database {
+  if (typeof window !== 'undefined' && (window as any).__epicureDbBust) {
+    memory = null;
+    (window as any).__epicureDbBust = false;
+  }
   if (memory) return memory;
   if (!canStore()) {
     memory = seed();
@@ -269,8 +116,11 @@ function persist(db: Database) {
   memory = db;
   if (!canStore()) return;
   try {
+    const updatedAt = Date.now();
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-    window.dispatchEvent(new CustomEvent(DB_CHANGED, { detail: { at: Date.now() } }));
+    window.localStorage.setItem(STORAGE_KEY + ':meta', JSON.stringify({ updatedAt }));
+    window.dispatchEvent(new CustomEvent(DB_CHANGED, { detail: { at: updatedAt } }));
+    window.dispatchEvent(new CustomEvent('epicure-data-changed', { detail: { at: updatedAt } }));
   } catch {
     /* quota */
   }

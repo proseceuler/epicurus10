@@ -72,6 +72,29 @@ export interface Todo {
   due_date: string | null;
   priority: 'urgent_important' | 'not_urgent_important' | 'urgent_not_important' | 'not_urgent_not_important';
   completed: boolean;
+  all_day?: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string;
+  calendar_event_id?: string | null;
+}
+
+export interface KanbanCheckItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface KanbanAttachment {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface KanbanComment {
+  id: string;
+  text: string;
+  created_at: string;
 }
 
 export interface KanbanTask {
@@ -79,9 +102,17 @@ export interface KanbanTask {
   title: string;
   description: string;
   subject_key: SubjectKey | null;
-  status: 'todo' | 'in_progress' | 'review' | 'done';
+  status: string;
   due_date: string | null;
   sort_order: number;
+  cover_url?: string | null;
+  checklist?: KanbanCheckItem[];
+  attachments?: KanbanAttachment[];
+  comments?: KanbanComment[];
+  linked_todo_id?: string | null;
+  linked_note_id?: string | null;
+  linked_habit_id?: string | null;
+  linked_event_id?: string | null;
 }
 
 export interface PomodoroSession {
@@ -119,7 +150,6 @@ export interface HabitCompletion {
   completion_date: string;
 }
 
-// ─── Finance ───
 export type ExpenseCategory = 'transportation' | 'food' | 'academics' | 'leisure';
 
 export interface FinanceSettings {
@@ -144,6 +174,7 @@ export interface FinanceGoal {
   name: string;
   target_amount: number;
   saved_amount: number;
+  url?: string | null;
 }
 
 export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; emoji: string }[] = [
@@ -153,7 +184,6 @@ export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; emoji: s
   { key: 'leisure', label: 'Wants / Leisure', emoji: '🎮' },
 ];
 
-// ─── Wellness ───
 export interface WellnessLog {
   id: string;
   log_date: string;
@@ -161,7 +191,6 @@ export interface WellnessLog {
   sleep_hours: number | null;
 }
 
-// ─── Notes ───
 export interface Note {
   id: string;
   title: string;
@@ -175,7 +204,6 @@ export interface Note {
   updated_at: string;
 }
 
-// ─── Timetable ───
 export interface TimetableEntry {
   id: string;
   subject_key: string;
@@ -192,7 +220,6 @@ export interface ClassAttendance {
   status: 'pending' | 'attended' | 'skipped';
 }
 
-// ─── Flashcards ───
 export interface FlashcardDeck {
   id: string;
   subject_key: string | null;
@@ -210,7 +237,6 @@ export interface Flashcard {
   review_count: number;
 }
 
-// ─── Forecast Scenarios ───
 export interface ForecastScenario {
   id: string;
   name: string;
@@ -221,7 +247,6 @@ export interface ForecastScenario {
   created_at: string;
 }
 
-// ─── Subtasks ───
 export interface TodoSubtask {
   id: string;
   todo_id: string;

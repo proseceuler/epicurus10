@@ -680,3 +680,88 @@
   font-style: italic;
   margin: 0.75rem 0;
 }
+
+/* tldraw — full-size editor + readable grey chrome */
+.epicure-tldraw {
+  height: 100%;
+  width: 100%;
+  min-height: 480px;
+  position: absolute;
+  inset: 0;
+}
+.epicure-tldraw .tl-container,
+.epicure-tldraw .tl-theme__light,
+.epicure-tldraw [data-tldraw] {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 480px;
+  pointer-events: auto !important;
+  touch-action: none;
+}
+.epicure-tldraw .tl-background {
+  background: transparent !important;
+}
+.epicure-tldraw .tlui-layout {
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  color: #18181b;
+  /* MUST be none so events reach the canvas; only chrome re-enables */
+  pointer-events: none !important;
+  z-index: 2;
+}
+.epicure-tldraw .tl-canvas,
+.epicure-tldraw .tl-canvas *,
+.epicure-tldraw canvas {
+  pointer-events: auto !important;
+  touch-action: none;
+}
+.epicure-tldraw .tlui-menu-zone,
+.epicure-tldraw .tlui-navigation-panel,
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-toolbar,
+.epicure-tldraw .tlui-help-menu,
+.epicure-tldraw .tlui-button,
+.epicure-tldraw .tlui-popover,
+.epicure-tldraw .tlui-input,
+.epicure-tldraw [data-testid="tools.draw"],
+.epicure-tldraw .tlui-toolbar__inner {
+  pointer-events: auto !important;
+  z-index: 3;
+}
+.epicure-tldraw .tlui-toolbar,
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-navigation-panel,
+.epicure-tldraw .tlui-menu-zone {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.epicure-tldraw .tlui-toolbar__inner,
+.epicure-tldraw .tlui-style-panel,
+.epicure-tldraw .tlui-navigation-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(24, 24, 27, 0.12) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(24, 24, 27, 0.1) !important;
+  backdrop-filter: blur(10px);
+}
+.epicure-tldraw .tlui-button:not([data-testid*="color"]) {
+  color: #18181b;
+}
+.epicure-tldraw .tlui-button__icon {
+  color: inherit;
+}
+/* keep style-panel color swatches showing real fills */
+.epicure-tldraw .tlui-style-panel button[style*="background"],
+.epicure-tldraw .tlui-button[style*="background"] {
+  background-color: inherit !important;
+}
+.epicure-tldraw .tl-color-bg {
+  opacity: 1 !important;
+}
+
+
+/* grayscale force — collapse remaining chromatic utilities */
+.bg-red-500, .bg-emerald-500, .bg-blue-500, .bg-amber-500, .bg-violet-500,
+.bg-green-500, .bg-orange-500, .text-red-500, .text-emerald-600, .text-blue-500,
+.text-amber-500, .text-violet-600, .text-green-600, .border-red-500 {
+  /* visual handled by .rice-shell filter; keep specificity hooks for docs */
+}

@@ -56,7 +56,6 @@ export default function SourcesPanel({
     <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-label="Sources">
       <div className="flex-1" onClick={onClose} />
       <div className="w-full max-w-sm h-full bg-[var(--sa-surface)] border-l border-[var(--sa-border)] flex flex-col shadow-2xl">
-        {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--sa-border)]">
           <div className="flex items-center gap-2">
             <Library className="w-4 h-4 text-[var(--sa-text)]" />
@@ -72,7 +71,6 @@ export default function SourcesPanel({
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="shrink-0 flex gap-1 px-4 pt-3">
           {[
             { id: 'attached' as const, label: 'Attached' },
@@ -90,7 +88,6 @@ export default function SourcesPanel({
           ))}
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {tab === 'attached' && (
             sources.length === 0 ? (

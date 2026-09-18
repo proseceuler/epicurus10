@@ -167,7 +167,9 @@ export function persistBoards(boards: Board[]) {
   window.dispatchEvent(new CustomEvent(BOARDS_CHANGED));
 }
 
-export function findBoardByName(boards: Board[], name: string) {
+export function findBoardByName(boards: Board[], name?: string | null) {
+  if (name == null || typeof name !== 'string') return undefined;
   const q = name.trim().toLowerCase();
+  if (!q) return undefined;
   return boards.find((b) => b.name.toLowerCase() === q);
 }

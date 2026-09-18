@@ -1,21 +1,19 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { DateField, TimeField } from '@/components/fields';
 
 export function Card({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
-    <div onClick={onClick} className={`hud-panel ${className} ${onClick ? 'cursor-pointer' : ''}`}>
+    <div onClick={onClick} className={`glass rounded-2xl ${className} ${onClick ? 'cursor-pointer glass-hover epic-press' : ''}`}>
       {children}
     </div>
   );
 }
 
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+export function PageHeader({ title, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-[#e4e5e8]">{title}</h2>
-        {subtitle && <p className="mt-1 text-sm text-[#6f747c]">{subtitle}</p>}
-      </div>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+      {title ? <h2 className="text-xl font-semibold tracking-tight text-zinc-800">{title}</h2> : <div />}
       {action}
     </div>
   );
@@ -50,7 +48,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[color,background-color,box-shadow,transform,opacity] duration-150 ease-out ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : 'epic-press'} ${className}`}
     >
       {children}
     </button>
@@ -63,67 +61,52 @@ export function Input({
   placeholder,
   type = 'text',
   className = '',
+  size = 'sm',
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
   className?: string;
+  size?: 'sm' | 'lg';
 }) {
+  if (type === 'date') return <DateField value={value} onChange={onChange} className={className} />;
+  if (type === 'time') return <TimeField value={value} onChange={onChange} className={className} />;
+  const sizing = size === 'lg'
+    ? 'h-14 min-h-14 px-3.5 py-3 text-lg font-semibold'
+    : 'h-9 px-3 py-2 text-sm';
   return (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-full rounded-lg bg-white/4 px-3 py-2 text-sm text-[#e4e5e8] placeholder-[#5c6168] outline-none ring-0 focus:bg-white/6 ${className}`}
+      className={`w-full rounded-xl leading-normal text-zinc-800 placeholder-zinc-400 glass-input ${sizing} ${className}`}
     />
   );
 }
 
-export function Select({
-  value,
-  onChange,
-  options,
-  className = '',
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  className?: string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full rounded-lg bg-white/4 px-3 py-2 text-sm text-[#e4e5e8] outline-none ${className}`}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
+export { Select, DateField, TimeField } from '@/components/fields';
 
 export function EmptyState({ icon: Icon, title, subtitle }: { icon: LucideIcon; title: string; subtitle?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/4">
-        <Icon className="h-6 w-6 text-[#5c6168]" />
+    <div className="epic-fade-in flex flex-col items-center justify-center py-8 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl glass">
+        <Icon className="h-6 w-6 text-zinc-400" />
       </div>
-      <p className="text-[#9aa0a6]">{title}</p>
-      {subtitle && <p className="mt-1 max-w-sm text-sm text-[#5c6168]">{subtitle}</p>}
+      <p className="font-medium text-zinc-600">{title}</p>
+      {subtitle && <p className="mt-1 max-w-sm text-sm text-zinc-400">{subtitle}</p>}
     </div>
   );
 }
 
 export function Badge({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'high' | 'mid' | 'low' | 'fail' }) {
   const tones: Record<string, string> = {
-    default: 'bg-white/6 text-[#9aa0a6]',
-    high: 'bg-[#d7d8dc] text-[#0b0c0e]',
-    mid: 'bg-white/12 text-[#d7d8dc]',
-    low: 'bg-white/8 text-[#8b8f96]',
-    fail: 'bg-white/4 text-[#6f747c]',
+    default: 'bg-zinc-100 text-zinc-600',
+    high: 'bg-zinc-900 text-white',
+    mid: 'bg-zinc-200 text-zinc-700',
+    low: 'bg-zinc-100 text-zinc-500',
+    fail: 'bg-zinc-100 text-zinc-400',
   };
   return (
     <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${tones[tone] ?? tones.default}`}>
@@ -134,7 +117,7 @@ export function Badge({ children, tone = 'default' }: { children: ReactNode; ton
 
 export function SubjectBadge({ shortName }: { shortName: string }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 font-mono text-[11px] text-[#9aa0a6]">
+    <span className="inline-flex items-center rounded-md bg-zinc-200/60 px-2 py-0.5 text-xs font-medium text-zinc-600">
       {shortName}
     </span>
   );

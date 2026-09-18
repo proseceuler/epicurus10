@@ -52,7 +52,6 @@ export default function ChatInputBar({
 
   return (
     <div className="w-full max-w-2xl">
-      {/* Image preview */}
       {image && (
         <div className="mb-2 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--sa-surface)] border border-[var(--sa-border)]">
           <img src={image} alt="Preview" className="w-8 h-8 rounded object-cover" />
@@ -80,9 +79,7 @@ export default function ChatInputBar({
         />
 
         <div className="flex items-center justify-between mt-2">
-          {/* Left: + menu + model dropdown */}
           <div className="flex items-center gap-1">
-            {/* Plus menu */}
             <div ref={plusRef} className="relative">
               <button
                 onClick={() => setPlusOpen((v) => !v)}
@@ -133,11 +130,9 @@ export default function ChatInputBar({
               )}
             </div>
 
-            {/* Model dropdown */}
             <ModelDropdown models={models} value={model} onChange={onModelChange} />
           </div>
 
-          {/* Right: image, mic, send/stop */}
           <div className="flex items-center gap-1">
             {visionModel && (
               <>

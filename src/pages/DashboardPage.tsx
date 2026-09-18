@@ -1,11 +1,24 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { SUBJECTS, NUM_TERMS, type Assessment, type Todo, type PomodoroSession } from '@/lib/types';
+import {
+  SUBJECTS,
+  NUM_TERMS,
+  type Assessment,
+  type Todo,
+  type PomodoroSession,
+  type Habit,
+  type HabitCompletion,
+} from '@/lib/types';
 import { computeFinalGrade, computeGeneralAverage, computeTermGrade } from '@/lib/gradeUtils';
 import { Card, EmptyState, SubjectBadge, gradeColor } from '@/components/kit';
 import type { PageId } from '@/components/AppLayout';
 import { usePomodoro } from '@/context/PomodoroContext';
-import { Calendar, BookOpen } from 'lucide-react';
+import { doneSet, isDone, monthDays, todayIso } from '@/lib/habit-stats';
+import { getXP } from '@/lib/xp';
+import WeeklyRecapSlideshow, { shouldShowSundayRecap } from '@/components/WeeklyRecapSlideshow';
+import { fetchWeather, type WeatherSnapshot } from '@/lib/weather';
+import { Calendar, BookOpen, Flame, CheckSquare, Clock, Target } from 'lucide-react';
+import { DashboardTerm } from '@/components/DashboardTerm';
 
 const SIGIL_KEY = 'epicure-ascii-sigil';
 
@@ -13,9 +26,9 @@ const DEFAULT_SIGIL = `
       .·:·.
     ·´     \`·
    /    ∧    \\
-  |   /   \\   |
-  |   \\   /   |
-   \\   \\_/   /
+  |   /   \   |
+  |   \   /   |
+   \   \_/   /
     \`·.   .·´
        \`·´
 `.trimEnd();
@@ -40,11 +53,97 @@ function computeStreak(sessions: PomodoroSession[]): number {
   return streak;
 }
 
+/** Consecutive days where every habit was completed. */
+function computeHabitStreak(
+  habits: { id: string }[],
+  done: Set<string>,
+): { current: number; best: number } {
+  if (!habits.length) return { current: 0, best: 0 };
+  const dayComplete = (dateStr: string) => habits.every((h) => done.has(`${h.id}|${dateStr}`));
+  const iso = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  let best = 0;
+  let run = 0;
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() - i);
+    if (dayComplete(iso(d))) {
+      run += 1;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  }
+  let current = 0;
+  const cursor = new Date(start);
+  if (!dayComplete(iso(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dayComplete(iso(cursor))) return { current: 0, best };
+  }
+  while (dayComplete(iso(cursor))) {
+    current += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return { current, best: Math.max(best, current) };
+}
+
+/** Official DepEd SY 2026–2027 term windows (Order No. 009, s. 2026). */
+function termWeekProgress(term: number): { week: number; total: number; pct: number; label: string } {
+  const now = new Date();
+  const windows: Record<number, [Date, Date]> = {
+    1: [new Date(2026, 5, 8), new Date(2026, 8, 15)],
+    2: [new Date(2026, 8, 16), new Date(2026, 11, 18)],
+    3: [new Date(2027, 0, 4), new Date(2027, 3, 8)],
+  };
+  const pair = windows[term] || windows[1];
+  const start = pair[0];
+  const end = pair[1];
+  const totalMs = Math.max(1, end.getTime() - start.getTime());
+  const elapsed = Math.min(totalMs, Math.max(0, now.getTime() - start.getTime()));
+  const totalWeeks = Math.max(1, Math.round(totalMs / (7 * 86400000)));
+  const week = Math.min(totalWeeks, Math.max(1, Math.floor(elapsed / (7 * 86400000)) + 1));
+  const pct = Math.round((elapsed / totalMs) * 100);
+  return { week, total: totalWeeks, pct, label: `Week ${week}/${totalWeeks}` };
+}
+
+function currentDepEdTerm(now = new Date()): number {
+  const t = now.getTime();
+  if (t < new Date(2026, 8, 16).getTime()) return 1;
+  if (t < new Date(2027, 0, 4).getTime()) return 2;
+  return 3;
+}
+
+function useMilitaryClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const dateLabel = now.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  return { time: `${hh}:${mm}:${ss}`, dateLabel };
+}
+
 export default function DashboardPage({ navigate }: { navigate: (p: PageId) => void }) {
   const pomodoro = usePomodoro();
+  const clock = useMilitaryClock();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [loading, setLoading] = useState(true);
   const [sigil, setSigil] = useState(() => {
     try {
@@ -55,20 +154,34 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   });
   const [editingSigil, setEditingSigil] = useState(false);
   const [awake, setAwake] = useState(false);
+  const [showSundayRecap, setShowSundayRecap] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
   const loadData = useCallback(async () => {
-    const [{ data: aData }, { data: tData }, { data: sData }] = await Promise.all([
+    const [
+      { data: aData },
+      { data: tData },
+      { data: sData },
+      { data: hData },
+      { data: cData },
+    ] = await Promise.all([
       supabase.from('assessments').select('*'),
       supabase.from('todos').select('*').order('created_at', { ascending: false }),
       supabase.from('pomodoro_sessions').select('*'),
+      supabase.from('habits').select('*').order('created_at', { ascending: true }),
+      supabase.from('habit_completions').select('*'),
     ]);
     if (aData) setAssessments(aData as Assessment[]);
     if (tData) setTodos(tData as Todo[]);
     if (sData) setSessions(sData as PomodoroSession[]);
+    if (hData) setHabits(hData as Habit[]);
+    if (cData) setCompletions(cData as HabitCompletion[]);
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const generalAverage = computeGeneralAverage(assessments);
   const activeTodos = todos.filter((t) => !t.completed);
@@ -81,14 +194,102 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const upcomingTodos = activeTodos
     .filter((t) => t.due_date)
     .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
-    .slice(0, 5);
+    .slice(0, 6);
 
-  const currentTerm = (() => {
-    const month = new Date().getMonth();
-    if (month >= 5 && month <= 9) return 1;
-    if (month >= 10 || month <= 1) return 2;
-    return 3;
-  })();
+  const deadlineCount = activeTodos.filter((t) => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date + 'T00:00:00');
+    const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
+    return diff >= 0 && diff <= 7;
+  }).length;
+
+  const currentTerm = currentDepEdTerm();
+
+  const done = useMemo(() => doneSet(completions), [completions]);
+  const monthCells = useMemo(() => {
+    const n = new Date();
+    return monthDays(n.getFullYear(), n.getMonth());
+  }, []);
+  const monthDone = useMemo(
+    () => habits.reduce((s, h) => s + monthCells.filter((d) => isDone(done, h.id, d.dateStr)).length, 0),
+    [habits, monthCells, done],
+  );
+  const monthSlots = Math.max(1, habits.length * monthCells.length);
+  const monthPct = habits.length ? (monthDone / monthSlots) * 100 : 0;
+  const todayHabitDone = habits.filter((h) => isDone(done, h.id, todayIso())).length;
+  const habitStreak = useMemo(() => computeHabitStreak(habits, done), [habits, done]);
+  const termProg = useMemo(() => termWeekProgress(currentTerm), [currentTerm]);
+
+  const weakSubjects = useMemo(() => {
+    return SUBJECTS.map((s) => {
+      const fg = computeFinalGrade(s.key, assessments);
+      const tg = computeTermGrade(s.key, currentTerm, assessments);
+      return { subject: s, fg, tg };
+    })
+      .filter((x) => x.fg !== null)
+      .sort((a, b) => (a.fg ?? 100) - (b.fg ?? 100))
+      .slice(0, 4);
+  }, [assessments, currentTerm]);
+
+  const gradedCount = useMemo(
+    () => SUBJECTS.filter((s) => computeFinalGrade(s.key, assessments) !== null).length,
+    [assessments],
+  );
+
+  const weekFocus = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return sessions
+      .filter((s) => s.session_type === 'focus' && new Date(s.completed_at) >= start)
+      .reduce((sum, s) => sum + s.duration_minutes, 0);
+  }, [sessions]);
+
+  const weekRecap = useMemo(() => {
+    const focusMin = weekFocus;
+    return {
+      focusLabel: `${Math.floor(focusMin / 60)}h ${focusMin % 60}m`,
+      streak: habitStreak.current,
+      habitsToday: todayHabitDone,
+      habitsTotal: habits.length,
+      openTasks: activeTodos.length,
+      level: getXP().level,
+      xp: getXP().xp,
+    };
+  }, [activeTodos, weekFocus, habitStreak, todayHabitDone, habits.length]);
+
+  useEffect(() => {
+    if (!loading && shouldShowSundayRecap()) setShowSundayRecap(true);
+  }, [loading]);
+
+  useEffect(() => {
+    void fetchWeather()
+      .then((w) => setWeather(w))
+      .catch(() => setWeather(null));
+  }, []);
+
+  useEffect(() => {
+    if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
+      setAwake(true);
+      const t = window.setTimeout(() => setAwake(false), 2200);
+      return () => window.clearTimeout(t);
+    }
+  }, [pomodoro.isRunning, pomodoro.lastCompletedAt, streak]);
+
+  const saveSigil = (value: string) => {
+    const next = value.trim() || DEFAULT_SIGIL;
+    setSigil(next);
+    try {
+      localStorage.setItem(SIGIL_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    setEditingSigil(false);
+  };
+
+  const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
+  const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
+  const weekFocusLabel = `${Math.floor(weekFocus / 60)}h ${weekFocus % 60}m`;
 
   useEffect(() => {
     if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
@@ -122,98 +323,111 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   }
 
   return (
+    <>
+    {showSundayRecap && (
+      <WeeklyRecapSlideshow
+        stats={{
+          focusLabel: weekRecap.focusLabel,
+          streak: weekRecap.streak,
+          habitsToday: weekRecap.habitsToday,
+          habitsTotal: weekRecap.habitsTotal,
+          openTasks: weekRecap.openTasks,
+          focusMinutes: weekFocus,
+        }}
+        onClose={() => setShowSundayRecap(false)}
+      />
+    )}
     <div>
-      <section className={`hud-hero mb-10 ${awake ? 'hud-awake' : ''}`}>
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-14">
-          <div className="min-w-0 flex-1">
-            {editingSigil ? (
-              <div>
-                <textarea
-                  defaultValue={sigil}
-                  rows={10}
-                  className="w-full resize-y rounded-lg bg-transparent p-2 font-mono text-[11px] leading-[1.15] text-[#9aa8ab] outline-none"
-                  autoFocus
-                  onBlur={(e) => saveSigil(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setEditingSigil(false);
-                  }}
-                />
-                <p className="mt-1 font-mono text-[10px] text-[#5c6168]">click away to save · original glyph only</p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingSigil(true)}
-                title="Customize sigil"
-                className="hud-sigil block text-left"
-              >
-                <pre className="select-none font-mono text-[11px] leading-[1.15] sm:text-[12px]">{sigil}</pre>
-              </button>
-            )}
-          </div>
+      <DashboardTerm
+        awake={awake}
+        sigil={sigil}
+        editingSigil={editingSigil}
+        setEditingSigil={setEditingSigil}
+        saveSigil={saveSigil}
+        time={clock.time}
+        dateLabel={clock.dateLabel}
+        weather={weather}
+        host="epicure"
+        streak={streak}
+        term={currentTerm}
+        terms={NUM_TERMS}
+        focusLabel={focusLabel}
+        gpa={gpa}
+        tasks={activeTodos.length}
+        navigate={navigate}
+      />
 
-          <div className="font-mono text-[12px] leading-6 text-[#8b8f96] lg:min-w-[280px] lg:pt-2">
-            <p className="text-[#d7d8dc]">
-              user<span className="text-[#5c6168]">@</span>{host}
-            </p>
-            <p className="text-[#3f4349]">{'─'.repeat(22)}</p>
-            <StatRow label="OS" value="epicure 10.2" />
-            <StatRow label="STREAK" value={`${streak}d`} />
-            <StatRow label="TERM" value={`T${currentTerm} / ${NUM_TERMS}`} />
-            <StatRow label="FOCUS" value={focusLabel} />
-            <StatRow label="GPA" value={gpa} />
-            <StatRow label="TASKS" value={`${activeTodos.length} open`} />
-            <StatRow label="KERNEL" value={`${SUBJECTS.length} subjects`} />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => navigate('grades')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
-                → grades
-              </button>
-              <button type="button" onClick={() => navigate('pomodoro')} className="font-mono text-[11px] tracking-wide text-[#7a8a8c] hover:text-[#c5d4d6]">
-                → focus
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="mb-10 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
-        <QuietStat label="GPA" value={gpa} onOpen={() => navigate('grades')} />
-        <QuietStat label="PENDING" value={String(activeTodos.length)} onOpen={() => navigate('todos')} />
-        <QuietStat label="FOCUS" value={focusLabel} onOpen={() => navigate('pomodoro')} />
-        <QuietStat label="TERM" value={`T${currentTerm}`} onOpen={() => navigate('grades')} />
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <InsightTile
+          icon={Flame}
+          label="Streak"
+          value={`${habitStreak.current}d`}
+          hint={`Best: ${habitStreak.best}d`}
+          onOpen={() => navigate('habits')}
+        />
+        <InsightTile
+          icon={CheckSquare}
+          label="Deadlines"
+          value={String(deadlineCount)}
+          hint="Due in the next 7 days"
+          onOpen={() => navigate('todos')}
+        />
+        <InsightTile
+          icon={Clock}
+          label="Focus (7d)"
+          value={weekFocusLabel}
+          hint={`Today ${focusLabel}`}
+          onOpen={() => navigate('pomodoro')}
+        />
+        <InsightTile
+          icon={Target}
+          label="Term progress"
+          value={termProg.label}
+          hint={`${termProg.pct}% through T${currentTerm}`}
+          onOpen={() => navigate('grades')}
+        />
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-2">
-        <Card className="p-0">
-          <div className="mb-5 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">SUBJECT GRADES</h3>
-            <button onClick={() => navigate('grades')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">all →</button>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Weak subjects</h3>
+            <button type="button" onClick={() => navigate('grades')} className="text-xs text-zinc-500 hover:text-zinc-800">
+              Grades →
+            </button>
           </div>
-          {assessments.length === 0 ? (
-            <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add your assessment scores to see your grades here." />
+          {weakSubjects.length === 0 ? (
+            <EmptyState icon={BookOpen} title="No grades yet" subtitle="Add assessments to surface weak spots." />
           ) : (
             <div className="space-y-1">
-              {SUBJECTS.map((s) => {
-                const fg = computeFinalGrade(s.key, assessments);
-                const tg = computeTermGrade(s.key, currentTerm, assessments);
-                return (
-                  <button key={s.key} onClick={() => navigate('grades')} className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/3">
-                    <SubjectBadge shortName={s.shortName} />
-                    <div className="flex items-center gap-4 font-mono">
-                      <span className="text-[11px] text-[#5c6168]">T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}</span>
-                      <span className={`text-sm ${gradeColor(fg)}`}>{fg !== null ? fg.toFixed(2) : '—'}</span>
-                    </div>
-                  </button>
-                );
-              })}
+              {weakSubjects.map(({ subject, fg, tg }) => (
+                <button
+                  key={subject.key}
+                  type="button"
+                  onClick={() => navigate('grades')}
+                  className="group flex w-full items-center justify-between rounded-md px-1 py-2 transition-colors hover:bg-white/40"
+                >
+                  <SubjectBadge shortName={subject.shortName} />
+                  <div className="flex items-center gap-3 font-mono">
+                    <span className="text-[11px] text-zinc-500">
+                      T{currentTerm}: {tg !== null ? tg.toFixed(1) : '—'}
+                    </span>
+                    <span className={`text-sm ${gradeColor(fg)}`}>
+                      {fg !== null ? fg.toFixed(2) : '—'}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </Card>
 
-        <Card className="p-0">
-          <div className="mb-5 flex items-baseline justify-between">
-            <h3 className="font-mono text-[11px] tracking-[0.22em] text-[#8b8f96]">UPCOMING</h3>
-            <button onClick={() => navigate('calendar')} className="font-mono text-[10px] text-[#5c6168] hover:text-[#c9cbd0]">calendar →</button>
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Upcoming</h3>
+            <button type="button" onClick={() => navigate('calendar')} className="text-xs text-zinc-500 hover:text-zinc-800">
+              Calendar →
+            </button>
           </div>
           {upcomingTodos.length === 0 ? (
             <EmptyState icon={Calendar} title="No upcoming deadlines" subtitle="Add due dates to your tasks to see them here." />
@@ -221,16 +435,20 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             <div className="space-y-1">
               {upcomingTodos.map((todo) => {
                 const dDate = new Date(todo.due_date! + 'T00:00:00');
-                const daysAway = Math.ceil((dDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                const daysAway = Math.ceil((dDate.getTime() - Date.now()) / 86400000);
                 return (
                   <div key={todo.id} className="flex items-center gap-3 rounded-md px-1 py-2">
-                    <div className="w-10 shrink-0 font-mono">
-                      <div className="text-[9px] uppercase tracking-wider text-[#5c6168]">{dDate.toLocaleDateString('en-US', { month: 'short' })}</div>
-                      <div className="text-sm text-[#d7d8dc]">{dDate.getDate()}</div>
+                    <div className="flex w-11 shrink-0 flex-col items-center justify-center font-mono leading-tight">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                        {dDate.toLocaleDateString('en-US', { month: 'short' })}
+                      </span>
+                      <span className="text-base font-semibold tabular-nums text-zinc-900">{dDate.getDate()}</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-[#c9cbd0]">{todo.title}</p>
-                      <span className="font-mono text-[10px] text-[#5c6168]">{daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}</span>
+                      <p className="truncate text-sm text-zinc-800">{todo.title}</p>
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        {daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `${daysAway}d`}
+                      </span>
                     </div>
                   </div>
                 );
@@ -238,8 +456,71 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
             </div>
           )}
         </Card>
+
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Today</h3>
+            <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+              <Flame className="h-3 w-3" />
+              {streak}d streak
+            </span>
+          </div>
+          <div className="space-y-3">
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Habits today</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">
+                {habits.length ? `${todayHabitDone}/${habits.length}` : '—'}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                {habits.length
+                  ? `${Math.round((todayHabitDone / Math.max(habits.length, 1)) * 100)}% complete`
+                  : 'Add habits to track'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Focus today</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{focusLabel}</p>
+              <p className="text-[11px] text-zinc-500">{weekFocusLabel} this week</p>
+            </div>
+            <div className="rounded-xl border border-zinc-200/50 bg-white/40 px-3 py-3">
+              <p className="text-xs font-medium text-zinc-500">Open tasks</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{activeTodos.length}</p>
+              <p className="text-[11px] text-zinc-500">{deadlineCount} due within 7 days</p>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
+    </>
+  );
+}
+
+function InsightTile({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  onOpen,
+}: {
+  icon: typeof BookOpen;
+  label: string;
+  value: string;
+  hint: string;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="glass group rounded-2xl p-4 text-left font-mono transition-colors hover:bg-white/50"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-zinc-500" />
+        <span className="text-[11px] lowercase tracking-wide text-zinc-500">{label}</span>
+      </div>
+      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
+      <div className="mt-1 text-[11px] lowercase text-zinc-500">{hint}</div>
+    </button>
   );
 }
 

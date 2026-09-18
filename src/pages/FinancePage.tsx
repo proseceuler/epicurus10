@@ -1,11 +1,34 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { onDataChanged } from '@/lib/assistant/sync';
 import {
   type FinanceSettings, type FinanceTransaction, type FinanceGoal,
   type ExpenseCategory, EXPENSE_CATEGORIES,
 } from '@/lib/types';
 import { Card, PageHeader, Button, Input, Select, EmptyState } from '@/components/kit';
-import { Wallet, Plus, Trash2, Target, TrendingDown, PiggyBank, ArrowRight, TrendingUp } from 'lucide-react';
+import { ExpenseOverlay } from '@/pages/finance/ExpenseOverlay';
+import { MotionCollapse } from '@/components/MotionUI';
+import { Wallet, Plus, Trash2, Target, TrendingDown, PiggyBank, ArrowRight, TrendingUp, ExternalLink } from 'lucide-react';
+
+function normalizeGoalUrl(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function faviconFor(url?: string | null): string | null {
+  const href = url ? normalizeGoalUrl(url) : null;
+  if (!href) return null;
+  try {
+    return `https://www.google.com/s2/favicons?domain=${new URL(href).hostname}&sz=32`;
+  } catch {
+    return null;
+  }
+}
+
+const PHP = String.fromCharCode(0x20B1);
+const MID = String.fromCharCode(0x00B7);
 
 export default function FinancePage() {
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
@@ -15,7 +38,7 @@ export default function FinancePage() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ category: 'food' as ExpenseCategory, amount: '', description: '' });
-  const [goalForm, setGoalForm] = useState({ name: '', target: '' });
+  const [goalForm, setGoalForm] = useState({ name: '', target: '', url: '' });
   const [allowanceInput, setAllowanceInput] = useState('');
   const [periodInput, setPeriodInput] = useState<'weekly' | 'monthly'>('weekly');
 
@@ -36,6 +59,7 @@ export default function FinancePage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => onDataChanged(() => { void loadData(); }), [loadData]);
 
   const saveAllowance = async () => {
     const amount = parseFloat(allowanceInput) || 0;
@@ -74,11 +98,14 @@ export default function FinancePage() {
     const target = parseFloat(goalForm.target);
     if (!goalForm.name.trim() || isNaN(target) || target <= 0) return;
     const { data } = await supabase.from('finance_goals').insert({
-      name: goalForm.name.trim(), target_amount: target, saved_amount: 0,
+      name: goalForm.name.trim(),
+      target_amount: target,
+      saved_amount: 0,
+      url: normalizeGoalUrl(goalForm.url),
     }).select().single();
     if (data) {
       setGoals([...goals, data as FinanceGoal]);
-      setGoalForm({ name: '', target: '' });
+      setGoalForm({ name: '', target: '', url: '' });
       setShowAddGoal(false);
     }
   };
@@ -99,26 +126,33 @@ export default function FinancePage() {
   };
 
   const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const remaining = settings ? Number(settings.allowance_amount) - totalSpent : 0;
+  const allowanceAmt = settings ? Number(settings.allowance_amount) || 0 : 0;
+  const remaining = settings ? allowanceAmt - totalSpent : 0;
 
   const today = new Date();
-  const periodStart = settings ? new Date(settings.period_start_date) : today;
+  today.setHours(0, 0, 0, 0);
+  let periodStart = today;
+  if (settings?.period_start_date) {
+    const parsed = new Date(settings.period_start_date);
+    if (!Number.isNaN(parsed.getTime())) periodStart = parsed;
+  }
+  periodStart.setHours(0, 0, 0, 0);
   const periodEnd = settings?.allowance_period === 'weekly'
     ? new Date(periodStart.getTime() + 7 * 24 * 60 * 60 * 1000)
     : new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, periodStart.getDate());
 
-  const remainingDays = Math.max(1, Math.ceil((periodEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-  const schoolDaysLeft = settings
-    ? Math.max(1, Math.ceil(remainingDays * settings.school_days_per_week / 7))
-    : 1;
-  const dailySafeSpend = remaining > 0 ? remaining / schoolDaysLeft : 0;
+  const rawDays = Math.ceil((periodEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingDays = Number.isFinite(rawDays) ? Math.max(1, rawDays) : 1;
+  const schoolPerWeek = Number(settings?.school_days_per_week);
+  const schoolDaysPerWeek = Number.isFinite(schoolPerWeek) && schoolPerWeek > 0 ? schoolPerWeek : 5;
+  const schoolDaysLeft = Math.max(1, Math.ceil(remainingDays * schoolDaysPerWeek / 7));
+  const dailySafeSpend = remaining > 0 && schoolDaysLeft > 0 ? remaining / schoolDaysLeft : 0;
 
   const categoryTotals = EXPENSE_CATEGORIES.map((cat) => ({
     ...cat,
     total: transactions.filter((t) => t.category === cat.key).reduce((sum, t) => sum + Number(t.amount), 0),
   }));
 
-  // 14-day spending trend
   const spendingTrend = useMemo(() => {
     const days: { date: string; total: number; label: string }[] = [];
     for (let i = 13; i >= 0; i--) {
@@ -143,12 +177,11 @@ export default function FinancePage() {
     <div>
       <PageHeader
         title="Baon Tracker"
-        subtitle="Student allowance manager · Track spending · Save for goals"
-        action={<Button onClick={() => setShowAddExpense(!showAddExpense)}><Plus className="w-4 h-4" /> Add Expense</Button>}
+        subtitle={`Student allowance manager ${MID} Track spending ${MID} Save for goals`}
+        action={<Button onClick={() => setShowAddExpense(true)}><Plus className="w-4 h-4" /> Add Expense</Button>}
       />
 
       <div className="grid lg:grid-cols-3 gap-6 mb-6">
-        {/* Allowance — light card, dark text for readability */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center">
@@ -157,15 +190,28 @@ export default function FinancePage() {
             <span className="font-semibold text-zinc-800">Allowance (Baon)</span>
           </div>
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount</label>
-              <div className="flex gap-2">
-                <Input value={allowanceInput} onChange={setAllowanceInput} type="number" placeholder="0" className="flex-1" />
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-base font-semibold text-zinc-500">{PHP}</span>
+                  <Input
+                    value={allowanceInput}
+                    onChange={setAllowanceInput}
+                    type="number"
+                    placeholder="0.00"
+                    size="lg"
+                    className="pl-9 pr-3"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Period</label>
                 <Select
                   value={periodInput}
                   onChange={(v) => setPeriodInput(v as 'weekly' | 'monthly')}
                   options={[{ value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]}
-                  className="w-28"
+                  className="h-11 w-full"
                 />
               </div>
             </div>
@@ -175,15 +221,14 @@ export default function FinancePage() {
           <div className="mt-6 pt-6 border-t border-zinc-200/40">
             <p className="text-xs font-medium text-zinc-500 mb-1">Daily Safe-to-Spend</p>
             <div className="text-4xl font-bold text-zinc-900">
-              ₱{dailySafeSpend.toFixed(2)}
+              {PHP}{(Number.isFinite(dailySafeSpend) ? dailySafeSpend : 0).toFixed(2)}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
-              ₱{remaining.toFixed(2)} left · {schoolDaysLeft} school days remaining
+              {PHP}{(Number.isFinite(remaining) ? remaining : 0).toFixed(2)} left {MID} {Number.isFinite(schoolDaysLeft) ? schoolDaysLeft : 0} school days remaining
             </p>
           </div>
         </Card>
 
-        {/* Spending breakdown */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center">
@@ -198,7 +243,7 @@ export default function FinancePage() {
                 <div key={cat.key}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm text-zinc-600">{cat.emoji} {cat.label}</span>
-                    <span className="text-sm font-semibold text-zinc-800">₱{cat.total.toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-zinc-800">{PHP}{cat.total.toFixed(2)}</span>
                   </div>
                   <div className="h-2 bg-zinc-200/50 rounded-full overflow-hidden">
                     <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -209,11 +254,10 @@ export default function FinancePage() {
           </div>
           <div className="mt-4 pt-4 border-t border-zinc-200/40 flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-700">Total Spent</span>
-            <span className="text-lg font-bold text-zinc-900">₱{totalSpent.toFixed(2)}</span>
+            <span className="text-lg font-bold text-zinc-900">{PHP}{totalSpent.toFixed(2)}</span>
           </div>
         </Card>
 
-        {/* Savings Goals */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -222,18 +266,24 @@ export default function FinancePage() {
               </div>
               <span className="font-semibold text-zinc-800">Savings Goals</span>
             </div>
-            <button onClick={() => setShowAddGoal(!showAddGoal)} className="text-zinc-400 hover:text-zinc-700">
-              <Plus className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => setShowAddGoal(!showAddGoal)}
+              aria-label={showAddGoal ? 'Close add goal' : 'Add goal'}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
+            >
+              <Plus className={`h-4 w-4 transition-transform duration-200 ${showAddGoal ? 'rotate-45' : ''}`} />
             </button>
           </div>
 
-          {showAddGoal && (
-            <div className="space-y-2 mb-3 pb-3 border-b border-zinc-200/40">
+          <MotionCollapse open={showAddGoal} className="mb-3">
+            <div className="space-y-2 pb-3 border-b border-zinc-200/40">
               <Input value={goalForm.name} onChange={(v) => setGoalForm({ ...goalForm, name: v })} placeholder="Goal name (e.g. Keyboard)" />
               <Input value={goalForm.target} onChange={(v) => setGoalForm({ ...goalForm, target: v })} type="number" placeholder="Target amount" />
+              <Input value={goalForm.url} onChange={(v) => setGoalForm({ ...goalForm, url: v })} placeholder="Link (optional) - store, listing, wishlist" />
               <Button onClick={addGoal} size="sm" className="w-full">Add Goal</Button>
             </div>
-          )}
+          </MotionCollapse>
 
           {goals.length === 0 ? (
             <p className="text-sm text-zinc-400 text-center py-4">No savings goals yet.</p>
@@ -241,20 +291,38 @@ export default function FinancePage() {
             <div className="space-y-3">
               {goals.map((goal) => {
                 const pct = goal.target_amount > 0 ? Math.min((goal.saved_amount / goal.target_amount) * 100, 100) : 0;
+                const href = goal.url ? normalizeGoalUrl(goal.url) : null;
+                const fav = faviconFor(goal.url);
                 return (
                   <div key={goal.id} className="group">
                     <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Target className="w-3.5 h-3.5 text-zinc-500" />
-                        <span className="text-sm font-medium text-zinc-700">{goal.name}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {fav ? (
+                          <img src={fav} alt="" width={16} height={16} className="w-4 h-4 rounded-sm shrink-0" />
+                        ) : (
+                          <Target className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                        )}
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-zinc-700 hover:text-zinc-900 truncate inline-flex items-center gap-1"
+                          >
+                            {goal.name}
+                            <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-sm font-medium text-zinc-700 truncate">{goal.name}</span>
+                        )}
                       </div>
                       <button onClick={() => deleteGoal(goal.id)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
-                      <span>₱{goal.saved_amount.toFixed(2)}</span>
-                      <span>₱{goal.target_amount.toFixed(2)}</span>
+                      <span>{PHP}{goal.saved_amount.toFixed(2)}</span>
+                      <span>{PHP}{goal.target_amount.toFixed(2)}</span>
                     </div>
                     <div className="h-2 bg-zinc-200/50 rounded-full overflow-hidden mb-2">
                       <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -264,7 +332,7 @@ export default function FinancePage() {
                         onClick={() => transferLeftover(goal.id)}
                         className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900 font-medium"
                       >
-                        <ArrowRight className="w-3 h-3" /> Transfer leftover (₱{remaining.toFixed(2)})
+                        <ArrowRight className="w-3 h-3" /> Transfer leftover ({PHP}{remaining.toFixed(2)})
                       </button>
                     )}
                   </div>
@@ -275,7 +343,6 @@ export default function FinancePage() {
         </Card>
       </div>
 
-      {/* 14-day spending trend */}
       <Card className="p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-4 h-4 text-zinc-600" />
@@ -287,7 +354,7 @@ export default function FinancePage() {
             return (
               <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
                 <span className="text-[9px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                  ₱{d.total.toFixed(0)}
+                  {PHP}{d.total.toFixed(0)}
                 </span>
                 <div
                   className={`w-full rounded-t transition-all ${d.total > 0 ? 'bg-zinc-700' : 'bg-zinc-200/50'}`}
@@ -300,32 +367,13 @@ export default function FinancePage() {
         </div>
       </Card>
 
-      {showAddExpense && (
-        <Card className="p-4 mb-6">
-          <div className="grid sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Category</label>
-              <Select
-                value={expenseForm.category}
-                onChange={(v) => setExpenseForm({ ...expenseForm, category: v as ExpenseCategory })}
-                options={EXPENSE_CATEGORIES.map((c) => ({ value: c.key, label: `${c.emoji} ${c.label}` }))}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Amount (₱)</label>
-              <Input value={expenseForm.amount} onChange={(v) => setExpenseForm({ ...expenseForm, amount: v })} type="number" placeholder="0.00" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-500 mb-1 block">Description</label>
-              <Input value={expenseForm.description} onChange={(v) => setExpenseForm({ ...expenseForm, description: v })} placeholder="Optional note" />
-            </div>
-          </div>
-          <div className="flex gap-2 mt-3">
-            <Button onClick={addExpense} size="sm">Add Expense</Button>
-            <Button onClick={() => setShowAddExpense(false)} variant="ghost" size="sm">Cancel</Button>
-          </div>
-        </Card>
-      )}
+      <ExpenseOverlay
+        open={showAddExpense}
+        onClose={() => setShowAddExpense(false)}
+        form={expenseForm}
+        setForm={setExpenseForm}
+        onAdd={() => void addExpense()}
+      />
 
       {transactions.length === 0 ? (
         <EmptyState icon={Wallet} title="No expenses logged" subtitle="Add your first expense to start tracking your baon." />
@@ -339,9 +387,9 @@ export default function FinancePage() {
                   <span className="text-xl">{cat?.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-700">{t.description || cat?.label}</p>
-                    <p className="text-xs text-zinc-400">{cat?.label} · {new Date(t.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    <p className="text-xs text-zinc-400">{cat?.label} {MID} {new Date(t.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                   </div>
-                  <span className="text-sm font-bold text-zinc-900">₱{Number(t.amount).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-zinc-900">{PHP}{Number(t.amount).toFixed(2)}</span>
                   <button onClick={() => deleteExpense(t.id)} className="text-zinc-300 hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="w-4 h-4" />
                   </button>

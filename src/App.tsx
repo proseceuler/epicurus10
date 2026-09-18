@@ -1,57 +1,110 @@
-import { AnimatePresence, motion } from 'motion/react';
-import type { ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { PomodoroProvider } from '@/context/PomodoroContext';
-import AppLayout, { usePageState } from '@/components/AppLayout';
-import DashboardPage from '@/pages/DashboardPage';
-import GradesPage from '@/pages/GradesPage';
-import ClassHubPage from '@/pages/ClassHubPage';
-import TodosPage from '@/pages/TodosPage';
-import KanbanPage from '@/pages/KanbanPage';
-import CalendarPage from '@/pages/CalendarPage';
-import PomodoroPage from '@/pages/PomodoroPage';
-import HabitsPage from '@/pages/HabitsPage';
-import FinancePage from '@/pages/FinancePage';
-import NotesPage from '@/pages/NotesPage';
-import FlashcardsPage from '@/pages/FlashcardsPage';
-import SettingsPage from '@/pages/SettingsPage';
+import { startDbSync } from '@/lib/dbSync';
+import { ConfirmProvider } from '@/components/ConfirmProvider';
+import AppLayout, { usePageState, type PageId } from '@/components/AppLayout';
+import { motionTransition, pageMotion } from '@/lib/motion';
 import './rice.css';
+import './styles.css';
+import './motion.css';
+
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const GradesPage = lazy(() => import('@/pages/GradesPage'));
+const ClassHubPage = lazy(() => import('@/pages/ClassHubPage'));
+const TodosPage = lazy(() => import('@/pages/TodosPage'));
+const KanbanPage = lazy(() => import('@/pages/KanbanPage'));
+const CalendarPage = lazy(() => import('@/pages/CalendarPage'));
+const PomodoroPage = lazy(() => import('@/pages/PomodoroPage'));
+const HabitsPage = lazy(() => import('@/pages/HabitsPage'));
+const FinancePage = lazy(() => import('@/pages/FinancePage'));
+const NotesPage = lazy(() => import('@/pages/NotesPage'));
+const FlashcardsPage = lazy(() => import('@/pages/FlashcardsPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const DrivePage = lazy(() => import('@/pages/DrivePage'));
+
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+if (typeof window !== 'undefined') {
+  startDbSync();
+}
+
+function useCompactUi() {
+  const [compact, setCompact] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1279px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1279px)');
+    const onChange = () => setCompact(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return compact;
+}
+
+function ActivePage({ page, navigate }: { page: PageId; navigate: (p: PageId, focus?: string | null) => void }) {
+  switch (page) {
+    case 'grades':
+    case 'forecast':
+      return <GradesPage />;
+    case 'classhub':
+      return <ClassHubPage />;
+    case 'todos':
+      return <TodosPage />;
+    case 'kanban':
+      return <KanbanPage />;
+    case 'calendar':
+      return <CalendarPage />;
+    case 'notes':
+      return <NotesPage />;
+    case 'drive':
+      return <DrivePage />;
+    case 'pomodoro':
+    case 'analytics':
+      return <PomodoroPage />;
+    case 'habits':
+      return <HabitsPage />;
+    case 'finance':
+      return <FinancePage />;
+    case 'flashcards':
+      return <FlashcardsPage />;
+    case 'settings':
+      return <SettingsPage />;
+    default:
+      return <DashboardPage navigate={navigate} />;
+  }
+}
 
 function App() {
   const [page, navigate] = usePageState();
-
-  const pages: Record<string, ReactNode> = {
-    dashboard: <DashboardPage navigate={navigate} />,
-    grades: <GradesPage />,
-    forecast: <GradesPage />,
-    classhub: <ClassHubPage />,
-    assistant: <DashboardPage navigate={navigate} />,
-    todos: <TodosPage />,
-    kanban: <KanbanPage />,
-    calendar: <CalendarPage />,
-    notes: <NotesPage />,
-    pomodoro: <PomodoroPage />,
-    analytics: <PomodoroPage />,
-    habits: <HabitsPage />,
-    finance: <FinancePage />,
-    flashcards: <FlashcardsPage />,
-    settings: <SettingsPage />,
-  };
+  const reduceMotion = useReducedMotion();
+  const compact = useCompactUi();
+  const quiet = Boolean(reduceMotion || compact);
 
   return (
     <PomodoroProvider>
-      <AppLayout page={page} navigate={navigate}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={page}
-            initial={{ opacity: 0, filter: 'blur(8px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, filter: 'blur(6px)' }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
-          >
-            {pages[page] ?? pages.dashboard}
-          </motion.div>
-        </AnimatePresence>
-      </AppLayout>
+      <ConfirmProvider>
+        <AppLayout page={page} navigate={navigate}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={page}
+              className="min-h-full"
+              initial={quiet ? false : pageMotion.initial}
+              animate={pageMotion.animate}
+              exit={quiet ? pageMotion.animate : pageMotion.exit}
+              transition={motionTransition(quiet, 0.2)}
+            >
+              <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+                <ActivePage page={page} navigate={navigate} />
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
+        </AppLayout>
+      </ConfirmProvider>
     </PomodoroProvider>
   );
 }

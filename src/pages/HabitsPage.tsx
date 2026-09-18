@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MotionSwap } from '@/components/MotionUI';
+import { Select } from '@/components/kit';
 import { supabase } from '@/lib/supabase';
 import type { Habit, HabitCompletion } from '@/lib/types';
-import { HomeView, TrackView, DashView, InsightsView, type View } from '@/components/habits/views';
+import { HomeView, type View } from '@/components/habits/views';
+import { TrackView } from '@/components/habits/views-track';
+import { DashView, InsightsView } from '@/components/habits/views-rest';
 import {
   MONTHS, monthDays, doneSet, isDone, todayIso, lastNDays, lifetimePct,
 } from '@/lib/habit-stats';
+import { awardXP } from '@/lib/xp';
+import { onDataChanged } from '@/lib/assistant/sync';
+import { useHashFocus } from '@/lib/routeFocus';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -35,6 +42,7 @@ function dedupeHabits(list: Habit[]) {
 
 export default function HabitsPage() {
   const [view, setView] = useState<View>('home');
+  const hashFocus = useHashFocus();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +76,11 @@ export default function HabitsPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => onDataChanged(() => { void load(); }), [load]);
+  useEffect(() => {
+    if (!hashFocus) return;
+    if (hashFocus === 'home' || hashFocus === 'track' || hashFocus === 'dash' || hashFocus === 'insights') setView(hashFocus);
+  }, [hashFocus]);
 
   const days = useMemo(() => monthDays(year, month), [year, month]);
   const weeks = useMemo(() => {
@@ -82,7 +95,10 @@ export default function HabitsPage() {
       setCompletions((cur) => cur.filter((c) => c.id !== existing.id));
     } else {
       const { data } = await supabase.from('habit_completions').insert({ habit_id: habitId, completion_date: dateStr }).select().single();
-      if (data) setCompletions((cur) => [...cur, data as HabitCompletion]);
+      if (data) {
+        setCompletions((cur) => [...cur, data as HabitCompletion]);
+        awardXP({ type: 'habit_complete', date: dateStr });
+      }
     }
   };
 
@@ -100,7 +116,7 @@ export default function HabitsPage() {
     await supabase.from('habit_completions').delete().eq('habit_id', id);
     await supabase.from('habits').delete().eq('id', id);
     setHabits((cur) => cur.filter((h) => h.id !== id));
-    setCompletions((cur) => cur.filter((c) => c.habit_id !== id));
+    setCompletions((cur) => cur.filter((c) => c.id !== id));
   };
 
   const life = lifetimePct(habits, completions);
@@ -116,20 +132,24 @@ export default function HabitsPage() {
   }
 
   return (
-    <div className="ht-shell min-h-[calc(100vh-5.5rem)] pb-16">
+    <div className={`ht-shell ${view === 'home' ? 'flex h-[calc(100vh-8.25rem)] max-h-[calc(100vh-8.25rem)] flex-col overflow-visible' : 'min-h-[calc(100vh-5.5rem)] pb-16'}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-800">Habit Tracker</h2>
         <div className="flex items-center gap-1">
           {VIEWS.map((v) => (
-            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
+            <button key={v.id} type="button" onClick={() => setView(v.id)} className={`epic-press rounded px-2 py-0.5 text-[11px] font-medium ${view === v.id ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800'}`}>{v.label}</button>
           ))}
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
-            {MONTHS.map((m, i) => <option key={m} value={i}>{m.slice(0, 3)}</option>)}
-          </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-[11px] text-zinc-700">
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <Select className="w-[5.5rem]" value={String(month)} onChange={(v) => setMonth(Number(v))} options={MONTHS.map((m, i) => ({ value: String(i), label: m.slice(0, 3) }))} />
+          <Select className="w-[4.5rem]" value={String(year)} onChange={(v) => setYear(Number(v))} options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => ({ value: String(y), label: String(y) }))} />
         </div>
+      </div>
+      <div className={view === 'home' ? 'flex min-h-0 flex-1 items-center justify-center overflow-visible' : ''}>
+      <MotionSwap id={view}>
+      {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
+      {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}
+      {view === 'dash' && <DashView habits={habits} days={days} weeks={weeks} done={done} monthLabel={`${MONTHS[month]} ${year}`} year={year} />}
+      {view === 'insights' && <InsightsView habits={habits} days={days} weeks={weeks} done={done} />}
+      </MotionSwap>
       </div>
       {view === 'home' && <HomeView habits={habits} done={done} today={today} life={life} todayLeft={todayLeft} dailyScores={dailyScores} completions={completions} onGo={setView} />}
       {view === 'track' && <TrackView habits={habits} weeks={weeks} days={days} done={done} today={today} year={year} month={month} showAdd={showAdd} draft={draft} setDraft={setDraft} setShowAdd={setShowAdd} onToggle={toggle} onAdd={() => void addHabit()} onRemove={removeHabit} life={life} />}

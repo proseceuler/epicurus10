@@ -142,24 +142,33 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
-  const [pos, setPos] = useState({ x: 60, y: 80 });
+  const [pos, setPos] = useState(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    return { x: isMobile ? 12 : 60, y: isMobile ? 60 : 80 };
+  });
   const dragRef = useRef(false);
   const offsetRef = useRef({ x: 0, y: 0 });
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!dragRef.current) return;
       setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
     };
     const onUp = () => { dragRef.current = false; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
   }, []);
 
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.PointerEvent) => {
     if (!detached) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = true;
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
   };
@@ -227,16 +236,17 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
     audioRef.current.play().catch(() => {});
   };
 
-  const containerClass = detached ? 'fixed z-[70] w-96' : 'w-full max-w-[400px] mx-auto';
-  const style = detached ? { left: pos.x, top: pos.y } : undefined;
+  const containerClass = detached
+    ? 'fixed z-[70] w-[min(13.5rem,calc(100vw-1.5rem))] sm:w-[min(15rem,calc(100vw-1.5rem))] md:w-[min(18rem,calc(100vw-1.5rem))]'
+    : 'w-full min-w-0 max-w-[min(18rem,calc(100vw-1.5rem))] mx-auto';
+  const style = detached ? { left: pos.x, top: pos.y, touchAction: 'none' as const } : undefined;
 
   return (
     <div className={containerClass} style={style}>
-      <div className="glass glass-shadow-lg rounded-3xl overflow-hidden">
-        {/* Title bar */}
+      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
         <div
-          className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
-          onMouseDown={onDragStart}
+          className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move touch-none' : ''}`}
+          onPointerDown={onDragStart}
         >
           <div className="flex items-center gap-2">
             {detached && <GripHorizontal className="w-3.5 h-3.5 text-zinc-400" />}
@@ -259,7 +269,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
           </div>
         </div>
 
-        {/* Search bar */}
         <div className="px-4 py-3 border-b border-zinc-200/30">
           <div className="flex gap-2">
             <input
@@ -267,18 +276,17 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && search(query)}
               placeholder="Look up a word..."
-              className="flex-1 px-3 py-1.5 glass-input rounded-xl text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
+              className="flex-1 min-w-0 px-3 py-1.5 glass-input rounded-xl text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
               autoFocus
             />
-            <button onClick={() => search(query)} disabled={loading} className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1">
+            <button onClick={() => search(query)} disabled={loading} className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1 shrink-0">
               <Search className="w-3.5 h-3.5" />
               {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Go'}
             </button>
           </div>
         </div>
 
-        {/* Results */}
-        <div className="max-h-[420px] overflow-y-auto">
+        <div className="max-h-[min(26rem,60dvh)] overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
@@ -299,7 +307,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
             <div className="px-5 py-4 space-y-4" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
               {entries.map((entry, idx) => (
                 <div key={idx} className={idx > 0 ? 'pt-4 border-t border-zinc-200/40' : ''}>
-                  {/* Headword */}
                   <div className="border-b border-zinc-300/40 pb-2 mb-3">
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="text-2xl font-bold text-zinc-900 lowercase">{entry.word}</span>
@@ -320,7 +327,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     )}
                   </div>
 
-                  {/* Definitions */}
                   {entry.definitions.length > 0 && (
                     <ol className="space-y-2 mb-3">
                       {entry.definitions.map((def, i) => (
@@ -332,7 +338,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     </ol>
                   )}
 
-                  {/* Usage notes */}
                   {entry.usageNotes && (
                     <div className="mb-3 p-2.5 rounded-lg bg-amber-50/60 border border-amber-100/50">
                       <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Usage</p>
@@ -340,7 +345,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     </div>
                   )}
 
-                  {/* Etymology */}
                   {entry.etymology && (
                     <div className="mb-3">
                       <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-0.5">Etymology</p>
@@ -348,7 +352,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     </div>
                   )}
 
-                  {/* Examples */}
                   {entry.examples.length > 0 && (
                     <div className="mb-3">
                       <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1">Examples in context</p>
@@ -362,7 +365,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     </div>
                   )}
 
-                  {/* Synonyms & Antonyms */}
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     {entry.synonyms.length > 0 && (
                       <div>
@@ -398,7 +400,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     )}
                   </div>
 
-                  {/* Related words */}
                   {entry.relatedWords.length > 0 && (
                     <div className="pt-2 border-t border-zinc-200/40">
                       <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Related Words</p>

@@ -3,6 +3,17 @@ export const MW_KEY = 'epicure-mw-key';
 export const MODEL_KEY = 'epicure-default-model';
 export const TAVILY_KEY = 'epicure-tavily-key';
 export const SAPLING_KEY = 'epicure-sapling-key';
+export const PINECONE_KEY = 'epicure-pinecone-key';
+export const PINECONE_HOST = 'epicure-pinecone-host';
+export const GROQ_KEY = 'epicure-groq-key';
+export const FISH_KEY = 'epicure-fish-key';
+export const KOKORO_URL = 'epicure-kokoro-url';
+export const KOKORO_KEY = 'epicure-kokoro-key';
+export const KOKORO_VOICE = 'epicure-kokoro-voice';
+export const TTS_ENGINE = 'epicure-tts-engine';
+export const ARRODES_FRAME_PNG = 'epicure-arrodes-frame-png';
+
+export type TtsEngine = 'auto' | 'kokoro' | 'fish' | 'browser';
 
 function read(key: string, fallback = '') {
   if (typeof window === 'undefined') return fallback;
@@ -23,10 +34,39 @@ export const getSaplingKey = () =>
   import.meta.env.VITE_SAPLING_API_KEY ||
   '';
 
+export const getPineconeKey = () =>
+  read(PINECONE_KEY, import.meta.env.VITE_PINECONE_API_KEY || '');
+
+export const getPineconeHost = () =>
+  read(PINECONE_HOST, import.meta.env.VITE_PINECONE_HOST || '');
+
+export const getGroqKey = () =>
+  read(GROQ_KEY, import.meta.env.VITE_GROQ_API_KEY || '');
+
+export const getFishKey = () =>
+  read(FISH_KEY, import.meta.env.VITE_FISH_API_KEY || '');
+
+export const getKokoroUrl = () =>
+  read(KOKORO_URL, import.meta.env.VITE_KOKORO_URL || '');
+
+export const getKokoroKey = () =>
+  read(KOKORO_KEY, import.meta.env.VITE_KOKORO_API_KEY || '');
+
+export const getKokoroVoice = () =>
+  read(KOKORO_VOICE, import.meta.env.VITE_KOKORO_VOICE || 'af_heart') || 'af_heart';
+
+export const getTtsEngine = (): TtsEngine => {
+  const raw = read(TTS_ENGINE, import.meta.env.VITE_TTS_ENGINE || 'auto');
+  return raw === 'kokoro' || raw === 'fish' || raw === 'browser' || raw === 'auto' ? raw : 'auto';
+};
+
 export const getDefaultModel = () => read(MODEL_KEY);
+
+export const getArrodesFramePng = () => read(ARRODES_FRAME_PNG);
 
 export function saveKey(key: string, value: string) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(key, value);
-  window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }));
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
+  window.dispatchEvent(new StorageEvent('storage', { key, newValue: value || null }));
 }

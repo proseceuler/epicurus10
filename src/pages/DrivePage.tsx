@@ -15,6 +15,7 @@ import {
   fetchSignedUrl, GridThumb, SkeletonGrid, loadStarred, saveStarred, loadRecent,
   pushRecent, typeFilterMatch, sortItems, TAG_COLORS, FOLDER_TINTS,
   loadTags, saveTags, loadFolderColors, saveFolderColors,
+  // pinned helpers inlined below
 } from './driveKit';
 
 export default function DrivePage() {
@@ -37,6 +38,10 @@ export default function DrivePage() {
   const [tags, setTags] = useState<Record<string, TagId[]>>(() => loadTags());
   const [folderColors, setFolderColors] = useState<Record<string, TagId>>(() => loadFolderColors());
   const [tagMenu, setTagMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const [pinned, setPinned] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('epicure-drive-pinned') || '[]'); } catch { return []; }
+  });
+  const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: DriveItem } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [newMode, setNewMode] = useState<NewMode>('menu');
@@ -255,6 +260,15 @@ export default function DrivePage() {
       return next;
     });
   };
+  const togglePin = (key: string) => {
+    setPinned((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key].slice(0, 12);
+      localStorage.setItem('epicure-drive-pinned', JSON.stringify(next));
+      return next;
+    });
+  };
+
+
 
   const openViewer = useCallback(async (item: DriveItem) => {
     if (item.type === 'folder') {
@@ -335,8 +349,16 @@ export default function DrivePage() {
     if (peekTimer.current) window.clearTimeout(peekTimer.current);
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     peekTimer.current = window.setTimeout(async () => {
-      const x = Math.min(rect.right + 8, window.innerWidth - 280);
-      const y = Math.min(rect.top, window.innerHeight - 200);
+      const cardW = 256;
+      const cardH = 200;
+      // Prefer right of card; if not enough room, place to the left
+      let x = rect.right + 12;
+      if (x + cardW > window.innerWidth - 12) x = rect.left - cardW - 12;
+      if (x < 12) x = 12;
+      // Keep fully in viewport vertically
+      let y = rect.top;
+      if (y + cardH > window.innerHeight - 12) y = window.innerHeight - cardH - 12;
+      if (y < 12) y = 12;
       let url = urlCache.current.get(item.key);
       if (!url) {
         try {
@@ -345,7 +367,7 @@ export default function DrivePage() {
         } catch { return; }
       }
       setPeek({ item, x, y, url });
-    }, 400);
+    }, 350);
   };
 
   const onItemLeave = () => {
@@ -450,7 +472,13 @@ export default function DrivePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Delete failed');
-      toast.success('Deleted', { description: 'Refresh if items still appear.' });
+      toast.success('Deleted', {
+        description: `${keys.length} item${keys.length > 1 ? 's' : ''} removed`,
+        action: {
+          label: 'Dismiss',
+          onClick: () => {},
+        },
+      });
       setSelectedKeys(new Set());
       if (viewer && keys.includes(viewer.key)) closeViewer();
       void load();
@@ -662,6 +690,51 @@ export default function DrivePage() {
         )}
       </AnimatePresence>
 
+      {/* Pinned folders + suggested (P3) */}
+      {(pinned.length > 0 || (scope === 'files' && loadRecent().length > 0 && !prefix)) && (
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          {pinned.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Pinned</span>
+              {pinned.map((key) => {
+                const name = key.split('/').filter(Boolean).pop() || key || 'Root';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => { setPrefix(key); setScope('files'); }}
+                    className="flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-200"
+                  >
+                    <Folder className="h-3 w-3 text-amber-600/80" />
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {scope === 'files' && !prefix && !search && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Suggested</span>
+              {loadRecent().slice(0, 5).map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => {
+                    const item = items.find((i) => i.key === r.key);
+                    if (item) void openViewer(item);
+                    else toast.message(r.name, { description: 'Open its folder to access this file' });
+                  }}
+                  className="max-w-[140px] truncate rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200/80 transition-colors hover:bg-zinc-100"
+                  title={r.name}
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Main pane */}
         <div
@@ -740,8 +813,8 @@ export default function DrivePage() {
                       onMouseEnter={(e) => onItemEnter(item, e)}
                       onMouseLeave={onItemLeave}
                       onContextMenu={(e) => { e.preventDefault(); selectOnly(item.key); setCtx({ x: e.clientX, y: e.clientY, item }); }}
-                      className={`group relative flex flex-col items-center gap-1.5 rounded-xl text-center transition-all duration-150 ${compact ? 'p-2' : 'p-2.5'} ${
-                        sel ? 'scale-[0.97] bg-zinc-900/10 ring-2 ring-zinc-400/80 shadow-sm' : 'hover:scale-[1.02] hover:bg-zinc-100/80 hover:shadow-sm'
+                      className={`group relative flex flex-col items-center gap-1.5 rounded-xl text-center transition-colors duration-150 ${compact ? 'p-2' : 'p-2.5'} ${
+                        sel ? 'bg-zinc-900/10 ring-2 ring-zinc-400/70' : 'hover:bg-zinc-100/80'
                       }`}
                     >
                       <button type="button" onClick={(e) => toggleSelect(item.key, e)}
@@ -930,7 +1003,11 @@ export default function DrivePage() {
                           </div>
                         </div>
                       )}
-                      <p className="text-[10px] text-zinc-400">Tip: press <kbd className="rounded bg-zinc-100 px-1">Space</kbd> for Quick Look</p>
+                      <div>
+                        <p className="mb-1 text-zinc-500">Linked to</p>
+                        <p className="text-[11px] text-zinc-400">Attach to tasks, notes, or events from those pages (coming soon).</p>
+                      </div>
+                      <p className="text-[10px] text-zinc-400">Tip: press <kbd className="rounded bg-zinc-100 px-1">Space</kbd> for Quick Look · arrows to move selection</p>
                     </div>
                     <div className="flex flex-wrap gap-1 pt-1">
                       <button type="button" className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-white"
@@ -993,7 +1070,7 @@ export default function DrivePage() {
       <AnimatePresence>
         {peek && peek.url && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-            className="glass glass-shadow-lg pointer-events-none fixed z-[90] w-64 overflow-hidden rounded-2xl"
+            className="glass glass-shadow-lg pointer-events-none fixed z-[90] w-64 max-h-[min(220px,70vh)] overflow-hidden rounded-2xl shadow-lg"
             style={{ left: peek.x, top: peek.y }}>
             <div className="aspect-video bg-zinc-100/80">
               {previewKind(peek.item.name) === 'image' ? (
@@ -1014,30 +1091,54 @@ export default function DrivePage() {
         panelClassName="epic-glass-sheet flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden p-0">
         {viewer && (
           <>
-            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-200/50 px-3 py-2">
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+              className="flex shrink-0 items-center gap-1 border-b border-zinc-200/50 px-3 py-2"
+            >
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{viewer.name}</span>
               {kind === 'image' && (
-                <>
-                  <button type="button" disabled={imgIdx <= 0} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30" onClick={() => goSibling(-1)}><ChevronLeft className="h-4 w-4" /></button>
-                  <button type="button" disabled={imgIdx < 0 || imgIdx >= imageSiblings.length - 1} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30" onClick={() => goSibling(1)}><ChevronRight className="h-4 w-4" /></button>
-                  <button type="button" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" onClick={() => setFitMode((f) => !f)}><Maximize2 className="h-4 w-4" /></button>
+                <div className="flex items-center gap-0.5">
+                  <motion.button type="button" whileTap={{ scale: 0.9 }} disabled={imgIdx <= 0}
+                    className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 disabled:opacity-30"
+                    onClick={() => goSibling(-1)} title="Previous"><ChevronLeft className="h-4 w-4" /></motion.button>
+                  <motion.button type="button" whileTap={{ scale: 0.9 }} disabled={imgIdx < 0 || imgIdx >= imageSiblings.length - 1}
+                    className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 disabled:opacity-30"
+                    onClick={() => goSibling(1)} title="Next"><ChevronRight className="h-4 w-4" /></motion.button>
+                  <motion.button type="button" whileTap={{ scale: 0.9 }}
+                    className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100"
+                    onClick={() => setFitMode((f) => !f)} title={fitMode ? 'Zoom' : 'Fit'}><Maximize2 className="h-4 w-4" /></motion.button>
                   {!fitMode && (
                     <>
-                      <button type="button" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}><ZoomOut className="h-4 w-4" /></button>
-                      <button type="button" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}><ZoomIn className="h-4 w-4" /></button>
+                      <motion.button type="button" whileTap={{ scale: 0.9 }} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100"
+                        onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}><ZoomOut className="h-4 w-4" /></motion.button>
+                      <motion.button type="button" whileTap={{ scale: 0.9 }} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100"
+                        onClick={() => setZoom((z) => Math.min(4, z + 0.25))}><ZoomIn className="h-4 w-4" /></motion.button>
                     </>
                   )}
-                </>
+                </div>
               )}
-              <button type="button" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" onClick={() => void downloadItem(viewer)}><Download className="h-4 w-4" /></button>
-              <button type="button" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" onClick={closeViewer}><X className="h-4 w-4" /></button>
-            </div>
+              <motion.button type="button" whileTap={{ scale: 0.9 }} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100"
+                onClick={() => void downloadItem(viewer)} title="Download"><Download className="h-4 w-4" /></motion.button>
+              <motion.button type="button" whileTap={{ scale: 0.9 }} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100"
+                onClick={closeViewer} title="Close"><X className="h-4 w-4" /></motion.button>
+            </motion.div>
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-zinc-900/[0.03] p-3">
               {viewerLoading && <div className="text-sm text-zinc-500">Loading…</div>}
               {viewerError && !viewerLoading && <p className="text-sm text-zinc-600">{viewerError}</p>}
               {!viewerLoading && !viewerError && viewerUrl && kind === 'image' && (
-                <img src={viewerUrl} alt={viewer.name} className="max-h-full max-w-full" draggable={false}
-                  style={fitMode ? { objectFit: 'contain', maxHeight: '100%', maxWidth: '100%' } : { transform: `scale(${zoom})` }} />
+                <motion.img
+                  key={viewer.key}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.25 }}
+                  src={viewerUrl}
+                  alt={viewer.name}
+                  className="max-h-full max-w-full"
+                  draggable={false}
+                  style={fitMode ? { objectFit: 'contain', maxHeight: '100%', maxWidth: '100%' } : { transform: `scale(${zoom})` }}
+                />
               )}
               {!viewerLoading && !viewerError && viewerUrl && kind === 'pdf' && (
                 <iframe title={viewer.name} src={viewerUrl} className="h-full min-h-[60vh] w-full rounded-lg border-0 bg-white" />
@@ -1121,6 +1222,12 @@ export default function DrivePage() {
             onClick={() => { toggleStar(ctx.item.key); setCtx(null); }}>
             <Star className="h-4 w-4" /> {starred.has(ctx.item.key) ? 'Unstar' : 'Star'}
           </button>
+          {ctx.item.type === 'folder' && (
+            <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
+              onClick={() => { togglePin(ctx.item.key); setCtx(null); toast.success(pinned.includes(ctx.item.key) ? 'Unpinned' : 'Pinned'); }}>
+              <Folder className="h-4 w-4" /> {pinned.includes(ctx.item.key) ? 'Unpin' : 'Pin folder'}
+            </button>
+          )}
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
             onClick={() => { setDetailsOpen(true); selectOnly(ctx.item.key); setCtx(null); }}>
             <Info className="h-4 w-4" /> Details

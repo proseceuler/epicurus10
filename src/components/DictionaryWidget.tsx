@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { BookOpen, GripHorizontal, X, Search, Volume2, Loader as Loader2 } from 'lucide-react';
 import { getMwKey } from '@/lib/apiKeys';
 
@@ -168,6 +169,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
 
   const onDragStart = (e: React.PointerEvent) => {
     if (!detached) return;
+    if ((e.target as HTMLElement).closest('button')) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = true;
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
@@ -237,39 +239,39 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-[min(13.5rem,calc(100vw-1.5rem))] sm:w-[min(15rem,calc(100vw-1.5rem))] md:w-[min(18rem,calc(100vw-1.5rem))]'
-    : 'w-full min-w-0 max-w-[min(18rem,calc(100vw-1.5rem))] mx-auto';
-  const style = detached ? { left: pos.x, top: pos.y, touchAction: 'none' as const } : undefined;
+    ? 'fixed z-[100] w-[min(20rem,calc(100vw-1.5rem))]'
+    : 'w-full min-w-0';
+  const style = detached ? { left: pos.x, top: pos.y } : undefined;
 
-  return (
+  const panel = (
     <div className={containerClass} style={style}>
-      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
+      <div className={detached ? 'epic-glass-sheet overflow-hidden rounded-3xl' : 'overflow-hidden'}>
         <div
-          className={`flex items-center justify-between px-4 py-2 border-b border-white/10 ${detached ? 'cursor-move touch-none' : ''}`}
+          className={`flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
           onPointerDown={onDragStart}
         >
-          <div className="flex items-center gap-2">
-            {detached && <GripHorizontal className="w-3.5 h-3.5 text-zinc-400" />}
-            <BookOpen className="w-4 h-4 text-zinc-600" />
-            <span className="text-xs font-medium text-zinc-700">Merriam-Webster Dictionary</span>
+          <div className="flex min-w-0 items-center gap-2">
+            {detached && <GripHorizontal className="w-3.5 h-3.5 shrink-0 text-zinc-400" />}
+            <BookOpen className="w-4 h-4 shrink-0 text-zinc-600" />
+            <span className="truncate text-xs font-medium text-zinc-700">Dictionary</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {detached ? (
-              <button onClick={onSnapBack} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Snap to dock">
+              <button type="button" onClick={onSnapBack} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Snap to dock">
                 ↓
               </button>
             ) : (
-              <button onClick={onDetach} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Detach">
+              <button type="button" onClick={onDetach} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Detach">
                 ↑
               </button>
             )}
-            <button onClick={onClose} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center">
+            <button type="button" onClick={onClose} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center">
               <X className="w-3.5 h-3.5 text-zinc-500" />
             </button>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-zinc-200/30">
+        <div className="px-3 py-3 border-b border-zinc-200/30">
           <div className="flex gap-2">
             <input
               value={query}
@@ -279,7 +281,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
               className="flex-1 min-w-0 px-3 py-1.5 glass-input rounded-xl text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
               autoFocus
             />
-            <button onClick={() => search(query)} disabled={loading} className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1 shrink-0">
+            <button type="button" onClick={() => search(query)} disabled={loading} className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1 shrink-0">
               <Search className="w-3.5 h-3.5" />
               {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Go'}
             </button>
@@ -299,7 +301,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
 
           {!loading && !error && entries.length === 0 && !searched && (
             <div className="px-5 py-8 text-center text-sm text-zinc-400 italic">
-              Enter a word to see full dictionary entries with pronunciation, etymology, and more.
+              Enter a word to see pronunciation, etymology, and more.
             </div>
           )}
 
@@ -319,6 +321,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                     )}
                     {entry.audioUrl && (
                       <button
+                        type="button"
                         onClick={() => playAudio(entry.audioUrl)}
                         className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 text-white text-xs font-medium hover:bg-zinc-800 transition-colors"
                       >
@@ -372,6 +375,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                         <div className="flex flex-wrap gap-1.5">
                           {entry.synonyms.map((syn, i) => (
                             <button
+                              type="button"
                               key={i}
                               onClick={() => { setQuery(syn); search(syn); }}
                               className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-xs hover:bg-emerald-100 transition-colors"
@@ -388,6 +392,7 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
                         <div className="flex flex-wrap gap-1.5">
                           {entry.antonyms.map((ant, i) => (
                             <button
+                              type="button"
                               key={i}
                               onClick={() => { setQuery(ant); search(ant); }}
                               className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-xs hover:bg-red-100 transition-colors"
@@ -420,4 +425,6 @@ export default function DictionaryWidget({ detached, onDetach, onSnapBack, onClo
       </div>
     </div>
   );
+  if (detached && typeof document !== 'undefined') return createPortal(panel, document.body);
+  return panel;
 }

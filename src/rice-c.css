@@ -119,9 +119,10 @@
   transform: none;
 }
 [data-global-dock] .dock-sheet {
-  width: min(22rem, calc(100vw - 1.5rem));
-  min-width: min(20rem, calc(100vw - 1.5rem));
+  width: min(20rem, calc(100vw - 1.5rem));
+  min-width: 0;
   max-width: calc(100vw - 1.5rem);
+  max-height: min(36rem, calc(100vh - 6.5rem));
   overflow: hidden;
   scrollbar-width: none !important;
 }
@@ -165,7 +166,10 @@
   padding: 0 !important;
   border-radius: 999px !important;
   flex: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06) !important;
+  overflow: hidden !important;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.16) !important;
 }
 @media (max-width: 1279px) {
   .rice-main {

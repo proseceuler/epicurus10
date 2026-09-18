@@ -37,10 +37,10 @@ export function Button({
   disabled?: boolean;
 }) {
   const variants = {
-    primary: 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm',
-    secondary: 'glass glass-hover text-zinc-700',
-    ghost: 'hover:bg-zinc-200/50 text-zinc-600',
-    danger: 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600',
+    primary: 'bg-[#d7d8dc] hover:bg-white text-[#0b0c0e]',
+    secondary: 'bg-white/5 hover:bg-white/8 text-[#c9cbd0]',
+    ghost: 'hover:bg-white/5 text-[#8b8f96]',
+    danger: 'bg-white/5 hover:bg-white/8 text-[#9a8f8f]',
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
   return (
@@ -124,9 +124,9 @@ export function SubjectBadge({ shortName }: { shortName: string }) {
 }
 
 export function gradeColor(grade: number | null): string {
-  if (grade === null) return 'text-zinc-300';
-  if (grade >= 85) return 'text-zinc-900';
-  if (grade >= 80) return 'text-zinc-700';
-  if (grade >= 75) return 'text-zinc-500';
-  return 'text-zinc-400';
+  if (grade === null) return 'text-[#3f4349]';
+  if (grade >= 85) return 'text-[#e4e5e8]';
+  if (grade >= 80) return 'text-[#c9cbd0]';
+  if (grade >= 75) return 'text-[#8b8f96]';
+  return 'text-[#6f747c]';
 }

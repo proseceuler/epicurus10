@@ -291,6 +291,29 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
   const weekFocusLabel = `${Math.floor(weekFocus / 60)}h ${weekFocus % 60}m`;
 
+  useEffect(() => {
+    if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
+      setAwake(true);
+      const t = window.setTimeout(() => setAwake(false), 2200);
+      return () => window.clearTimeout(t);
+    }
+  }, [pomodoro.isRunning, pomodoro.lastCompletedAt, streak]);
+
+  const saveSigil = (value: string) => {
+    const next = value.trim() || DEFAULT_SIGIL;
+    setSigil(next);
+    try {
+      localStorage.setItem(SIGIL_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    setEditingSigil(false);
+  };
+
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
+  const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -497,6 +520,24 @@ function InsightTile({
       </div>
       <div className="text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
       <div className="mt-1 text-[11px] lowercase text-zinc-500">{hint}</div>
+    </button>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p>
+      <span className="inline-block w-[7.5rem] text-[#5c6168]">{label}:</span>
+      <span className="text-[#c9cbd0]">{value}</span>
+    </p>
+  );
+}
+
+function QuietStat({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="group text-left">
+      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-[#5c6168]">{label}</div>
+      <div className="font-mono text-2xl text-[#e4e5e8]">{value}</div>
     </button>
   );
 }

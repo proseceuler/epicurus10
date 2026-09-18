@@ -1,67 +1,67 @@
-import { Storage, type Bucket } from '@google-cloud/storage';
+import {
+  S3Client,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  HeadObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export type DriveStorageConfig = {
-  projectId: string;
-  clientEmail: string;
-  privateKey: string;
+  region: string;
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
   bucket: string;
 };
 
-function parseServiceAccount(): DriveStorageConfig | null {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
-  if (raw.trim()) {
-    try {
-      const parsed = JSON.parse(raw) as {
-        project_id?: string;
-        client_email?: string;
-        private_key?: string;
-      };
-      const projectId = parsed.project_id || process.env.FIREBASE_PROJECT_ID || '';
-      const clientEmail = parsed.client_email || '';
-      const privateKey = String(parsed.private_key || '').replace(/\\n/g, '\n');
-      const bucket =
-        process.env.FIREBASE_STORAGE_BUCKET ||
-        process.env.GCS_BUCKET ||
-        (projectId ? `${projectId}.firebasestorage.app` : '');
-      if (projectId && clientEmail && privateKey && bucket) {
-        return { projectId, clientEmail, privateKey, bucket };
-      }
-    } catch {
-      return null;
-    }
-  }
-
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || '';
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  const bucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET || '';
-  if (!projectId || !clientEmail || !privateKey || !bucket) return null;
-  return { projectId, clientEmail, privateKey, bucket };
-}
-
 export function getDriveStorageConfig(): DriveStorageConfig | null {
-  return parseServiceAccount();
+  const accessKeyId =
+    process.env.B2_KEY_ID ||
+    process.env.B2_APPLICATION_KEY_ID ||
+    process.env.BACKBLAZE_KEY_ID ||
+    '';
+  const secretAccessKey =
+    process.env.B2_APPLICATION_KEY ||
+    process.env.B2_KEY ||
+    process.env.BACKBLAZE_APPLICATION_KEY ||
+    '';
+  const bucket = process.env.B2_BUCKET || process.env.B2_BUCKET_NAME || process.env.BACKBLAZE_BUCKET || '';
+  const region = process.env.B2_REGION || process.env.B2_S3_REGION || 'us-west-004';
+  const endpoint =
+    process.env.B2_ENDPOINT ||
+    process.env.B2_S3_ENDPOINT ||
+    `https://s3.${region}.backblazeb2.com`;
+  if (!accessKeyId || !secretAccessKey || !bucket) return null;
+  return { region, endpoint, accessKeyId, secretAccessKey, bucket };
 }
 
 export function storageConfigured() {
   return Boolean(getDriveStorageConfig());
 }
 
-function getBucket(): Bucket {
+function createClient(cfg: DriveStorageConfig) {
+  return new S3Client({
+    region: cfg.region,
+    endpoint: cfg.endpoint,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: cfg.accessKeyId,
+      secretAccessKey: cfg.secretAccessKey,
+    },
+  });
+}
+
+function requireCfg() {
   const cfg = getDriveStorageConfig();
   if (!cfg) {
     throw new Error(
-      'Firebase Storage is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and FIREBASE_STORAGE_BUCKET (or FIREBASE_SERVICE_ACCOUNT JSON).',
+      'Backblaze B2 is not configured. Set B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET, and B2_REGION.',
     );
   }
-  const storage = new Storage({
-    projectId: cfg.projectId,
-    credentials: {
-      client_email: cfg.clientEmail,
-      private_key: cfg.privateKey,
-    },
-  });
-  return storage.bucket(cfg.bucket);
+  return cfg;
 }
 
 export function normalizePrefix(prefix: string) {
@@ -78,91 +78,79 @@ export function joinKey(...parts: string[]) {
 }
 
 export async function listDrive(prefix = '', delimiter = '/') {
-  const bucket = getBucket();
+  const cfg = requireCfg();
+  const client = createClient(cfg);
   const pfx = normalizePrefix(prefix);
-  const queryPrefix = pfx ? `${pfx}/` : '';
-  const [objects, , apiResponse] = await bucket.getFiles({
-    prefix: queryPrefix,
-    delimiter,
-    autoPaginate: false,
-  });
-  const response = apiResponse as { prefixes?: string[] };
-
-  const folders = (response.prefixes || [])
-    .map((raw) => {
-      const key = String(raw || '').replace(/\/+$/, '');
+  const res = await client.send(
+    new ListObjectsV2Command({
+      Bucket: cfg.bucket,
+      Prefix: pfx ? `${pfx}/` : '',
+      Delimiter: delimiter,
+    }),
+  );
+  const folders = (res.CommonPrefixes || [])
+    .map((c) => {
+      const key = (c.Prefix || '').replace(/\/+$/, '');
       const name = key.split('/').filter(Boolean).pop() || key;
       return { type: 'folder' as const, key, name };
     })
     .filter((f) => f.name && f.name !== '.trash');
-
-  const files = objects
-    .filter((o) => o.name && o.name !== queryPrefix && !o.name.endsWith('/'))
+  const files = (res.Contents || [])
+    .filter((o) => o.Key && o.Key !== (pfx ? `${pfx}/` : '') && !o.Key.endsWith('/'))
     .map((o) => {
-      const key = o.name;
+      const key = o.Key!;
       const name = key.split('/').filter(Boolean).pop() || key;
-      const meta = o.metadata || {};
       return {
         type: 'file' as const,
         key,
         name,
-        size: Number(meta.size || 0),
-        modified: (meta.updated as string) || (meta.timeCreated as string) || null,
+        size: o.Size || 0,
+        modified: o.LastModified?.toISOString() || null,
       };
     });
-
   return { folders, files, prefix: pfx };
 }
 
 export async function uploadDrive(key: string, body: Buffer | Uint8Array, contentType?: string) {
-  const bucket = getBucket();
-  const clean = key.replace(/^\/+/, '');
-  const file = bucket.file(clean);
-  await file.save(Buffer.from(body), {
-    resumable: false,
-    contentType: contentType || 'application/octet-stream',
-    metadata: { contentType: contentType || 'application/octet-stream' },
-  });
-  return { key: clean };
+  const cfg = requireCfg();
+  const client = createClient(cfg);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: cfg.bucket,
+      Key: key.replace(/^\/+/, ''),
+      Body: body,
+      ContentType: contentType || 'application/octet-stream',
+    }),
+  );
+  return { key: key.replace(/^\/+/, '') };
 }
 
 export async function deleteDrive(keys: string[]) {
-  const bucket = getBucket();
+  const cfg = requireCfg();
+  const client = createClient(cfg);
   const clean = keys.map((k) => k.replace(/^\/+/, '')).filter(Boolean);
-  await Promise.all(
-    clean.map(async (key) => {
-      try {
-        await bucket.file(key).delete({ ignoreNotFound: true });
-      } catch {
-        /* ignore missing */
-      }
-      if (!key.endsWith('/')) {
-        try {
-          await bucket.file(`${key}/`).delete({ ignoreNotFound: true });
-        } catch {
-          /* ignore */
-        }
-      }
+  if (!clean.length) return;
+  if (clean.length === 1) {
+    await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: clean[0] }));
+    return;
+  }
+  await client.send(
+    new DeleteObjectsCommand({
+      Bucket: cfg.bucket,
+      Delete: { Objects: clean.map((Key) => ({ Key })), Quiet: true },
     }),
   );
 }
 
 export async function signedGetUrl(key: string, expiresIn = 3600) {
-  const bucket = getBucket();
-  const file = bucket.file(key.replace(/^\/+/, ''));
-  const [url] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + expiresIn * 1000,
-  });
-  return url;
+  const cfg = requireCfg();
+  const client = createClient(cfg);
+  const cmd = new GetObjectCommand({ Bucket: cfg.bucket, Key: key.replace(/^\/+/, '') });
+  return getSignedUrl(client, cmd, { expiresIn });
 }
 
 export async function headDrive(key: string) {
-  const bucket = getBucket();
-  const file = bucket.file(key.replace(/^\/+/, ''));
-  const [exists] = await file.exists();
-  if (!exists) throw new Error('Not found');
-  const [metadata] = await file.getMetadata();
-  return metadata;
+  const cfg = requireCfg();
+  const client = createClient(cfg);
+  return client.send(new HeadObjectCommand({ Bucket: cfg.bucket, Key: key.replace(/^\/+/, '') }));
 }

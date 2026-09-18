@@ -110,7 +110,7 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
 
   return (
     <div className={containerClass} style={style}>
-      <div className="epic-glass-sheet overflow-hidden rounded-3xl">
+      <div className={detached ? 'epic-glass-sheet overflow-hidden rounded-3xl' : 'overflow-hidden'}>
         <div
           className={`flex items-center justify-between px-3 py-2 border-b border-white/10 ${detached ? 'cursor-move touch-none' : ''}`}
           onPointerDown={onDragStart}

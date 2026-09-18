@@ -41,6 +41,10 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
   const seconds = pomodoro.timeLeft % 60;
   const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   const toolOpen = open && activeTab !== 'main';
+  const sheetBlocked =
+    (activeTab === 'calculator' && calcDetached) ||
+    (activeTab === 'dictionary' && dictDetached) ||
+    (activeTab === 'inbox' && inboxDetached);
 
   useEffect(() => {
     const sync = () => setInboxUnread(unreadCount());
@@ -72,6 +76,9 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
       window.dispatchEvent(new CustomEvent('epicure-toggle-search'));
       return;
     }
+    if (tab === 'calculator') setCalcDetached(false);
+    if (tab === 'dictionary') setDictDetached(false);
+    if (tab === 'inbox') setInboxDetached(false);
     setOpen(true);
     setActiveTab(tab);
     if (tab === 'pomodoro') pomodoro.setDockOpen(true);
@@ -80,6 +87,9 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
 
   const closeTab = () => {
     if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
+    setCalcDetached(false);
+    setDictDetached(false);
+    setInboxDetached(false);
     setActiveTab('main');
     pomodoro.setDockOpen(false);
   };
@@ -145,9 +155,9 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
         </Suspense>
       )}
 
-      <div data-global-dock className="fixed z-40 overflow-visible">
+      <div data-global-dock className="fixed z-[90] overflow-visible">
         <AnimatePresence>
-          {toolOpen && !calcDetached && !dictDetached && !(activeTab === 'inbox' && inboxDetached) && (
+          {toolOpen && !sheetBlocked && (
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, x: 28 }}
@@ -156,7 +166,7 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className="dock-sheet epic-glass-sheet absolute bottom-[4.35rem] right-0 origin-bottom-right overflow-hidden"
             >
-              <Suspense fallback={null}>
+              <Suspense fallback={<div className="px-4 py-5 text-center text-xs text-zinc-500">Loading…</div>}>
                 {activeTab === 'calculator' && (
                   <ScientificCalculator detached={false} onDetach={() => setCalcDetached(true)} onSnapBack={() => setCalcDetached(false)} onClose={closeTab} />
                 )}
@@ -244,6 +254,9 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
             onClick={() => {
               if (open) {
                 if (activeTab === 'pomodoro' && pomodoro.isRunning) pomodoro.floatAway();
+                setCalcDetached(false);
+                setDictDetached(false);
+                setInboxDetached(false);
                 setActiveTab('main');
                 pomodoro.setDockOpen(false);
                 setOpen(false);
@@ -257,10 +270,10 @@ export default function GlobalDock({ navigate }: { navigate: (p: PageId, focus?:
             aria-label={open ? 'Close tools' : 'Open tools'}
             className={
               open
-                ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white'
+                ? 'dock-fab relative flex items-center justify-center rounded-full bg-zinc-900 text-white'
                 : pomodoro.isRunning
-                  ? 'dock-fab relative flex items-center justify-center bg-zinc-900 text-white ring-2 ring-zinc-900/15'
-                  : 'dock-fab relative flex items-center justify-center epic-glass-sheet text-zinc-800'
+                  ? 'dock-fab relative flex items-center justify-center rounded-full bg-zinc-900 text-white ring-2 ring-zinc-900/15'
+                  : 'dock-fab relative flex items-center justify-center rounded-full bg-white/90 text-zinc-800'
             }
           >
             {open ? (

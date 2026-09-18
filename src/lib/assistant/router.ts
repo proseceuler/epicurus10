@@ -76,12 +76,24 @@ export function stripReasoning(raw: string, fallback = 'Hey — what do you need
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
-  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move|delete|remove|check|show|list|open)\b/.test(t);
-  const actionNoun = /\b(task|tasks|todo|todos|to-do|to do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
+
+  // WRITE verbs only. "list" / "show" / "check" / "open" are read verbs — do not trigger execute.
+  const writeVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|delete|remove|move|attend|attended|skip|skipped)\b/.test(t);
+  // "did/done" only count as writes when paired with a clear write sense (mark done / I did X habit)
+  const doneWrite = /\b(mark|set|make)\b.{0,20}\b(done|complete|finished)\b|\b(done|finished|completed)\b.{0,12}\b(task|todo|habit)\b/.test(t);
+  const actionNoun = /\b(task|tasks|todo|todos|to-do|to do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|quiz|exam|score|attendance|period|column|board)\b/.test(t);
+
+  // Pure read phrasing — even if a weak verb appears, prefer data over execute
+  const readCue = /\b(what|what'?s|whats|which|how many|show|list|tell me|get|see|view|display|check|open)\b/.test(t)
+    && !writeVerb;
+
   const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
   const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
-  if (actionVerb && actionNoun) layers.add('execute');
-  if (/\b(attended|skipped|attend|skip)\b/.test(t)) layers.add('execute');
+
+  if ((writeVerb || doneWrite) && actionNoun && !readCue) layers.add('execute');
+  if (/\b(attended|skipped|attend|skip)\b/.test(t) && !readCue) layers.add('execute');
+
+  // Read-only data: vault questions, "my X", or deterministic read-tool matches
   if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon|todos?|to-?dos?))\b/.test(t)) layers.add('data');
   if (guessReadTools(t).length) layers.add('data');
   if (hasMedia) layers.add('chat');
@@ -92,38 +104,40 @@ export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolea
 function guessReadTools(text: string): Array<{ name: string; args: Record<string, unknown> }> {
   const t = text.toLowerCase();
   const tools: Array<{ name: string; args: Record<string, unknown> }> = [];
+  // Shared write-verb guard for read tools (do not fire get_* when user is mutating)
+  const isWrite = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|delete|remove|move)\b/.test(t);
   if (
     (/\b(to\s*do|to-do|todos?|todo list|task list|tasks?)\b/.test(t) || /\bstats?\b/.test(t))
-    && !/\b(add|create|make|complete|finish|edit)\b/.test(t)
+    && !isWrite
   ) {
     tools.push({ name: 'get_todos', args: { only_pending: false } });
   }
-  if (/\b(habit|habits|streak)\b/.test(t) && !/\b(add|create|mark|check)\b/.test(t)) {
+  if (/\b(habit|habits|streak)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_habits', args: {} });
     tools.push({ name: 'get_habit_stats', args: {} });
   }
-  if (/\b(grade|grades|score|gpa)\b/.test(t) && !/\b(add|log|record)\b/.test(t)) {
+  if (/\b(grade|grades|score|gpa)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_grades', args: {} });
   }
-  if (/\b(calendar|schedule|due|deadline|event)\b/.test(t) && !/\b(add|create|make)\b/.test(t)) {
+  if (/\b(calendar|schedule|due|deadline|event)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_calendar', args: {} });
   }
-  if (/\b(flashcard|cards?|deck)\b/.test(t) && !/\b(add|create|delete|edit)\b/.test(t)) {
+  if (/\b(flashcard|cards?|deck)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_flashcards', args: {} });
   }
-  if (/\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) && !/\b(log|set|add)\b/.test(t)) {
+  if (/\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_finance_summary', args: {} });
   }
   if (/\b(timetable|class hub|classhub|today'?s class)\b/.test(t)) {
     tools.push({ name: 'get_timetable', args: {} });
   }
-  if (/\b(note|notes|vault)\b/.test(t) && !/\b(add|save|create)\b/.test(t)) {
+  if (/\b(note|notes|vault)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_notes', args: { query: text } });
   }
-  if (/\b(kanban|board cards?)\b/.test(t) && !/\b(add|move|create)\b/.test(t)) {
+  if (/\b(kanban|board cards?)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_kanban', args: {} });
   }
-  if (/\b(pomodoro|focus|stats?|this week|week)\b/.test(t) && !/\b(start|add)\b/.test(t)) {
+  if (/\b(pomodoro|focus|stats?|this week|week)\b/.test(t) && !isWrite) {
     tools.push({ name: 'get_focus_stats', args: { days: 7 } });
     tools.push({ name: 'get_habit_stats', args: {} });
   }
@@ -359,11 +373,17 @@ export async function runAssistantTurn(opts: {
   const hasMedia = Boolean(last?.attachments?.length);
   const voice = Boolean(opts.voice);
   const layers = classifyIntent(last?.content || '', hasMedia, opts.searchEnabled);
-  if (voice && !layers.includes('execute') && !hasMedia) {
+  const writeIntent = layers.includes('execute');
+  // Deterministic read tools (get_todos, get_calendar, …) — preferred for voice latency
+  const guessed = guessReadTools(last?.content || '');
+  const voiceFastRead = Boolean(voice && !hasMedia && !writeIntent && guessed.length > 0);
+
+  // Voice non-writes: skip multi-layer LLM routing; use tools + one chat model only
+  if (voice && !writeIntent && !hasMedia) {
     layers.length = 0;
     layers.push('chat');
   }
-  const usedLayers = [...layers];
+  const usedLayers = voiceFastRead ? (['chat'] as AssistantLayer[]) : [...layers];
   const apiMessages = toApiMessages(opts.history, opts.page, opts.searchEnabled, voice);
   const ctx = opts.ctx;
 
@@ -371,7 +391,8 @@ export async function runAssistantTurn(opts: {
   let pending: PendingWrite | undefined;
   const sources: { title: string; url: string }[] = [];
 
-  const guessed = voice && !layers.includes('execute') ? [] : guessReadTools(last?.content || '');
+  // Always run deterministic read tools when matched (voice + text).
+  // This is the fast path: get_todos → one chat call, no intermediate data/execute LLM.
   if (guessed.length) {
     for (const call of guessed) {
       try {
@@ -383,7 +404,8 @@ export async function runAssistantTurn(opts: {
     }
   }
 
-  if (layers.includes('data')) {
+  // Data LLM only when we still need open-ended vault/RAG lookup (no deterministic tools yet)
+  if (layers.includes('data') && !guessed.length) {
     const dataTools = listToolDefs({ webSearch: false, writes: false });
     const data = await complete({
       key: opts.key,

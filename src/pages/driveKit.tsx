@@ -9,16 +9,30 @@ import {
   Code2,
 } from 'lucide-react';
 
-type DriveItem =
+export type DriveItem =
   | { type: 'folder'; key: string; name: string }
   | { type: 'file'; key: string; name: string; size: number; modified: string | null };
 
-type ViewMode = 'grid' | 'list';
-type Density = 'comfortable' | 'compact';
-type NewMode = 'menu' | 'folder' | 'text';
-type PreviewKind = 'image' | 'text' | 'pdf' | 'video' | 'audio' | 'unknown';
+export type ViewMode = 'grid' | 'list';
+export type Density = 'comfortable' | 'compact';
+export type NewMode = 'menu' | 'folder' | 'text';
+export type PreviewKind = 'image' | 'text' | 'pdf' | 'video' | 'audio' | 'unknown';
+export type SortKey = 'name' | 'size' | 'modified';
+export type TypeFilter = 'all' | 'folder' | 'image' | 'video' | 'audio' | 'document' | 'other';
+export type ScopeView = 'files' | 'starred' | 'recent';
 
-function formatSize(bytes?: number) {
+export type UploadJob = {
+  id: string;
+  name: string;
+  progress: number;
+  status: 'uploading' | 'done' | 'error';
+  error?: string;
+};
+
+const STAR_KEY = 'epicure-drive-starred';
+const RECENT_KEY = 'epicure-drive-recent';
+
+export function formatSize(bytes?: number) {
   if (bytes == null || bytes === 0) return '—';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -26,14 +40,14 @@ function formatSize(bytes?: number) {
   return `${(bytes / 1073741824).toFixed(2)} GB`;
 }
 
-function formatDate(iso?: string | null) {
+export function formatDate(iso?: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function previewKind(name: string): PreviewKind {
+export function previewKind(name: string): PreviewKind {
   const n = name.toLowerCase();
   if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(n)) return 'image';
   if (/\.(pdf)$/.test(n)) return 'pdf';
@@ -44,7 +58,7 @@ function previewKind(name: string): PreviewKind {
   return 'unknown';
 }
 
-function iconFor(item: DriveItem) {
+export function iconFor(item: DriveItem) {
   if (item.type === 'folder') return Folder;
   const kind = previewKind(item.name);
   if (kind === 'image') return ImageIcon;
@@ -55,36 +69,92 @@ function iconFor(item: DriveItem) {
   return FileIcon;
 }
 
-/** Middle-truncate so the extension stays visible: Gemini_Generated_Im…550sc (1).png */
-function middleTruncate(name: string, max = 22): string {
+export function middleTruncate(name: string, max = 22): string {
   if (name.length <= max) return name;
   const dot = name.lastIndexOf('.');
   const hasExt = dot > 0 && name.length - dot <= 8;
   const ext = hasExt ? name.slice(dot) : '';
   const base = hasExt ? name.slice(0, dot) : name;
-  const budget = max - ext.length - 1; // 1 for ellipsis
+  const budget = max - ext.length - 1;
   if (budget < 4) return name.slice(0, max - 1) + '…';
   const head = Math.ceil(budget * 0.55);
   const tail = budget - head;
   return `${base.slice(0, head)}…${base.slice(-tail)}${ext}`;
 }
 
-function parentPrefix(prefix: string) {
+export function parentPrefix(prefix: string) {
   if (!prefix) return '';
   const parts = prefix.split('/').filter(Boolean);
   parts.pop();
   return parts.join('/');
 }
 
-async function fetchSignedUrl(key: string): Promise<string> {
+export async function fetchSignedUrl(key: string): Promise<string> {
   const res = await fetch(`/api/drive/signed-url?key=${encodeURIComponent(key)}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Could not sign URL');
   return data.url as string;
 }
 
-/** Grid thumbnail: real image preview when possible, otherwise type icon. */
-function GridThumb({
+export function loadStarred(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STAR_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveStarred(keys: Set<string>) {
+  localStorage.setItem(STAR_KEY, JSON.stringify([...keys]));
+}
+
+export function loadRecent(): { key: string; name: string; at: number }[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as { key: string; name: string; at: number }[];
+  } catch {
+    return [];
+  }
+}
+
+export function pushRecent(item: { key: string; name: string }) {
+  const prev = loadRecent().filter((r) => r.key !== item.key);
+  const next = [{ key: item.key, name: item.name, at: Date.now() }, ...prev].slice(0, 40);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+}
+
+export function typeFilterMatch(item: DriveItem, filter: TypeFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'folder') return item.type === 'folder';
+  if (item.type === 'folder') return false;
+  const kind = previewKind(item.name);
+  if (filter === 'image') return kind === 'image';
+  if (filter === 'video') return kind === 'video';
+  if (filter === 'audio') return kind === 'audio';
+  if (filter === 'document') return kind === 'text' || kind === 'pdf';
+  return kind === 'unknown';
+}
+
+export function sortItems(items: DriveItem[], sortKey: SortKey, dir: 'asc' | 'desc'): DriveItem[] {
+  const mul = dir === 'asc' ? 1 : -1;
+  return [...items].sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+    if (sortKey === 'name') return a.name.localeCompare(b.name) * mul;
+    if (sortKey === 'size') {
+      const sa = a.type === 'file' ? a.size : 0;
+      const sb = b.type === 'file' ? b.size : 0;
+      return (sa - sb) * mul;
+    }
+    const ma = a.type === 'file' && a.modified ? new Date(a.modified).getTime() : 0;
+    const mb = b.type === 'file' && b.modified ? new Date(b.modified).getTime() : 0;
+    return (ma - mb) * mul;
+  });
+}
+
+export function GridThumb({
   item,
   urlCache,
   compact,
@@ -136,9 +206,7 @@ function GridThumb({
   }
 
   if (isImage && !failed && !src) {
-    return (
-      <div className={`${box} animate-pulse rounded-xl bg-zinc-200/70`} />
-    );
+    return <div className={`${box} animate-pulse rounded-xl bg-zinc-200/70`} />;
   }
 
   return (
@@ -150,7 +218,7 @@ function GridThumb({
   );
 }
 
-function SkeletonGrid({ compact }: { compact: boolean }) {
+export function SkeletonGrid({ compact }: { compact: boolean }) {
   const count = compact ? 12 : 10;
   return (
     <div
@@ -170,17 +238,3 @@ function SkeletonGrid({ compact }: { compact: boolean }) {
     </div>
   );
 }
-
-
-export type { DriveItem, ViewMode, Density, NewMode, PreviewKind };
-export {
-  formatSize,
-  formatDate,
-  previewKind,
-  iconFor,
-  middleTruncate,
-  parentPrefix,
-  fetchSignedUrl,
-  GridThumb,
-  SkeletonGrid,
-};

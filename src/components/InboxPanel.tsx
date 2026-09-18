@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, CheckCheck, ExternalLink, GripHorizontal, X } from 'lucide-react';
 import { getInbox, markRead, markAllRead, unreadCount, INBOX_CHANGED, type InboxItem } from '@/lib/inbox';
 import type { PageId } from '@/components/AppLayout';
@@ -64,10 +65,11 @@ export default function InboxPanel({
   const body = (
     <>
       <div
-        className={`flex items-center justify-between border-b border-zinc-200/70 px-3 py-2 ${detached ? 'cursor-move touch-none' : ''}`}
+        className={`flex items-center justify-between border-b border-zinc-200/70 px-3 py-2 ${detached ? 'cursor-move' : ''}`}
         onPointerDown={
           detached
             ? (e) => {
+                if ((e.target as HTMLElement).closest('button')) return;
                 e.currentTarget.setPointerCapture?.(e.pointerId);
                 dragging.current = true;
                 offset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
@@ -131,11 +133,12 @@ export default function InboxPanel({
   );
 
   if (detached) {
-    return (
-      <div className="epic-glass-sheet fixed z-[70] w-[min(100vw-1.5rem,13.5rem)] sm:w-[min(100vw-1.5rem,15rem)] md:w-[min(100vw-2rem,18rem)] overflow-hidden" style={{ left: pos.x, top: pos.y, touchAction: 'none' }}>
+    const node = (
+      <div className="epic-glass-sheet fixed z-[100] w-[min(100vw-1.5rem,20rem)] overflow-hidden" style={{ left: pos.x, top: pos.y }}>
         {body}
       </div>
     );
+    return typeof document !== 'undefined' ? createPortal(node, document.body) : node;
   }
 
   if (embedded) {

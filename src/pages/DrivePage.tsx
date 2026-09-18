@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Cloud, Folder, FileText, Music, Search, Plus, LayoutGrid, List, MoreVertical,
@@ -44,6 +44,7 @@ export default function DrivePage() {
   });
   const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: DriveItem } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [newOpen, setNewOpen] = useState(false);
   const [newMode, setNewMode] = useState<NewMode>('menu');
   const [folderName, setFolderName] = useState('');
@@ -90,6 +91,22 @@ export default function DrivePage() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setSelectedKeys(new Set()); }, [prefix, scope]);
+
+  
+  // Position context menu in viewport after mount (fixes transform/overflow parents)
+  useLayoutEffect(() => {
+    if (!ctx || !ctxRef.current) return;
+    const el = ctxRef.current;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    let left = ctx.x;
+    let top = ctx.y;
+    if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
+    if (top + rect.height > window.innerHeight - pad) top = ctx.y - rect.height;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    setMenuPos({ left, top });
+  }, [ctx]);
 
   useEffect(() => {
     if (!ctx) return;
@@ -342,7 +359,6 @@ export default function DrivePage() {
   };
 
   const onItemEnter = (_item: DriveItem, _e: React.MouseEvent) => {
-    // Hover peek disabled — caused layout jump / off-screen menus. Use Space for Quick Look.
     if (peekTimer.current) window.clearTimeout(peekTimer.current);
     setPeek(null);
   };
@@ -789,7 +805,7 @@ export default function DrivePage() {
                       onDoubleClick={() => openFile(item)}
                       onMouseEnter={(e) => onItemEnter(item, e)}
                       onMouseLeave={onItemLeave}
-                      onContextMenu={(e) => { e.preventDefault(); selectOnly(item.key); setCtx({ x: e.clientX, y: e.clientY, item }); }}
+                      onContextMenu={(e) => { e.preventDefault(); selectOnly(item.key); setMenuPos({ left: e.clientX, top: e.clientY }); setCtx({ x: e.clientX, y: e.clientY, item }); }}
                       className={`group relative flex flex-col items-center gap-1 rounded-xl text-center transition-[background-color,box-shadow] duration-150 ${compact ? 'p-2' : 'p-2.5'} ${
                         sel
                           ? 'bg-zinc-900/10 shadow-[inset_0_0_0_2px_rgba(113,113,122,0.7)]'
@@ -804,7 +820,7 @@ export default function DrivePage() {
                         </button>
                         <button type="button"
                           className="pointer-events-auto absolute right-1 top-1 rounded-md bg-white/90 p-0.5 shadow-sm ring-1 ring-zinc-200/80 opacity-0 transition-opacity hover:bg-zinc-100 group-hover:opacity-100"
-                          onClick={(e) => { e.stopPropagation(); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
+                          onClick={(e) => { e.stopPropagation(); setMenuPos({ left: e.clientX, top: e.clientY }); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
                           <MoreVertical className="h-3.5 w-3.5 text-zinc-500" />
                         </button>
                         {starred.has(item.key) && (
@@ -861,7 +877,7 @@ export default function DrivePage() {
                         onDoubleClick={() => openFile(item)}
                         onMouseEnter={(e) => onItemEnter(item, e)}
                         onMouseLeave={onItemLeave}
-                        onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
+                        onContextMenu={(e) => { e.preventDefault(); setMenuPos({ left: e.clientX, top: e.clientY }); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
                         <td className="px-1">
                           <button type="button" onClick={(e) => toggleSelect(item.key, e)}>
                             {sel ? <CheckSquare className="h-4 w-4 text-zinc-800" /> : <Square className="h-4 w-4 text-zinc-300" />}
@@ -893,7 +909,7 @@ export default function DrivePage() {
                         </td>
                         <td className="px-1">
                           <button type="button" className="rounded p-1 hover:bg-zinc-200"
-                            onClick={(e) => { e.stopPropagation(); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
+                            onClick={(e) => { e.stopPropagation(); setMenuPos({ left: e.clientX, top: e.clientY }); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
                             <MoreVertical className="h-3.5 w-3.5 text-zinc-500" />
                           </button>
                         </td>
@@ -1049,25 +1065,6 @@ export default function DrivePage() {
         )}
       </AnimatePresence>
 
-      {/* Peek, viewer, new menu, context — same patterns as P0, condensed */}
-      <AnimatePresence>
-        {peek && peek.url && (
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-            className="glass glass-shadow-lg pointer-events-none fixed z-[90] w-64 max-h-[min(220px,70vh)] overflow-hidden rounded-2xl shadow-lg"
-            style={{ left: peek.x, top: peek.y }}>
-            <div className="aspect-video bg-zinc-100/80">
-              {previewKind(peek.item.name) === 'image' ? (
-                <img src={peek.url} alt="" className="h-full w-full object-contain" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs text-zinc-500"><FileText className="h-8 w-8 text-zinc-400" /></div>
-              )}
-            </div>
-            <div className="px-3 py-2">
-              <p className="truncate text-xs font-semibold text-zinc-800">{peek.item.name}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <MotionOverlay open={!!viewer} onClose={closeViewer} zClass="z-[100]"
         frameClassName="items-stretch justify-center p-2 sm:p-4"
@@ -1196,18 +1193,8 @@ export default function DrivePage() {
       {ctx && createPortal(
         <div
           ref={ctxRef}
-          className="glass glass-shadow-lg fixed z-[9999] min-w-[180px] overflow-hidden rounded-xl py-1"
-          style={(() => {
-            const menuW = 200;
-            const menuH = 280;
-            let left = ctx.x;
-            let top = ctx.y;
-            if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
-            if (top + menuH > window.innerHeight - 8) top = Math.max(8, ctx.y - menuH);
-            if (top < 8) top = 8;
-            if (left < 8) left = 8;
-            return { left, top };
-          })()}
+          className="fixed z-[99999] min-w-[200px] overflow-hidden rounded-xl border border-zinc-200/80 bg-white py-1 shadow-xl"
+          style={{ left: menuPos.left, top: menuPos.top }}
           onClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -1270,22 +1257,15 @@ export default function DrivePage() {
       {/* Tag / folder color picker */}
       {tagMenu && createPortal(
         <div
-          className="glass glass-shadow-lg fixed z-[9999] min-w-[160px] rounded-xl p-2"
+          className="fixed z-[99999] min-w-[180px] rounded-xl border border-zinc-200/80 bg-white p-2 shadow-xl"
           style={(() => {
-            const menuW = 180;
-            const menuH = 180;
-            let left = tagMenu.x;
-            let top = tagMenu.y;
-            if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
-            if (left < 8) left = 8;
-            if (top + menuH > window.innerHeight - 8) top = tagMenu.y - menuH;
-            if (top < 8) top = 8;
-            return {
-              left,
-              top,
-              maxHeight: 'min(200px, calc(100vh - 16px))',
-              overflowY: 'auto' as const,
-            };
+            const w = 180, h = 160, pad = 8;
+            let left = tagMenu.x, top = tagMenu.y;
+            if (left + w > window.innerWidth - pad) left = window.innerWidth - w - pad;
+            if (top + h > window.innerHeight - pad) top = Math.max(pad, tagMenu.y - h);
+            if (left < pad) left = pad;
+            if (top < pad) top = pad;
+            return { left, top };
           })()}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1299,12 +1279,12 @@ export default function DrivePage() {
                   type="button"
                   title={TAG_COLORS[t].label}
                   onClick={() => toggleTag(tagMenu.key, t)}
-                  className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${TAG_COLORS[t].bg} ${on ? 'ring-2 ring-offset-1 ring-zinc-800' : ''}`}
+                  className={`h-5 w-5 rounded-full ${TAG_COLORS[t].bg} ${on ? 'ring-2 ring-offset-1 ring-zinc-800' : ''}`}
                 />
               );
             })}
           </div>
-          {filtered.find((i) => i.key === tagMenu.key)?.type === 'folder' && (
+          {items.find((i) => i.key === tagMenu.key)?.type === 'folder' && (
             <>
               <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Folder color</p>
               <div className="mb-1 flex flex-wrap gap-1.5 px-1">

@@ -5,6 +5,7 @@ import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '
 import { fileToAttachment, isAudioFile, type ChatAttachment } from '@/lib/assistant/media';
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
 import { groqConfigured, startVoiceLoop, speakReply, stopReply, transcribeAudio, type VoiceLoop } from '@/lib/assistant/voiceCascade';
+import { createStreamingSpeaker } from '@/lib/assistant/tts';
 import { runAssistantTurn } from '@/lib/assistant/router';
 import { harvestMemory } from '@/lib/assistant/memory';
 import { dispatchTool } from '@/lib/assistant/registry';
@@ -110,14 +111,30 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
       onTranscript: (text) => send(text),
       onError: setError,
       shouldContinue: () => voiceOnRef.current && !busyRef.current && !speakingRef.current,
+      isSpeaking: () => speakingRef.current,
+      onBargeIn: () => {
+        if (!speakingRef.current && !busyRef.current) return;
+        abortRef.current?.abort();
+        abortRef.current = null;
+        stopReply();
+        speakingRef.current = false;
+        setSpeaking(false);
+        busyRef.current = false;
+        setBusy(false);
+        setInterim('Listening…');
+      },
     });
   };
 
   const toggleVoice = () => {
-    if (voiceOn && (speakingRef.current || speaking)) {
+    if (voiceOn && (speakingRef.current || speaking || busyRef.current)) {
+      abortRef.current?.abort();
+      abortRef.current = null;
       stopReply();
       speakingRef.current = false;
       setSpeaking(false);
+      busyRef.current = false;
+      setBusy(false);
       setInterim('Interrupted — still listening');
       return;
     }
@@ -213,16 +230,55 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     busyRef.current = true;
     setBusy(true);
     try {
+      const voice = voiceOnRef.current;
+      let spokenViaStream = false;
+      let streamSpeaker: ReturnType<typeof createStreamingSpeaker> | null = null;
+
+      if (voice) {
+        streamSpeaker = createStreamingSpeaker({
+          onStart: () => {
+            speakingRef.current = true;
+            setSpeaking(true);
+          },
+          onEnd: () => {
+            speakingRef.current = false;
+            setSpeaking(false);
+          },
+        });
+      }
+
       const reply = await runAssistantTurn({
-        key, page, history: next, searchEnabled: searchOn, voice: voiceOnRef.current,
+        key, page, history: next, searchEnabled: searchOn, voice,
         ctx: { startFocus: focus },
         signal: ac.signal,
+        onSentence: voice
+          ? (sentence) => {
+              if (ac.signal.aborted) return;
+              spokenViaStream = true;
+              streamSpeaker?.push(sentence);
+            }
+          : undefined,
       });
-      if (ac.signal.aborted) return;
+
+      if (ac.signal.aborted) {
+        streamSpeaker?.stop();
+        return;
+      }
+
       const assistant: Msg = { id: newId(), role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
       harvestMemory(user.content, reply.content);
       setMessages([...next, assistant]);
-      if (voiceOnRef.current && reply.content) await speak(reply.content);
+
+      if (voice && reply.content) {
+        if (spokenViaStream) {
+          streamSpeaker?.end();
+        } else {
+          streamSpeaker?.stop();
+          await speak(reply.content);
+        }
+      } else {
+        streamSpeaker?.stop();
+      }
     } catch (err) {
       if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
       setError(err instanceof Error ? err.message : 'Something went wrong.');

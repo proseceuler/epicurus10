@@ -291,29 +291,6 @@ export default function DashboardPage({ navigate }: { navigate: (p: PageId) => v
   const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
   const weekFocusLabel = `${Math.floor(weekFocus / 60)}h ${weekFocus % 60}m`;
 
-  useEffect(() => {
-    if (pomodoro.isRunning || pomodoro.lastCompletedAt) {
-      setAwake(true);
-      const t = window.setTimeout(() => setAwake(false), 2200);
-      return () => window.clearTimeout(t);
-    }
-  }, [pomodoro.isRunning, pomodoro.lastCompletedAt, streak]);
-
-  const saveSigil = (value: string) => {
-    const next = value.trim() || DEFAULT_SIGIL;
-    setSigil(next);
-    try {
-      localStorage.setItem(SIGIL_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    setEditingSigil(false);
-  };
-
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  const gpa = generalAverage !== null ? generalAverage.toFixed(2) : '—';
-  const focusLabel = `${Math.floor(todayFocus / 60)}h ${todayFocus % 60}m`;
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">

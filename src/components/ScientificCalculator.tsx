@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calculator, Expand, Minimize, GripHorizontal, X } from 'lucide-react';
 
 interface CalcProps {
@@ -44,6 +45,7 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
 
   const onDragStart = (e: React.PointerEvent) => {
     if (!detached) return;
+    if ((e.target as HTMLElement).closest('button')) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = true;
     offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
@@ -104,15 +106,15 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
   };
 
   const containerClass = detached
-    ? 'fixed z-[70] w-[min(13.5rem,calc(100vw-1.5rem))] sm:w-[min(15rem,calc(100vw-1.5rem))] md:w-[min(18rem,calc(100vw-1.5rem))]'
+    ? 'fixed z-[100] w-[min(18rem,calc(100vw-1.5rem))]'
     : 'w-full';
-  const style = detached ? { left: pos.x, top: pos.y, touchAction: 'none' as const } : undefined;
+  const style = detached ? { left: pos.x, top: pos.y } : undefined;
 
-  return (
+  const panel = (
     <div className={containerClass} style={style}>
       <div className={detached ? 'epic-glass-sheet overflow-hidden rounded-3xl' : 'overflow-hidden'}>
         <div
-          className={`flex items-center justify-between px-3 py-2 border-b border-white/10 ${detached ? 'cursor-move touch-none' : ''}`}
+          className={`flex items-center justify-between px-3 py-2 border-b border-white/10 ${detached ? 'cursor-move' : ''}`}
           onPointerDown={onDragStart}
         >
           <div className="flex items-center gap-2">
@@ -121,15 +123,15 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
             <span className="text-xs font-medium text-zinc-700">Calculator</span>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => setScientific((s) => !s)} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center" title="Toggle scientific">
+            <button type="button" onClick={() => setScientific((s) => !s)} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center" title="Toggle scientific">
               {scientific ? <Minimize className="w-3.5 h-3.5 text-zinc-500" /> : <Expand className="w-3.5 h-3.5 text-zinc-500" />}
             </button>
             {detached ? (
-              <button onClick={onSnapBack} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Snap to dock">↓</button>
+              <button type="button" onClick={onSnapBack} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Snap to dock">↓</button>
             ) : (
-              <button onClick={onDetach} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Detach">↑</button>
+              <button type="button" onClick={onDetach} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center text-xs text-zinc-500" title="Detach">↑</button>
             )}
-            <button onClick={onClose} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center">
+            <button type="button" onClick={onClose} className="w-6 h-6 rounded-lg hover:bg-zinc-200/50 flex items-center justify-center">
               <X className="w-3.5 h-3.5 text-zinc-500" />
             </button>
           </div>
@@ -182,6 +184,8 @@ export default function ScientificCalculator({ detached, onDetach, onSnapBack, o
       </div>
     </div>
   );
+  if (detached && typeof document !== 'undefined') return createPortal(panel, document.body);
+  return panel;
 }
 
 function Btn({

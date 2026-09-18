@@ -19,6 +19,9 @@ import {
   ChevronRight,
   X,
   RefreshCw,
+  FolderPlus,
+  FilePlus,
+  FolderUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -72,11 +75,16 @@ export default function DrivePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: DriveItem } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [newAnchor, setNewAnchor] = useState<{ top: number; left: number } | null>(null);
   const [folderModal, setFolderModal] = useState(false);
   const [folderName, setFolderName] = useState('');
+  const [textModal, setTextModal] = useState(false);
+  const [textName, setTextName] = useState('');
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const newRef = useRef<HTMLDivElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const newBtnRef = useRef<HTMLButtonElement>(null);
+  const newMenuRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -111,14 +119,25 @@ export default function DrivePage() {
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (ctxRef.current?.contains(t)) return;
-      if (newRef.current?.contains(t)) return;
+      if (newMenuRef.current?.contains(t)) return;
+      if (newBtnRef.current?.contains(t)) return;
       setCtx(null);
       setNewOpen(false);
     };
-    const id = window.setTimeout(() => document.addEventListener('click', onDoc), 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setCtx(null);
+        setNewOpen(false);
+      }
+    };
+    const id = window.setTimeout(() => {
+      document.addEventListener('click', onDoc);
+      document.addEventListener('keydown', onKey);
+    }, 0);
     return () => {
       clearTimeout(id);
       document.removeEventListener('click', onDoc);
+      document.removeEventListener('keydown', onKey);
     };
   }, [ctx, newOpen]);
 
@@ -129,6 +148,7 @@ export default function DrivePage() {
   }, [items, search]);
 
   const crumbs = useMemo(() => {
+    if (!prefix) return [{ label: 'My Files', path: '' }];
     const parts = prefix.split('/').filter(Boolean);
     const out: { label: string; path: string }[] = [{ label: 'My Files', path: '' }];
     let acc = '';
@@ -139,13 +159,18 @@ export default function DrivePage() {
     return out;
   }, [prefix]);
 
-  const uploadFiles = async (files: File[]) => {
+  const uploadFiles = async (files: File[], opts?: { relativePaths?: boolean }) => {
     if (!files.length) return;
     let ok = 0;
     for (const file of files) {
       const form = new FormData();
       form.append('file', file);
-      form.append('prefix', prefix);
+      // Preserve folder structure when uploading a directory (webkitRelativePath)
+      const rel = opts?.relativePaths && (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+      const effectivePrefix = rel
+        ? [prefix, ...rel.split('/').slice(0, -1)].filter(Boolean).join('/')
+        : prefix;
+      form.append('prefix', effectivePrefix);
       try {
         const res = await fetch('/api/drive/upload', { method: 'POST', body: form });
         const data = await res.json();
@@ -176,6 +201,28 @@ export default function DrivePage() {
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'mkdir failed');
+    }
+  };
+
+  const createTextFile = async () => {
+    let name = textName.trim();
+    if (!name) return;
+    if (!/\.[a-z0-9]+$/i.test(name)) name = `${name}.txt`;
+    try {
+      const blob = new Blob([''], { type: 'text/plain' });
+      const file = new File([blob], name, { type: 'text/plain' });
+      const form = new FormData();
+      form.append('file', file);
+      form.append('prefix', prefix);
+      const res = await fetch('/api/drive/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not create file');
+      toast.success(`Created “${name}”`);
+      setTextModal(false);
+      setTextName('');
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Create failed');
     }
   };
 
@@ -216,6 +263,23 @@ export default function DrivePage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Download failed');
     }
+  };
+
+  const openNewMenu = () => {
+    const btn = newBtnRef.current;
+    if (!btn) {
+      setNewOpen((v) => !v);
+      return;
+    }
+    if (newOpen) {
+      setNewOpen(false);
+      return;
+    }
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8);
+    setNewAnchor({ top: rect.bottom + 6, left: Math.max(8, left) });
+    setNewOpen(true);
   };
 
   return (
@@ -262,34 +326,50 @@ export default function DrivePage() {
             <List className="h-4 w-4" />
           </button>
         </div>
-        <div className="relative" ref={newRef}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setNewOpen((v) => !v);
-            }}
-            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            <Plus className="h-3.5 w-3.5" /> New
-          </button>
-          {newOpen && (
-            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg">
-              <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => { setNewOpen(false); setFolderModal(true); }}>
-                <Folder className="h-4 w-4 text-zinc-500" /> New folder
-              </button>
-              <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => { setNewOpen(false); fileInputRef.current?.click(); }}>
-                <Upload className="h-4 w-4 text-zinc-500" /> Upload file
-              </button>
-            </div>
-          )}
-        </div>
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) void uploadFiles(files); e.target.value = ''; }} />
+        <button
+          ref={newBtnRef}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openNewMenu();
+          }}
+          className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          <Plus className="h-3.5 w-3.5" /> New
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            if (files.length) void uploadFiles(files);
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          // @ts-expect-error webkitdirectory is non-standard but widely supported
+          webkitdirectory=""
+          directory=""
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            if (files.length) void uploadFiles(files, { relativePaths: true });
+            e.target.value = '';
+          }}
+        />
       </div>
 
       <div
         className="glass relative min-h-0 flex-1 overflow-hidden rounded-2xl"
-        onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragOver={(e) => e.preventDefault()}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
@@ -431,7 +511,14 @@ export default function DrivePage() {
                         {item.type === 'file' ? formatDate(item.modified) : '—'}
                       </td>
                       <td className="px-1">
-                        <button type="button" className="rounded p-1 hover:bg-zinc-200" onClick={(e) => { e.stopPropagation(); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
+                        <button
+                          type="button"
+                          className="rounded p-1 hover:bg-zinc-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCtx({ x: e.clientX, y: e.clientY, item });
+                          }}
+                        >
                           <MoreVertical className="h-3.5 w-3.5 text-zinc-500" />
                         </button>
                       </td>
@@ -444,19 +531,96 @@ export default function DrivePage() {
         </div>
       </div>
 
+      {/* New menu — fixed glass popup (avoids toolbar overflow:hidden clipping) */}
+      {newOpen && newAnchor && (
+        <div
+          ref={newMenuRef}
+          className="glass glass-shadow-lg fixed z-[60] w-[220px] overflow-hidden rounded-2xl py-1.5"
+          style={{ top: newAnchor.top, left: newAnchor.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+            Create
+          </div>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
+            onClick={() => {
+              setNewOpen(false);
+              setFolderModal(true);
+            }}
+          >
+            <FolderPlus className="h-4 w-4 text-zinc-500" />
+            New folder
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
+            onClick={() => {
+              setNewOpen(false);
+              setTextName('');
+              setTextModal(true);
+            }}
+          >
+            <FilePlus className="h-4 w-4 text-zinc-500" />
+            New text file
+          </button>
+          <div className="my-1.5 border-t border-zinc-200/60" />
+          <div className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+            Upload
+          </div>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
+            onClick={() => {
+              setNewOpen(false);
+              fileInputRef.current?.click();
+            }}
+          >
+            <Upload className="h-4 w-4 text-zinc-500" />
+            Upload files
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
+            onClick={() => {
+              setNewOpen(false);
+              folderInputRef.current?.click();
+            }}
+          >
+            <FolderUp className="h-4 w-4 text-zinc-500" />
+            Upload folder
+          </button>
+        </div>
+      )}
+
       {ctx && (
         <div
           ref={ctxRef}
-          className="fixed z-50 min-w-[160px] overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
+          className="glass glass-shadow-lg fixed z-[60] min-w-[168px] overflow-hidden rounded-xl py-1"
           style={{ left: Math.min(ctx.x, window.innerWidth - 180), top: Math.min(ctx.y, window.innerHeight - 120) }}
           onClick={(e) => e.stopPropagation()}
         >
           {ctx.item.type === 'file' && (
-            <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => { void downloadItem(ctx.item); setCtx(null); }}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
+              onClick={() => {
+                void downloadItem(ctx.item);
+                setCtx(null);
+              }}
+            >
               <Download className="h-4 w-4" /> Download
             </button>
           )}
-          <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => { void removeItem(ctx.item); setCtx(null); }}>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50/80"
+            onClick={() => {
+              void removeItem(ctx.item);
+              setCtx(null);
+            }}
+          >
             <Trash2 className="h-4 w-4" /> Delete
           </button>
         </div>
@@ -464,10 +628,12 @@ export default function DrivePage() {
 
       {folderModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/30 p-4" onClick={() => setFolderModal(false)}>
-          <div className="glass w-full max-w-sm rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="glass glass-shadow-lg w-full max-w-sm rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-zinc-800">New folder</h3>
-              <button type="button" onClick={() => setFolderModal(false)}><X className="h-4 w-4 text-zinc-500" /></button>
+              <button type="button" onClick={() => setFolderModal(false)}>
+                <X className="h-4 w-4 text-zinc-500" />
+              </button>
             </div>
             <input
               value={folderName}
@@ -478,6 +644,31 @@ export default function DrivePage() {
               autoFocus
             />
             <button type="button" onClick={() => void createFolder()} className="w-full rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white">
+              Create
+            </button>
+          </div>
+        </div>
+      )}
+
+      {textModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/30 p-4" onClick={() => setTextModal(false)}>
+          <div className="glass glass-shadow-lg w-full max-w-sm rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-800">New text file</h3>
+              <button type="button" onClick={() => setTextModal(false)}>
+                <X className="h-4 w-4 text-zinc-500" />
+              </button>
+            </div>
+            <input
+              value={textName}
+              onChange={(e) => setTextName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void createTextFile()}
+              placeholder="filename.txt"
+              className="glass-input mb-3 w-full rounded-xl px-3 py-2 text-sm"
+              autoFocus
+            />
+            <p className="mb-3 text-[11px] text-zinc-500">Extension optional — defaults to .txt</p>
+            <button type="button" onClick={() => void createTextFile()} className="w-full rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white">
               Create
             </button>
           </div>

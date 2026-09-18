@@ -39,6 +39,8 @@ export default function DrivePage() {
   const [tags, setTags] = useState<Record<string, TagId[]>>(() => loadTags());
   const [folderColors, setFolderColors] = useState<Record<string, TagId>>(() => loadFolderColors());
   const [tagMenu, setTagMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [pinned, setPinned] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('epicure-drive-pinned') || '[]'); } catch { return []; }
   });
@@ -547,14 +549,15 @@ export default function DrivePage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] min-h-[420px] flex-col gap-3">
       {/* Toolbar */}
-      <div className="glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-sm">
-          <Cloud className="h-4 w-4 shrink-0 text-zinc-500" />
+      {/* Single top row */}
+      <div className="flex flex-wrap items-center gap-2 px-0.5">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto text-sm">
+          <Cloud className="mr-1 h-4 w-4 shrink-0 text-zinc-400" />
           {crumbs.map((c, i) => {
             const last = i === crumbs.length - 1;
             return (
-              <span key={`${c.path}-${i}`} className="flex items-center gap-1">
-                {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />}
+              <span key={`${c.path}-${i}`} className="flex items-center gap-0.5">
+                {i > 0 && <ChevronRight className="h-3 w-3 text-zinc-300" />}
                 <button
                   type="button"
                   disabled={last && scope === 'files'}
@@ -566,48 +569,109 @@ export default function DrivePage() {
                     if (files.length) void uploadFiles(files, { targetPrefix: c.path });
                   }}
                   className={`truncate rounded-md px-1.5 py-0.5 transition-colors ${
-                    last && scope === 'files' ? 'font-medium text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800'
+                    last && scope === 'files' ? 'font-medium text-zinc-800' : 'text-zinc-500 hover:text-zinc-800'
                   }`}
-                  title={last ? c.label : `Go to ${c.label} (drop files to upload here)`}
                 >
                   {c.label}
                 </button>
               </span>
             );
           })}
+          {/* Quiet scope switcher */}
+          <span className="mx-1 text-zinc-300">·</span>
+          {(['files', 'starred', 'recent'] as ScopeView[]).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setScope(id)}
+              className={`rounded-md px-1.5 py-0.5 text-xs transition-colors ${
+                scope === id ? 'font-medium text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              {id === 'files' ? 'Files' : id === 'starred' ? 'Starred' : 'Recent'}
+            </button>
+          ))}
         </div>
-        <div className="relative w-full max-w-[200px] sm:w-48">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search in folder"
-            className="glass-input w-full rounded-full py-1.5 pl-8 pr-3 text-xs" />
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            placeholder="Search"
+            className="w-40 rounded-lg border-0 bg-zinc-100/80 py-1.5 pl-8 pr-2 text-xs text-zinc-800 outline-none ring-0 placeholder:text-zinc-400 focus:bg-zinc-100 sm:w-48"
+          />
+          {(searchFocused || typeFilter !== 'all') && (
+            <div className="absolute left-0 top-full z-30 mt-1 flex flex-wrap gap-1 rounded-xl border border-zinc-200/80 bg-white p-1.5 shadow-lg">
+              {TYPE_CHIPS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setTypeFilter(c.id)}
+                  className={`rounded-md px-2 py-1 text-[11px] transition-colors ${
+                    typeFilter === c.id ? 'bg-zinc-100 font-medium text-zinc-800' : 'text-zinc-500 hover:bg-zinc-50'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <button type="button" onClick={() => void load()} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" title="Refresh">
-          <RefreshCw className="h-4 w-4" />
-        </button>
-        <div className="flex overflow-hidden rounded-lg border border-zinc-200/70">
-          <button type="button" onClick={() => setViewMode('grid')} title="Grid"
-            className={`p-1.5 ${viewMode === 'grid' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-50'}`}>
+
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            title="Grid"
+            className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
             <LayoutGrid className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => setViewMode('list')} title="List"
-            className={`p-1.5 ${viewMode === 'list' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-50'}`}>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            title="List"
+            className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
             <List className="h-4 w-4" />
           </button>
         </div>
+
         {viewMode === 'grid' && (
-          <button type="button" onClick={() => setDensity((d) => (d === 'compact' ? 'comfortable' : 'compact'))}
-            title={compact ? 'Comfortable' : 'Compact'} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100">
-            <Rows3 className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={() => cycleSort(sortKey === 'name' ? 'modified' : sortKey === 'modified' ? 'size' : 'name')}
+            onContextMenu={(e) => { e.preventDefault(); setSortDir((d) => (d === 'asc' ? 'desc' : 'asc')); }}
+            title="Click to change sort · right-click to flip direction"
+            className="rounded-md px-1.5 py-1 text-[11px] text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            {sortKey === 'name' ? 'Name' : sortKey === 'modified' ? 'Modified' : 'Size'} {sortDir === 'asc' ? '↑' : '↓'}
           </button>
         )}
-        <button type="button" onClick={() => setDetailsOpen((v) => !v)} title="Details panel"
-          className={`rounded-lg p-1.5 hover:bg-zinc-100 ${detailsOpen ? 'text-zinc-900' : 'text-zinc-500'}`}>
-          <Info className="h-4 w-4" />
-        </button>
-        <button type="button" onClick={openNew}
-          className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white active:scale-[0.97]">
+
+        {selectedKeys.size === 1 && (
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((v) => !v)}
+            title="Details"
+            className={`rounded-md p-1.5 transition-colors ${detailsOpen ? 'text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
+            <Info className="h-4 w-4" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={openNew}
+          className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
+        >
           <Plus className="h-3.5 w-3.5" /> New
         </button>
+
         <input ref={fileInputRef} type="file" multiple className="hidden"
           onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) void uploadFiles(files); e.target.value = ''; }} />
         <input ref={folderInputRef} type="file" multiple className="hidden"
@@ -615,73 +679,6 @@ export default function DrivePage() {
           webkitdirectory="" directory=""
           onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) void uploadFiles(files, { relativePaths: true }); e.target.value = ''; }} />
       </div>
-
-      {/* Scope + filters */}
-      <div className="flex flex-wrap items-center gap-2 px-0.5">
-        <div className="flex overflow-hidden rounded-lg border border-zinc-200/70 text-xs">
-          {([
-            { id: 'files' as const, label: 'My Files', icon: Folder },
-            { id: 'starred' as const, label: 'Starred', icon: Star },
-            { id: 'recent' as const, label: 'Recent', icon: Clock },
-          ]).map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => setScope(id)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 ${scope === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-50'}`}>
-              <Icon className="h-3.5 w-3.5" /> {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {TYPE_CHIPS.map((c) => (
-            <button key={c.id} type="button" onClick={() => setTypeFilter(c.id)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                typeFilter === c.id ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-              }`}>
-              {c.label}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1 text-[11px] text-zinc-500">
-          <ArrowUpDown className="h-3 w-3" />
-          <button type="button" onClick={() => cycleSort('name')} className={`rounded px-1.5 py-0.5 hover:bg-zinc-100 ${sortKey === 'name' ? 'font-semibold text-zinc-800' : ''}`}>Name</button>
-          <button type="button" onClick={() => cycleSort('modified')} className={`rounded px-1.5 py-0.5 hover:bg-zinc-100 ${sortKey === 'modified' ? 'font-semibold text-zinc-800' : ''}`}>Modified</button>
-          <button type="button" onClick={() => cycleSort('size')} className={`rounded px-1.5 py-0.5 hover:bg-zinc-100 ${sortKey === 'size' ? 'font-semibold text-zinc-800' : ''}`}>Size</button>
-          <span className="text-zinc-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        </div>
-      </div>
-
-      {/* Selection toolbar */}
-      <AnimatePresence>
-        {selectedKeys.size > 0 && (
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className="glass flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm"
-          >
-            <span className="text-xs font-medium text-zinc-700">{selectedKeys.size} selected</span>
-            <button type="button" className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-              onClick={() => void downloadSelected()}>
-              <Download className="h-3.5 w-3.5" /> Download
-            </button>
-            <button type="button" className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-              onClick={() => { [...selectedKeys].forEach((k) => toggleStar(k)); toast.success('Updated stars'); }}>
-              <Star className="h-3.5 w-3.5" /> Star
-            </button>
-            <button type="button" className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-              onClick={() => toast.message('Share links coming soon')}>
-              <Share2 className="h-3.5 w-3.5" /> Share
-            </button>
-            <button type="button" className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-              onClick={() => void removeKeys([...selectedKeys])}>
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
-            <button type="button" className="ml-auto rounded-lg px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
-              onClick={() => setSelectedKeys(new Set())}>
-              Clear
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Pinned folders + suggested (P3) */}
       {(pinned.length > 0 || (scope === 'files' && loadRecent().length > 0 && !prefix)) && (
@@ -731,7 +728,7 @@ export default function DrivePage() {
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Main pane */}
         <div
-          className="glass relative min-h-0 flex-1 overflow-hidden rounded-2xl"
+          className="relative min-h-0 flex-1 overflow-hidden"
           onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => setDragging(false)}
@@ -806,10 +803,8 @@ export default function DrivePage() {
                       onMouseEnter={(e) => onItemEnter(item, e)}
                       onMouseLeave={onItemLeave}
                       onContextMenu={(e) => { e.preventDefault(); selectOnly(item.key); setMenuPos({ left: e.clientX, top: e.clientY }); setCtx({ x: e.clientX, y: e.clientY, item }); }}
-                      className={`group relative flex flex-col items-center gap-1 rounded-xl text-center transition-[background-color,box-shadow] duration-150 ${compact ? 'p-2' : 'p-2.5'} ${
-                        sel
-                          ? 'bg-zinc-900/10 shadow-[inset_0_0_0_2px_rgba(113,113,122,0.7)]'
-                          : 'hover:bg-zinc-100/80'
+                      className={`group relative flex flex-col items-center gap-1 rounded-xl p-2 text-center transition-colors duration-150 ${
+                        sel ? 'bg-sky-50/90 ring-1 ring-sky-200/80' : 'hover:bg-zinc-50'
                       }`}
                     >
                       {/* Overlay controls — fixed layer, never affect layout */}
@@ -841,10 +836,10 @@ export default function DrivePage() {
                           </div>
                         )}
                       </div>
-                      <span className="w-full truncate text-xs font-medium leading-tight text-zinc-800" title={item.name}>
+                      <span className="w-full truncate text-xs font-normal leading-tight text-zinc-800" title={item.name}>
                         {middleTruncate(item.name, compact ? 18 : 22)}
                       </span>
-                      <span className="text-[10px] font-medium text-zinc-600">
+                      <span className="text-[10px] font-normal text-zinc-400">
                         {item.type === 'file' ? formatSize(item.size) : 'Folder'}
                       </span>
                     </motion.div>
@@ -869,7 +864,7 @@ export default function DrivePage() {
                     const sel = selectedKeys.has(item.key);
                     return (
                       <tr key={item.key}
-                        className={`cursor-default border-b border-zinc-100 transition-colors ${sel ? 'bg-zinc-900/5' : 'hover:bg-zinc-50'}`}
+                        className={`cursor-default border-b border-zinc-50 transition-colors ${sel ? 'bg-sky-50/80' : 'hover:bg-zinc-50/80'}`}
                         onClick={(e) => {
                           if (e.metaKey || e.ctrlKey || e.shiftKey) toggleSelect(item.key);
                           else selectOnly(item.key);
@@ -923,7 +918,7 @@ export default function DrivePage() {
 
           {/* Folder size hint */}
           {!loading && configured && items.length > 0 && (
-            <div className="absolute bottom-2 left-3 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200/60 backdrop-blur">
+            <div className="absolute bottom-2 left-1 text-[10px] text-zinc-400">
               This folder · {formatSize(folderBytes)}
             </div>
           )}
@@ -937,7 +932,7 @@ export default function DrivePage() {
               animate={{ width: 260, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="glass hidden shrink-0 overflow-hidden rounded-2xl sm:block"
+              className="hidden shrink-0 overflow-hidden border-l border-zinc-100 sm:block"
             >
               <div className="w-[260px] space-y-3 p-3">
                 <div className="flex items-center justify-between">
@@ -1027,6 +1022,31 @@ export default function DrivePage() {
           )}
         </AnimatePresence>
       </div>
+
+      
+      {/* Floating selection pill */}
+      <AnimatePresence>
+        {selectedKeys.size > 0 && (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className="pointer-events-none fixed bottom-6 left-1/2 z-[80] flex -translate-x-1/2 justify-center"
+          >
+            <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-zinc-200/80 bg-white px-2 py-1.5 shadow-lg">
+              <span className="px-2 text-xs tabular-nums text-zinc-500">{selectedKeys.size}</span>
+              <button type="button" title="Download" className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-zinc-100"
+                onClick={() => void downloadSelected()}><Download className="h-4 w-4" /></button>
+              <button type="button" title="Star" className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-zinc-100"
+                onClick={() => { [...selectedKeys].forEach((k) => toggleStar(k)); }}><Star className="h-4 w-4" /></button>
+              <button type="button" title="Delete" className="rounded-full p-2 text-red-500 transition-colors hover:bg-red-50"
+                onClick={() => void removeKeys([...selectedKeys])}><Trash2 className="h-4 w-4" /></button>
+              <button type="button" title="Clear" className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100"
+                onClick={() => setSelectedKeys(new Set())}><X className="h-4 w-4" /></button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Upload progress panel */}
       <AnimatePresence>
@@ -1228,8 +1248,10 @@ export default function DrivePage() {
           </button>
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
             onClick={(e) => {
-              setTagMenu({ key: ctx.item.key, x: e.clientX, y: e.clientY });
+              const x = e.clientX, y = e.clientY, key = ctx.item.key;
               setCtx(null);
+              // open tags after ctx unmounts so it isn't covered
+              requestAnimationFrame(() => setTagMenu({ key, x, y }));
             }}>
             <span className="flex h-4 w-4 items-center justify-center gap-px">
               <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
@@ -1240,8 +1262,9 @@ export default function DrivePage() {
           {ctx.item.type === 'folder' && (
             <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
               onClick={(e) => {
-                setTagMenu({ key: ctx.item.key, x: e.clientX, y: e.clientY });
+                const x = e.clientX, y = e.clientY, key = ctx.item.key;
                 setCtx(null);
+                requestAnimationFrame(() => setTagMenu({ key, x, y }));
               }}>
               <Folder className="h-4 w-4" /> Folder color…
             </button>
@@ -1257,7 +1280,7 @@ export default function DrivePage() {
       {/* Tag / folder color picker */}
       {tagMenu && createPortal(
         <div
-          className="fixed z-[99999] min-w-[180px] rounded-xl border border-zinc-200/80 bg-white p-2 shadow-xl"
+          className="fixed z-[100001] min-w-[180px] rounded-xl border border-zinc-200/80 bg-white p-2 shadow-xl"
           style={(() => {
             const w = 180, h = 160, pad = 8;
             let left = tagMenu.x, top = tagMenu.y;

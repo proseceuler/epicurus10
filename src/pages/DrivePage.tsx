@@ -24,12 +24,14 @@ import {
   FolderUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MotionOverlay } from '@/components/MotionUI';
 
 type DriveItem =
   | { type: 'folder'; key: string; name: string }
   | { type: 'file'; key: string; name: string; size: number; modified: string | null };
 
 type ViewMode = 'grid' | 'list';
+type NewMode = 'menu' | 'folder' | 'text';
 
 function formatSize(bytes?: number) {
   if (bytes == null || bytes === 0) return '—';
@@ -75,16 +77,12 @@ export default function DrivePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: DriveItem } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [newAnchor, setNewAnchor] = useState<{ top: number; left: number } | null>(null);
-  const [folderModal, setFolderModal] = useState(false);
+  const [newMode, setNewMode] = useState<NewMode>('menu');
   const [folderName, setFolderName] = useState('');
-  const [textModal, setTextModal] = useState(false);
   const [textName, setTextName] = useState('');
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const newBtnRef = useRef<HTMLButtonElement>(null);
-  const newMenuRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -115,20 +113,14 @@ export default function DrivePage() {
   }, [load]);
 
   useEffect(() => {
-    if (!ctx && !newOpen) return;
+    if (!ctx) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (ctxRef.current?.contains(t)) return;
-      if (newMenuRef.current?.contains(t)) return;
-      if (newBtnRef.current?.contains(t)) return;
       setCtx(null);
-      setNewOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setCtx(null);
-        setNewOpen(false);
-      }
+      if (e.key === 'Escape') setCtx(null);
     };
     const id = window.setTimeout(() => {
       document.addEventListener('click', onDoc);
@@ -139,7 +131,7 @@ export default function DrivePage() {
       document.removeEventListener('click', onDoc);
       document.removeEventListener('keydown', onKey);
     };
-  }, [ctx, newOpen]);
+  }, [ctx]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return items;
@@ -165,7 +157,6 @@ export default function DrivePage() {
     for (const file of files) {
       const form = new FormData();
       form.append('file', file);
-      // Preserve folder structure when uploading a directory (webkitRelativePath)
       const rel = opts?.relativePaths && (file as File & { webkitRelativePath?: string }).webkitRelativePath;
       const effectivePrefix = rel
         ? [prefix, ...rel.split('/').slice(0, -1)].filter(Boolean).join('/')
@@ -184,6 +175,20 @@ export default function DrivePage() {
     void load();
   };
 
+  const closeNew = () => {
+    setNewOpen(false);
+    setNewMode('menu');
+    setFolderName('');
+    setTextName('');
+  };
+
+  const openNew = () => {
+    setNewMode('menu');
+    setFolderName('');
+    setTextName('');
+    setNewOpen(true);
+  };
+
   const createFolder = async () => {
     const name = folderName.trim();
     if (!name) return;
@@ -196,8 +201,7 @@ export default function DrivePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not create folder');
       toast.success(`Folder “${name}” created`);
-      setFolderModal(false);
-      setFolderName('');
+      closeNew();
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'mkdir failed');
@@ -218,8 +222,7 @@ export default function DrivePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not create file');
       toast.success(`Created “${name}”`);
-      setTextModal(false);
-      setTextName('');
+      closeNew();
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Create failed');
@@ -263,33 +266,6 @@ export default function DrivePage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Download failed');
     }
-  };
-
-  const openNewMenu = () => {
-    const btn = newBtnRef.current;
-    if (!btn) {
-      setNewOpen((v) => !v);
-      return;
-    }
-    if (newOpen) {
-      setNewOpen(false);
-      return;
-    }
-    const rect = btn.getBoundingClientRect();
-    const menuWidth = 220;
-    const menuHeight = 220; // approx; keeps clear of bottom dock FAB
-    const gap = 8;
-    // Prefer aligning under the button, shifted left so we stay clear of the
-    // fixed GlobalDock FAB on the bottom-right (z-90).
-    let left = rect.right - menuWidth;
-    left = Math.max(gap, Math.min(left, window.innerWidth - menuWidth - gap));
-    let top = rect.bottom + 6;
-    if (top + menuHeight > window.innerHeight - 96) {
-      // Flip above the button if near the bottom / dock
-      top = Math.max(gap, rect.top - menuHeight - 6);
-    }
-    setNewAnchor({ top, left });
-    setNewOpen(true);
   };
 
   return (
@@ -337,12 +313,8 @@ export default function DrivePage() {
           </button>
         </div>
         <button
-          ref={newBtnRef}
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            openNewMenu();
-          }}
+          onClick={openNew}
           className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white"
         >
           <Plus className="h-3.5 w-3.5" /> New
@@ -432,7 +404,7 @@ export default function DrivePage() {
             <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-zinc-500">
               <Folder className="h-10 w-10 text-zinc-300" />
               <p>{search ? 'No matches' : 'This folder is empty'}</p>
-              {!search && <p className="text-xs text-zinc-400">Drop files here or use New → Upload</p>}
+              {!search && <p className="text-xs text-zinc-400">Drop files here or use New</p>}
             </div>
           )}
 
@@ -541,68 +513,151 @@ export default function DrivePage() {
         </div>
       </div>
 
-      {/* New menu — fixed glass popup (avoids toolbar overflow:hidden clipping) */}
-      {newOpen && newAnchor && (
-        <div
-          ref={newMenuRef}
-          className="glass glass-shadow-lg fixed z-[100] w-[220px] overflow-hidden rounded-2xl py-1.5"
-          style={{ top: newAnchor.top, left: newAnchor.left }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            Create
-          </div>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
-            onClick={() => {
-              setNewOpen(false);
-              setFolderModal(true);
-            }}
-          >
-            <FolderPlus className="h-4 w-4 text-zinc-500" />
-            New folder
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
-            onClick={() => {
-              setNewOpen(false);
-              setTextName('');
-              setTextModal(true);
-            }}
-          >
-            <FilePlus className="h-4 w-4 text-zinc-500" />
-            New text file
-          </button>
-          <div className="my-1.5 border-t border-zinc-200/60" />
-          <div className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            Upload
-          </div>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
-            onClick={() => {
-              setNewOpen(false);
-              fileInputRef.current?.click();
-            }}
-          >
-            <Upload className="h-4 w-4 text-zinc-500" />
-            Upload files
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-800 transition-colors hover:bg-white/50"
-            onClick={() => {
-              setNewOpen(false);
-              folderInputRef.current?.click();
-            }}
-          >
-            <FolderUp className="h-4 w-4 text-zinc-500" />
-            Upload folder
-          </button>
-        </div>
-      )}
+      <MotionOverlay open={newOpen} onClose={closeNew} zClass="z-[100]">
+        {newMode === 'menu' && (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-800">New</h3>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-500">Create</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewMode('folder')}
+                    className="flex items-center gap-2 rounded-xl border border-transparent glass px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-white/60"
+                  >
+                    <FolderPlus className="h-4 w-4 text-zinc-500" />
+                    New folder
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewMode('text')}
+                    className="flex items-center gap-2 rounded-xl border border-transparent glass px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-white/60"
+                  >
+                    <FilePlus className="h-4 w-4 text-zinc-500" />
+                    New text file
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-500">Upload</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeNew();
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-transparent glass px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-white/60"
+                  >
+                    <Upload className="h-4 w-4 text-zinc-500" />
+                    Upload files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeNew();
+                      folderInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-transparent glass px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-white/60"
+                  >
+                    <FolderUp className="h-4 w-4 text-zinc-500" />
+                    Upload folder
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closeNew}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {newMode === 'folder' && (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-800">New folder</h3>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500">Name</label>
+                <input
+                  value={folderName}
+                  onChange={(e) => setFolderName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void createFolder()}
+                  placeholder="Folder name"
+                  className="glass-input w-full rounded-full px-3 py-2 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setNewMode('menu')}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createFolder()}
+                  disabled={!folderName.trim()}
+                  className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {newMode === 'text' && (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-800">New text file</h3>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500">Filename</label>
+                <input
+                  value={textName}
+                  onChange={(e) => setTextName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void createTextFile()}
+                  placeholder="notes.txt"
+                  className="glass-input w-full rounded-full px-3 py-2 text-sm"
+                  autoFocus
+                />
+                <p className="mt-1.5 text-[11px] text-zinc-400">Extension optional — defaults to .txt</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setNewMode('menu')}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createTextFile()}
+                  disabled={!textName.trim()}
+                  className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </MotionOverlay>
 
       {ctx && (
         <div
@@ -633,55 +688,6 @@ export default function DrivePage() {
           >
             <Trash2 className="h-4 w-4" /> Delete
           </button>
-        </div>
-      )}
-
-      {folderModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/30 p-4" onClick={() => setFolderModal(false)}>
-          <div className="glass glass-shadow-lg w-full max-w-sm rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-zinc-800">New folder</h3>
-              <button type="button" onClick={() => setFolderModal(false)}>
-                <X className="h-4 w-4 text-zinc-500" />
-              </button>
-            </div>
-            <input
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void createFolder()}
-              placeholder="Folder name"
-              className="glass-input mb-3 w-full rounded-xl px-3 py-2 text-sm"
-              autoFocus
-            />
-            <button type="button" onClick={() => void createFolder()} className="w-full rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white">
-              Create
-            </button>
-          </div>
-        </div>
-      )}
-
-      {textModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/30 p-4" onClick={() => setTextModal(false)}>
-          <div className="glass glass-shadow-lg w-full max-w-sm rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-zinc-800">New text file</h3>
-              <button type="button" onClick={() => setTextModal(false)}>
-                <X className="h-4 w-4 text-zinc-500" />
-              </button>
-            </div>
-            <input
-              value={textName}
-              onChange={(e) => setTextName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void createTextFile()}
-              placeholder="filename.txt"
-              className="glass-input mb-3 w-full rounded-xl px-3 py-2 text-sm"
-              autoFocus
-            />
-            <p className="mb-3 text-[11px] text-zinc-500">Extension optional — defaults to .txt</p>
-            <button type="button" onClick={() => void createTextFile()} className="w-full rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white">
-              Create
-            </button>
-          </div>
         </div>
       )}
 

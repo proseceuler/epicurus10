@@ -1,52 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Cloud,
-  Folder,
-  FileText,
-  Film,
-  Music,
-  Code2,
-  Search,
-  Plus,
-  LayoutGrid,
-  List,
-  MoreVertical,
-  Download,
-  Trash2,
-  Upload,
-  ChevronRight,
-  ChevronLeft,
-  X,
-  RefreshCw,
-  FolderPlus,
-  FilePlus,
-  FolderUp,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Eye,
-  Info,
-  Rows3,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { MotionOverlay } from '@/components/MotionUI';
-import {
-  type DriveItem,
-  type ViewMode,
-  type Density,
-  type NewMode,
-  formatSize,
-  formatDate,
-  previewKind,
-  iconFor,
-  middleTruncate,
-  parentPrefix,
-  fetchSignedUrl,
-  GridThumb,
-  SkeletonGrid,
-} from './driveKit';
-
-// Full page is large — load from assembled parts if present, else show message.
-// TEMP: re-export approach replaced by full file in next commits.
-export { default } from './DrivePage.impl';
+/*
+ * Temporary note for local setup.
+ * The full DrivePage is at commit 1d308e3 (pre-P0 working version).
+ *
+ * PowerShell (from repo root):
+ *   Invoke-WebRequest -UseBasicParsing `
+ *     -Uri "https://raw.githubusercontent.com/proseceuler/epicurus10/1d308e332325e6a81a054b847d0df0b10220be0e/src/pages/DrivePage.tsx" `
+ *     -OutFile "src\pages\DrivePage.tsx"
+ *
+ * Optional P0 helpers (driveKit) already on this branch:
+ *   Invoke-WebRequest -UseBasicParsing `
+ *     -Uri "https://raw.githubusercontent.com/proseceuler/epicurus10/drive-p0-polish/src/pages/driveKit.tsx" `
+ *     -OutFile "src\pages\driveKit.tsx"
+ */
+export { default } from '../pages/DrivePage';

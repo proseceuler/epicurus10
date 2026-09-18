@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Cloud, Folder, FileText, Music, Search, Plus, LayoutGrid, List, MoreVertical,
   Download, Trash2, Upload, ChevronRight, ChevronLeft, X, RefreshCw, FolderPlus,
@@ -1192,26 +1193,24 @@ export default function DrivePage() {
         )}
       </MotionOverlay>
 
-      {ctx && (
-        <div ref={ctxRef} className="glass glass-shadow-lg fixed z-[100] min-w-[180px] overflow-hidden rounded-xl py-1"
+      {ctx && createPortal(
+        <div
+          ref={ctxRef}
+          className="glass glass-shadow-lg fixed z-[9999] min-w-[180px] overflow-hidden rounded-xl py-1"
           style={(() => {
             const menuW = 200;
-            const menuH = 260;
+            const menuH = 280;
             let left = ctx.x;
             let top = ctx.y;
-            if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
-            if (left < 8) left = 8;
-            // Flip above cursor when near bottom of viewport
-            if (top + menuH > window.innerHeight - 8) top = ctx.y - menuH;
+            if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+            if (top + menuH > window.innerHeight - 8) top = Math.max(8, ctx.y - menuH);
             if (top < 8) top = 8;
-            return {
-              left,
-              top,
-              maxHeight: 'min(260px, calc(100vh - 16px))',
-              overflowY: 'auto' as const,
-            };
+            if (left < 8) left = 8;
+            return { left, top };
           })()}
-          onClick={(e) => e.stopPropagation()}>
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
             onClick={() => { openFile(ctx.item); setCtx(null); }}>
             <Eye className="h-4 w-4" /> Open
@@ -1264,13 +1263,14 @@ export default function DrivePage() {
             onClick={() => { void removeKeys([ctx.item.key]); setCtx(null); }}>
             <Trash2 className="h-4 w-4" /> Delete
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Tag / folder color picker */}
-      {tagMenu && (
+      {tagMenu && createPortal(
         <div
-          className="glass glass-shadow-lg fixed z-[110] min-w-[160px] rounded-xl p-2"
+          className="glass glass-shadow-lg fixed z-[9999] min-w-[160px] rounded-xl p-2"
           style={(() => {
             const menuW = 180;
             const menuH = 180;
@@ -1328,7 +1328,8 @@ export default function DrivePage() {
             onClick={() => setTagMenu(null)}>
             Done
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {prefix && (

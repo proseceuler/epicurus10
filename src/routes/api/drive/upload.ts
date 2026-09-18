@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/drive/upload')({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         if (!r2Configured()) {
-          return json({ error: 'R2 is not configured', configured: false }, 503);
+          return json({ error: 'Firebase Storage is not configured', configured: false }, 503);
         }
         try {
           const form = await request.formData();

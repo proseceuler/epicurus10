@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/drive/delete')({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         if (!r2Configured()) {
-          return json({ error: 'R2 is not configured', configured: false }, 503);
+          return json({ error: 'Firebase Storage is not configured', configured: false }, 503);
         }
         try {
           const body = (await request.json()) as { keys?: string[] };

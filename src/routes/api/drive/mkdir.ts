@@ -12,13 +12,12 @@ export const Route = createFileRoute('/api/drive/mkdir')({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         if (!r2Configured()) {
-          return json({ error: 'R2 is not configured', configured: false }, 503);
+          return json({ error: 'Firebase Storage is not configured', configured: false }, 503);
         }
         try {
           const body = (await request.json()) as { prefix?: string; name?: string };
           const name = (body.name || '').trim().replace(/\/+/g, '');
           if (!name) return json({ error: 'Missing folder name' }, 400);
-          // R2/S3 folders are zero-byte objects ending with /
           const key = joinKey(body.prefix || '', name) + '/';
           await uploadR2(key, Buffer.alloc(0), 'application/x-directory');
           return json({ ok: true, key });

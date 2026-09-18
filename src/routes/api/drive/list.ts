@@ -14,8 +14,8 @@ export const Route = createFileRoute('/api/drive/list')({
         if (!r2Configured()) {
           return json(
             {
-              error: 'R2 is not configured',
-              hint: 'Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET in the server environment. See docs/r2-rclone.md.',
+              error: 'Firebase Storage is not configured',
+              hint: 'Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_STORAGE_BUCKET. See docs/firebase-storage.md.',
               configured: false,
             },
             503,

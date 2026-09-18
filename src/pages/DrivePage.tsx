@@ -268,8 +268,6 @@ export default function DrivePage() {
     });
   };
 
-
-
   const openViewer = useCallback(async (item: DriveItem) => {
     if (item.type === 'folder') {
       setPrefix(item.key);
@@ -342,32 +340,10 @@ export default function DrivePage() {
     if (next) void openViewer(next);
   };
 
-  const onItemEnter = (item: DriveItem, e: React.MouseEvent) => {
-    if (item.type !== 'file') return;
-    const kind = previewKind(item.name);
-    if (kind !== 'image' && kind !== 'pdf' && kind !== 'text') return;
+  const onItemEnter = (_item: DriveItem, _e: React.MouseEvent) => {
+    // Hover peek disabled — caused layout jump / off-screen menus. Use Space for Quick Look.
     if (peekTimer.current) window.clearTimeout(peekTimer.current);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    peekTimer.current = window.setTimeout(async () => {
-      const cardW = 256;
-      const cardH = 200;
-      // Prefer right of card; if not enough room, place to the left
-      let x = rect.right + 12;
-      if (x + cardW > window.innerWidth - 12) x = rect.left - cardW - 12;
-      x = Math.max(12, Math.min(x, window.innerWidth - cardW - 12));
-      // Prefer above mid of viewport to avoid scrolling the page
-      let y = Math.min(rect.top, window.innerHeight - cardH - 16);
-      y = Math.max(12, y);
-      // Never place so that document needs to scroll — peek is position:fixed
-      let url = urlCache.current.get(item.key);
-      if (!url) {
-        try {
-          url = await fetchSignedUrl(item.key);
-          urlCache.current.set(item.key, url);
-        } catch { return; }
-      }
-      setPeek({ item, x, y, url });
-    }, 350);
+    setPeek(null);
   };
 
   const onItemLeave = () => {
@@ -1218,12 +1194,23 @@ export default function DrivePage() {
 
       {ctx && (
         <div ref={ctxRef} className="glass glass-shadow-lg fixed z-[100] min-w-[180px] overflow-hidden rounded-xl py-1"
-          style={{
-            left: Math.max(8, Math.min(ctx.x, window.innerWidth - 200)),
-            top: Math.max(8, Math.min(ctx.y, window.innerHeight - 280)),
-            maxHeight: 'min(280px, calc(100vh - 16px))',
-            overflowY: 'auto',
-          }}
+          style={(() => {
+            const menuW = 200;
+            const menuH = 260;
+            let left = ctx.x;
+            let top = ctx.y;
+            if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+            if (left < 8) left = 8;
+            // Flip above cursor when near bottom of viewport
+            if (top + menuH > window.innerHeight - 8) top = ctx.y - menuH;
+            if (top < 8) top = 8;
+            return {
+              left,
+              top,
+              maxHeight: 'min(260px, calc(100vh - 16px))',
+              overflowY: 'auto' as const,
+            };
+          })()}
           onClick={(e) => e.stopPropagation()}>
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
             onClick={() => { openFile(ctx.item); setCtx(null); }}>
@@ -1284,12 +1271,22 @@ export default function DrivePage() {
       {tagMenu && (
         <div
           className="glass glass-shadow-lg fixed z-[110] min-w-[160px] rounded-xl p-2"
-          style={{
-            left: Math.max(8, Math.min(tagMenu.x, window.innerWidth - 180)),
-            top: Math.max(8, Math.min(tagMenu.y, window.innerHeight - 160)),
-            maxHeight: 'min(200px, calc(100vh - 16px))',
-            overflowY: 'auto',
-          }}
+          style={(() => {
+            const menuW = 180;
+            const menuH = 180;
+            let left = tagMenu.x;
+            let top = tagMenu.y;
+            if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+            if (left < 8) left = 8;
+            if (top + menuH > window.innerHeight - 8) top = tagMenu.y - menuH;
+            if (top < 8) top = 8;
+            return {
+              left,
+              top,
+              maxHeight: 'min(200px, calc(100vh - 16px))',
+              overflowY: 'auto' as const,
+            };
+          })()}
           onClick={(e) => e.stopPropagation()}
         >
           <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Tags</p>

@@ -154,7 +154,6 @@ export function sortItems(items: DriveItem[], sortKey: SortKey, dir: 'asc' | 'de
   });
 }
 
-
 export type TagId = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'gray';
 
 export const TAG_COLORS: Record<TagId, { bg: string; ring: string; label: string }> = {
@@ -252,7 +251,7 @@ export function GridThumb({
           src={src}
           alt=""
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+          className="h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
       </div>

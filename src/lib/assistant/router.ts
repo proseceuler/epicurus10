@@ -144,6 +144,7 @@ async function complete(opts: {
   temperature?: number;
   preferVision?: boolean;
   maxTokens?: number;
+  signal?: AbortSignal;
 }): Promise<{ content: string; tool_calls: Array<{ function: { name: string; arguments: string } }>; model: string }> {
   const chain = [
     opts.preferVision ? VISION_MODELS[0] : LAYER_MODELS[opts.layer],
@@ -152,6 +153,7 @@ async function complete(opts: {
 
   let lastErr = 'Assistant request failed.';
   for (const model of chain) {
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const res = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
@@ -168,6 +170,7 @@ async function complete(opts: {
         max_tokens: opts.maxTokens ?? 700,
         reasoning: { exclude: true },
       }),
+      signal: opts.signal,
     });
     if (!res.ok) {
       lastErr = `Assistant request failed (${res.status}).`;
@@ -234,6 +237,114 @@ async function runCalls(
   return { reads, writes, sources };
 }
 
+function takeSentences(buffer: string): [string[], string] {
+  const out: string[] = [];
+  let rest = buffer;
+  const re = /([^.!?\n]+[.!?]+(?:["'\u201d\u2019])?\s*|\n+)/;
+  while (true) {
+    const m = rest.match(re);
+    if (!m || m.index === undefined) break;
+    const end = m.index + m[0].length;
+    const piece = rest.slice(0, end).trim();
+    rest = rest.slice(end);
+    if (piece && piece.length >= 12) out.push(piece);
+    else if (piece) rest = piece + ' ' + rest;
+  }
+  return [out, rest];
+}
+
+async function streamComplete(opts: {
+  key: string;
+  layer: AssistantLayer;
+  messages: ORMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  signal?: AbortSignal;
+  onSentence?: (sentence: string) => void;
+}): Promise<{ content: string; tool_calls: Array<{ function: { name: string; arguments: string } }>; model: string }> {
+  const chain = [
+    LAYER_MODELS[opts.layer],
+    ...LAYER_FALLBACKS[opts.layer],
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastErr = 'Assistant request failed.';
+  for (const model of chain) {
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${opts.key}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://epicure.app',
+          'X-Title': 'epicure assistant',
+        },
+        body: JSON.stringify({
+          model,
+          messages: opts.messages,
+          temperature: opts.temperature ?? 0.5,
+          max_tokens: opts.maxTokens ?? 220,
+          stream: true,
+          reasoning: { exclude: true },
+        }),
+        signal: opts.signal,
+      });
+      if (!res.ok || !res.body) {
+        lastErr = `Assistant request failed (${res.status}).`;
+        continue;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      let carry = '';
+      let lineBuf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (opts.signal?.aborted) {
+          try { await reader.cancel(); } catch { /* ignore */ }
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        lineBuf += decoder.decode(value, { stream: true });
+        const lines = lineBuf.split('\n');
+        lineBuf = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === '[DONE]') continue;
+          try {
+            const json = JSON.parse(payload);
+            const delta = json.choices?.[0]?.delta?.content;
+            if (typeof delta === 'string' && delta) {
+              full += delta;
+              carry += delta;
+              const [sentences, rem] = takeSentences(carry);
+              carry = rem;
+              for (const s of sentences) opts.onSentence?.(s);
+            }
+          } catch { /* partial JSON — skip */ }
+        }
+      }
+
+      const tail = carry.trim();
+      if (tail) opts.onSentence?.(tail);
+
+      return {
+        content: stripReasoning(full, ''),
+        tool_calls: [],
+        model,
+      };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      lastErr = err instanceof Error ? err.message : 'stream failed';
+    }
+  }
+  throw new Error(lastErr);
+}
+
 export async function runAssistantTurn(opts: {
   key: string;
   page: PageId;
@@ -241,6 +352,8 @@ export async function runAssistantTurn(opts: {
   searchEnabled: boolean;
   voice?: boolean;
   ctx: ToolContext;
+  signal?: AbortSignal;
+  onSentence?: (sentence: string) => void;
 }): Promise<RouterReply> {
   const last = opts.history[opts.history.length - 1];
   const hasMedia = Boolean(last?.attachments?.length);
@@ -281,6 +394,7 @@ export async function runAssistantTurn(opts: {
       ],
       tools: dataTools,
       temperature: 0.1,
+      signal: opts.signal,
     });
     if (data.tool_calls.length) {
       const ran = await runCalls(data.tool_calls, ctx);
@@ -302,6 +416,7 @@ export async function runAssistantTurn(opts: {
       ],
       tools: execTools,
       temperature: 0.15,
+      signal: opts.signal,
     });
     if (exec.tool_calls.length) {
       const ran = await runCalls(exec.tool_calls, ctx);
@@ -320,15 +435,30 @@ export async function runAssistantTurn(opts: {
     });
   }
 
-  const chat = await complete({
-    key: opts.key,
-    layer: 'chat',
-    messages: chatMessages,
-    tools: voice ? undefined : chatTools,
-    temperature: voice ? 0.62 : 0.4,
-    preferVision: hasMedia,
-    maxTokens: voice ? 220 : 700,
-  });
+  const useStream = Boolean(voice && opts.onSentence && !hasMedia);
+  let chat: { content: string; tool_calls: Array<{ function: { name: string; arguments: string } }>; model: string };
+  if (useStream) {
+    chat = await streamComplete({
+      key: opts.key,
+      layer: 'chat',
+      messages: chatMessages,
+      temperature: 0.62,
+      maxTokens: 220,
+      signal: opts.signal,
+      onSentence: opts.onSentence,
+    });
+  } else {
+    chat = await complete({
+      key: opts.key,
+      layer: 'chat',
+      messages: chatMessages,
+      tools: voice ? undefined : chatTools,
+      temperature: voice ? 0.62 : 0.4,
+      preferVision: hasMedia,
+      maxTokens: voice ? 220 : 700,
+      signal: opts.signal,
+    });
+  }
 
   if (chat.tool_calls.length) {
     const ran = await runCalls(chat.tool_calls, ctx);
@@ -344,6 +474,7 @@ export async function runAssistantTurn(opts: {
           { role: 'user', content: `More tool results:\n${ran.reads.join('\n')}\nFinish the answer.` },
         ],
         temperature: 0.3,
+        signal: opts.signal,
       });
       return {
         content: stripReasoning(follow.content || chat.content || 'Here is what I found.'),
@@ -363,6 +494,7 @@ export async function runAssistantTurn(opts: {
         { role: 'user', content: `Tool results:\n${retrieval.slice(0, 3500)}\nAnswer the student in a short list. Do not say you lack an answer.` },
       ],
       temperature: 0.2,
+      signal: opts.signal,
     });
     return {
       content: stripReasoning(follow.content || summarizeRetrieval(retrieval)),

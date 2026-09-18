@@ -154,6 +154,60 @@ export function sortItems(items: DriveItem[], sortKey: SortKey, dir: 'asc' | 'de
   });
 }
 
+
+export type TagId = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'gray';
+
+export const TAG_COLORS: Record<TagId, { bg: string; ring: string; label: string }> = {
+  red: { bg: 'bg-red-400', ring: 'ring-red-300', label: 'Red' },
+  orange: { bg: 'bg-orange-400', ring: 'ring-orange-300', label: 'Orange' },
+  yellow: { bg: 'bg-yellow-400', ring: 'ring-yellow-300', label: 'Yellow' },
+  green: { bg: 'bg-emerald-400', ring: 'ring-emerald-300', label: 'Green' },
+  blue: { bg: 'bg-sky-400', ring: 'ring-sky-300', label: 'Blue' },
+  purple: { bg: 'bg-violet-400', ring: 'ring-violet-300', label: 'Purple' },
+  gray: { bg: 'bg-zinc-400', ring: 'ring-zinc-300', label: 'Gray' },
+};
+
+export const FOLDER_TINTS: Record<TagId, string> = {
+  red: 'text-red-500',
+  orange: 'text-orange-500',
+  yellow: 'text-amber-500',
+  green: 'text-emerald-500',
+  blue: 'text-sky-500',
+  purple: 'text-violet-500',
+  gray: 'text-zinc-500',
+};
+
+const TAG_KEY = 'epicure-drive-tags';
+const FOLDER_COLOR_KEY = 'epicure-drive-folder-colors';
+
+export function loadTags(): Record<string, TagId[]> {
+  try {
+    const raw = localStorage.getItem(TAG_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, TagId[]>;
+  } catch {
+    return {};
+  }
+}
+
+export function saveTags(map: Record<string, TagId[]>) {
+  localStorage.setItem(TAG_KEY, JSON.stringify(map));
+}
+
+export function loadFolderColors(): Record<string, TagId> {
+  try {
+    const raw = localStorage.getItem(FOLDER_COLOR_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, TagId>;
+  } catch {
+    return {};
+  }
+}
+
+export function saveFolderColors(map: Record<string, TagId>) {
+  localStorage.setItem(FOLDER_COLOR_KEY, JSON.stringify(map));
+}
+
 export function GridThumb({
   item,
   urlCache,

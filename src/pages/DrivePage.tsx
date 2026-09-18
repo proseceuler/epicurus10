@@ -10,10 +10,11 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { MotionOverlay } from '@/components/MotionUI';
 import {
   type DriveItem, type ViewMode, type Density, type NewMode, type SortKey,
-  type TypeFilter, type ScopeView, type UploadJob,
+  type TypeFilter, type ScopeView, type UploadJob, type TagId,
   formatSize, formatDate, previewKind, iconFor, middleTruncate, parentPrefix,
   fetchSignedUrl, GridThumb, SkeletonGrid, loadStarred, saveStarred, loadRecent,
-  pushRecent, typeFilterMatch, sortItems,
+  pushRecent, typeFilterMatch, sortItems, TAG_COLORS, FOLDER_TINTS,
+  loadTags, saveTags, loadFolderColors, saveFolderColors,
 } from './driveKit';
 
 export default function DrivePage() {
@@ -33,6 +34,9 @@ export default function DrivePage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [starred, setStarred] = useState<Set<string>>(() => loadStarred());
+  const [tags, setTags] = useState<Record<string, TagId[]>>(() => loadTags());
+  const [folderColors, setFolderColors] = useState<Record<string, TagId>>(() => loadFolderColors());
+  const [tagMenu, setTagMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; item: DriveItem } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [newMode, setNewMode] = useState<NewMode>('menu');
@@ -101,16 +105,57 @@ export default function DrivePage() {
     };
   }, [ctx]);
 
-  // Keyboard: Delete selected, Ctrl/Cmd+A select all
+  // Keyboard: Escape, Ctrl/Cmd+A, Space = Quick Look
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (viewer) return; // viewer has its own keys
       if (e.key === 'Escape') {
         setSelectedKeys(new Set());
         setDetailsOpen(false);
+        setTagMenu(null);
+        setCtx(null);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'a' && scope === 'files') {
         e.preventDefault();
         setSelectedKeys(new Set(filtered.map((i) => i.key)));
+      }
+      // Space = Quick Look (Apple-style) on single selection
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (selectedKeys.size === 1) {
+          const k = [...selectedKeys][0];
+          const item = filtered.find((i) => i.key === k) || items.find((i) => i.key === k);
+          if (item) void openViewer(item);
+        } else if (selectedKeys.size === 0 && filtered.length > 0) {
+          // no selection: quick look first item
+          void openViewer(filtered[0]);
+        }
+      }
+      // Arrow keys move selection when not in viewer
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        if (selectedKeys.size <= 1 && filtered.length) {
+          e.preventDefault();
+          const cur = selectedKeys.size === 1 ? [...selectedKeys][0] : null;
+          const idx = cur ? filtered.findIndex((i) => i.key === cur) : -1;
+          const next = filtered[Math.min(idx + 1, filtered.length - 1)] || filtered[0];
+          setSelectedKeys(new Set([next.key]));
+        }
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        if (selectedKeys.size <= 1 && filtered.length) {
+          e.preventDefault();
+          const cur = selectedKeys.size === 1 ? [...selectedKeys][0] : null;
+          const idx = cur ? filtered.findIndex((i) => i.key === cur) : 0;
+          const next = filtered[Math.max(idx - 1, 0)];
+          setSelectedKeys(new Set([next.key]));
+        }
+      }
+      if (e.key === 'Enter' && selectedKeys.size === 1) {
+        const k = [...selectedKeys][0];
+        const item = filtered.find((i) => i.key === k);
+        if (item) openFile(item);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -184,6 +229,29 @@ export default function DrivePage() {
       if (next.has(key)) next.delete(key);
       else next.add(key);
       saveStarred(next);
+      return next;
+    });
+  };
+
+  const toggleTag = (key: string, tag: TagId) => {
+    setTags((prev) => {
+      const cur = prev[key] || [];
+      const has = cur.includes(tag);
+      const nextTags = has ? cur.filter((t) => t !== tag) : [...cur, tag];
+      const next = { ...prev };
+      if (nextTags.length) next[key] = nextTags;
+      else delete next[key];
+      saveTags(next);
+      return next;
+    });
+  };
+
+  const setFolderColor = (key: string, color: TagId | null) => {
+    setFolderColors((prev) => {
+      const next = { ...prev };
+      if (color) next[key] = color;
+      else delete next[key];
+      saveFolderColors(next);
       return next;
     });
   };
@@ -673,7 +741,7 @@ export default function DrivePage() {
                       onMouseLeave={onItemLeave}
                       onContextMenu={(e) => { e.preventDefault(); selectOnly(item.key); setCtx({ x: e.clientX, y: e.clientY, item }); }}
                       className={`group relative flex flex-col items-center gap-1.5 rounded-xl text-center transition-all duration-150 ${compact ? 'p-2' : 'p-2.5'} ${
-                        sel ? 'scale-[0.98] bg-zinc-900/10 ring-1 ring-zinc-300' : 'hover:scale-[1.01] hover:bg-zinc-100/80'
+                        sel ? 'scale-[0.97] bg-zinc-900/10 ring-2 ring-zinc-400/80 shadow-sm' : 'hover:scale-[1.02] hover:bg-zinc-100/80 hover:shadow-sm'
                       }`}
                     >
                       <button type="button" onClick={(e) => toggleSelect(item.key, e)}
@@ -683,13 +751,25 @@ export default function DrivePage() {
                       {starred.has(item.key) && (
                         <Star className="absolute right-7 top-1.5 h-3 w-3 fill-amber-400 text-amber-400" />
                       )}
-                      <GridThumb item={item} urlCache={urlCache} compact={compact} />
+                      <div className="relative">
+                        <GridThumb item={item} urlCache={urlCache} compact={compact} />
+                        {item.type === 'folder' && folderColors[item.key] && (
+                          <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${TAG_COLORS[folderColors[item.key]].bg}`} />
+                        )}
+                      </div>
                       <span className="w-full text-xs font-medium leading-tight text-zinc-800" title={item.name}>
                         {middleTruncate(item.name, compact ? 18 : 22)}
                       </span>
                       <span className="text-[10px] font-medium text-zinc-600">
                         {item.type === 'file' ? formatSize(item.size) : 'Folder'}
                       </span>
+                      {(tags[item.key]?.length ?? 0) > 0 && (
+                        <div className="flex gap-0.5">
+                          {tags[item.key].map((t) => (
+                            <span key={t} className={`h-1.5 w-1.5 rounded-full ${TAG_COLORS[t].bg}`} title={TAG_COLORS[t].label} />
+                          ))}
+                        </div>
+                      )}
                       <button type="button"
                         className="absolute right-0.5 top-0.5 rounded-md p-1 opacity-0 transition-opacity hover:bg-zinc-200 group-hover:opacity-100"
                         onClick={(e) => { e.stopPropagation(); setCtx({ x: e.clientX, y: e.clientY, item }); }}>
@@ -733,9 +813,20 @@ export default function DrivePage() {
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-2">
-                            <Icon className={`h-4 w-4 shrink-0 ${item.type === 'folder' ? 'text-amber-600/80' : 'text-zinc-500'}`} />
+                            <Icon className={`h-4 w-4 shrink-0 ${
+                              item.type === 'folder'
+                                ? (folderColors[item.key] ? FOLDER_TINTS[folderColors[item.key]] : 'text-amber-600/80')
+                                : 'text-zinc-500'
+                            }`} />
                             <span className="truncate font-medium text-zinc-800" title={item.name}>{item.name}</span>
                             {starred.has(item.key) && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
+                            {(tags[item.key]?.length ?? 0) > 0 && (
+                              <span className="flex gap-0.5">
+                                {tags[item.key].map((t) => (
+                                  <span key={t} className={`h-2 w-2 rounded-full ${TAG_COLORS[t].bg}`} />
+                                ))}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="hidden px-2 py-2 text-xs font-medium text-zinc-600 sm:table-cell">
@@ -815,6 +906,31 @@ export default function DrivePage() {
                         <p className="text-zinc-500">Path</p>
                         <p className="break-all font-medium text-zinc-800">{primarySelected.key || '/'}</p>
                       </div>
+                      <div>
+                        <p className="mb-1 text-zinc-500">Tags</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(Object.keys(TAG_COLORS) as TagId[]).map((t) => {
+                            const on = (tags[primarySelected.key] || []).includes(t);
+                            return (
+                              <button key={t} type="button" title={TAG_COLORS[t].label}
+                                onClick={() => toggleTag(primarySelected.key, t)}
+                                className={`h-4 w-4 rounded-full ${TAG_COLORS[t].bg} ${on ? 'ring-2 ring-offset-1 ring-zinc-800' : 'opacity-40 hover:opacity-100'}`} />
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {primarySelected.type === 'folder' && (
+                        <div>
+                          <p className="mb-1 text-zinc-500">Folder color</p>
+                          <div className="flex flex-wrap gap-1">
+                            {(Object.keys(TAG_COLORS) as TagId[]).map((t) => (
+                              <button key={t} type="button" onClick={() => setFolderColor(primarySelected.key, t)}
+                                className={`h-4 w-4 rounded-full ${TAG_COLORS[t].bg} ${folderColors[primarySelected.key] === t ? 'ring-2 ring-offset-1 ring-zinc-800' : 'opacity-40 hover:opacity-100'}`} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-zinc-400">Tip: press <kbd className="rounded bg-zinc-100 px-1">Space</kbd> for Quick Look</p>
                     </div>
                     <div className="flex flex-wrap gap-1 pt-1">
                       <button type="button" className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-white"
@@ -1013,9 +1129,78 @@ export default function DrivePage() {
             onClick={() => { toast.message('Share links coming soon'); setCtx(null); }}>
             <Share2 className="h-4 w-4" /> Share
           </button>
+          <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
+            onClick={(e) => {
+              setTagMenu({ key: ctx.item.key, x: e.clientX, y: e.clientY });
+              setCtx(null);
+            }}>
+            <span className="flex h-4 w-4 items-center justify-center gap-px">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+            </span>
+            Tags…
+          </button>
+          {ctx.item.type === 'folder' && (
+            <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/50"
+              onClick={(e) => {
+                setTagMenu({ key: ctx.item.key, x: e.clientX, y: e.clientY });
+                setCtx(null);
+              }}>
+              <Folder className="h-4 w-4" /> Folder color…
+            </button>
+          )}
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50/80"
             onClick={() => { void removeKeys([ctx.item.key]); setCtx(null); }}>
             <Trash2 className="h-4 w-4" /> Delete
+          </button>
+        </div>
+      )}
+
+      {/* Tag / folder color picker */}
+      {tagMenu && (
+        <div
+          className="glass glass-shadow-lg fixed z-[110] min-w-[160px] rounded-xl p-2"
+          style={{ left: Math.min(tagMenu.x, window.innerWidth - 180), top: Math.min(tagMenu.y, window.innerHeight - 120) }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Tags</p>
+          <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+            {(Object.keys(TAG_COLORS) as TagId[]).map((t) => {
+              const on = (tags[tagMenu.key] || []).includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  title={TAG_COLORS[t].label}
+                  onClick={() => toggleTag(tagMenu.key, t)}
+                  className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${TAG_COLORS[t].bg} ${on ? 'ring-2 ring-offset-1 ring-zinc-800' : ''}`}
+                />
+              );
+            })}
+          </div>
+          {filtered.find((i) => i.key === tagMenu.key)?.type === 'folder' && (
+            <>
+              <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Folder color</p>
+              <div className="mb-1 flex flex-wrap gap-1.5 px-1">
+                {(Object.keys(TAG_COLORS) as TagId[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    title={TAG_COLORS[t].label}
+                    onClick={() => { setFolderColor(tagMenu.key, t); setTagMenu(null); }}
+                    className={`h-5 w-5 rounded-full ${TAG_COLORS[t].bg} ${folderColors[tagMenu.key] === t ? 'ring-2 ring-offset-1 ring-zinc-800' : ''}`}
+                  />
+                ))}
+                <button type="button" className="rounded-full px-2 text-[10px] text-zinc-500 hover:bg-zinc-100"
+                  onClick={() => { setFolderColor(tagMenu.key, null); setTagMenu(null); }}>
+                  Clear
+                </button>
+              </div>
+            </>
+          )}
+          <button type="button" className="mt-1 w-full rounded-lg px-2 py-1 text-left text-xs text-zinc-500 hover:bg-zinc-100"
+            onClick={() => setTagMenu(null)}>
+            Done
           </button>
         </div>
       )}

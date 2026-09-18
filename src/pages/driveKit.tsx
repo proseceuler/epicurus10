@@ -55,14 +55,14 @@ function iconFor(item: DriveItem) {
   return FileIcon;
 }
 
-/** Middle-truncate so the extension stays visible */
+/** Middle-truncate so the extension stays visible: Gemini_Generated_Im…550sc (1).png */
 function middleTruncate(name: string, max = 22): string {
   if (name.length <= max) return name;
   const dot = name.lastIndexOf('.');
   const hasExt = dot > 0 && name.length - dot <= 8;
   const ext = hasExt ? name.slice(dot) : '';
   const base = hasExt ? name.slice(0, dot) : name;
-  const budget = max - ext.length - 1;
+  const budget = max - ext.length - 1; // 1 for ellipsis
   if (budget < 4) return name.slice(0, max - 1) + '…';
   const head = Math.ceil(budget * 0.55);
   const tail = budget - head;
@@ -83,6 +83,7 @@ async function fetchSignedUrl(key: string): Promise<string> {
   return data.url as string;
 }
 
+/** Grid thumbnail: real image preview when possible, otherwise type icon. */
 function GridThumb({
   item,
   urlCache,
@@ -135,7 +136,9 @@ function GridThumb({
   }
 
   if (isImage && !failed && !src) {
-    return <div className={`${box} animate-pulse rounded-xl bg-zinc-200/70`} />;
+    return (
+      <div className={`${box} animate-pulse rounded-xl bg-zinc-200/70`} />
+    );
   }
 
   return (
@@ -167,6 +170,7 @@ function SkeletonGrid({ compact }: { compact: boolean }) {
     </div>
   );
 }
+
 
 export type { DriveItem, ViewMode, Density, NewMode, PreviewKind };
 export {

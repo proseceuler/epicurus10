@@ -14,8 +14,8 @@ export const Route = createFileRoute('/api/drive/list')({
         if (!r2Configured()) {
           return json(
             {
-              error: 'Firebase Storage is not configured',
-              hint: 'Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_STORAGE_BUCKET. See docs/firebase-storage.md.',
+              error: 'Backblaze B2 is not configured',
+              hint: 'Set B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET, and B2_REGION. See docs/backblaze-b2.md.',
               configured: false,
             },
             503,

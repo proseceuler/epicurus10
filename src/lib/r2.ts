@@ -1,4 +1,4 @@
-/** @deprecated Cloud Drive now uses Firebase Storage. These names stay so existing imports keep working. */
+/** Cloud Drive storage. Names kept so existing /api/drive imports keep working. */
 export {
   storageConfigured as r2Configured,
   getDriveStorageConfig as getR2Config,

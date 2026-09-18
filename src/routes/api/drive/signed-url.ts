@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/drive/signed-url')({
     handlers: {
       GET: async ({ request }: { request: Request }) => {
         if (!r2Configured()) {
-          return json({ error: 'Firebase Storage is not configured', configured: false }, 503);
+          return json({ error: 'Backblaze B2 is not configured', configured: false }, 503);
         }
         try {
           const url = new URL(request.url);

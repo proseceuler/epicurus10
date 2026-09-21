@@ -13,6 +13,7 @@ const SUBJECT_HINTS: Array<{ keys: string[]; subject: SubjectKey }> = [
   { keys: ['values'], subject: 'values' },
   { keys: ['mapeh', 'pe', 'music', 'arts'], subject: 'mapeh' },
   { keys: ['ap', 'araling'], subject: 'ap' },
+  { keys: ['creative', 'creative tech', 'creative technology', 'ct', 'tle', 'tech'], subject: 'creative_tech' },
 ];
 
 export function inferSubject(text: string, explicit?: string): SubjectKey | null {

@@ -6,7 +6,8 @@ export type SubjectKey =
   | 'filipino'
   | 'english'
   | 'values'
-  | 'mapeh';
+  | 'mapeh'
+  | 'creative_tech';
 
 export type ComponentType = 'ww' | 'pt' | 'ex';
 export type ExType = 'st1' | 'st2' | 'te';
@@ -27,6 +28,7 @@ export const SUBJECTS: Subject[] = [
   { key: 'english', name: 'English', shortName: 'English', weights: { ww: 20, pt: 50, ex: 30 } },
   { key: 'values', name: 'Values Education', shortName: 'Values Ed', weights: { ww: 20, pt: 50, ex: 30 } },
   { key: 'mapeh', name: 'Music, Arts, PE & Health', shortName: 'MAPEH', weights: { ww: 20, pt: 60, ex: 20 } },
+  { key: 'creative_tech', name: 'Creative Technology', shortName: 'Creative Tech', weights: { ww: 20, pt: 50, ex: 30 } },
 ];
 
 export const SUBJECT_MAP: Record<SubjectKey, Subject> = SUBJECTS.reduce(

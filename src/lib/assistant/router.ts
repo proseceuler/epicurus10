@@ -2,19 +2,18 @@ import {
   OPENROUTER_URL,
   LAYER_MODELS,
   LAYER_FALLBACKS,
-  VISION_MODELS,
-  VOICE_FAST_MODELS,
   type AssistantLayer,
 } from './models';
 import { listToolDefs, isWriteTool, dispatchTool, AUTO_APPLY_WRITES } from './registry';
 import { attachmentPrompt, visionParts, type ChatAttachment } from './media';
 import { memoryBlock } from './memory';
 import { voiceSystemPrompt } from './voicePrompt';
-import { streamVoiceComplete, type StreamHooks } from './streamVoice';
+import { streamVoiceComplete, stripReasoning, type StreamHooks } from './streamVoice';
 import type { ToolContext } from '@/lib/aiTools';
 import type { PageId } from '@/components/AppLayout';
 
 export type { StreamHooks };
+export { stripReasoning };
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -50,21 +49,9 @@ function systemPrompt(page: PageId, search: boolean) {
     memoryBlock(),
     'Use tools for the student data. Prefer get_* tools before guessing.',
     'Reply in markdown. Keep answers concise.',
+    'Never write Analyze User Input, Identify Role, Constraints, or chain-of-thought.',
     search ? 'Web search is ON.' : 'Web search is OFF unless asked.',
   ].filter(Boolean).join(' ');
-}
-
-const LEAK_RE = /identify core intent|thinking process|chain of thought|system prompt rule/i;
-
-export function stripReasoning(raw: string, fallback = 'Hey — what do you need?') {
-  let text = String(raw || '');
-  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  text = text.replace(/<\/?think>/gi, '');
-  text = text.replace(/```(?:thinking|reasoning|analysis)[\s\S]*?```/gi, '');
-  const parts = text.split(/\n+/).filter((p) => !LEAK_RE.test(p));
-  text = parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (!text || LEAK_RE.test(text)) return fallback;
-  return text;
 }
 
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
@@ -128,6 +115,7 @@ async function complete(opts: {
 }
 
 function toApiMessages(history: ChatTurn[], page: PageId, search: boolean, voice = false): ORMessage[] {
+  // Always use the strict voice prompt when voice is on (blocks CoT dumps)
   const system = voice ? voiceSystemPrompt(page) : systemPrompt(page, search);
   const out: ORMessage[] = [{ role: 'system', content: system }];
   const keep = history.slice(voice ? -6 : -24);
@@ -204,13 +192,13 @@ export async function runAssistantTurn(opts: {
     const chat = await streamVoiceComplete({
       openRouterKey: opts.key,
       messages: apiMessages,
-      temperature: 0.55,
-      maxTokens: 160,
+      temperature: 0.4,
+      maxTokens: 120,
       signal,
       hooks: opts.stream,
     });
     return {
-      content: stripReasoning(chat.content || 'I could not get a reply. Try again.'),
+      content: stripReasoning(chat.content || 'Hey — what do you need?'),
       usedLayers,
     };
   }
@@ -245,8 +233,8 @@ export async function runAssistantTurn(opts: {
     const chat = await streamVoiceComplete({
       openRouterKey: opts.key,
       messages: chatMessages,
-      temperature: 0.55,
-      maxTokens: 160,
+      temperature: 0.4,
+      maxTokens: 120,
       signal,
       hooks: opts.stream,
     });
@@ -263,8 +251,8 @@ export async function runAssistantTurn(opts: {
     layer: 'chat',
     messages: chatMessages,
     tools: voice ? undefined : listToolDefs({ webSearch: opts.searchEnabled, writes: false }),
-    temperature: voice ? 0.55 : 0.4,
-    maxTokens: voice ? 220 : 700,
+    temperature: voice ? 0.4 : 0.4,
+    maxTokens: voice ? 120 : 700,
     signal,
   });
 

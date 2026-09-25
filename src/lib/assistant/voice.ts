@@ -9,7 +9,10 @@ interface SpeechRecognitionLike {
   onstart: (() => void) | null;
   onend: (() => void) | null;
   onerror: ((ev: { error?: string }) => void) | null;
-  onresult: ((ev: { results: ArrayLike<{ isFinal?: boolean; 0: { transcript: string } }> }) => void) | null;
+  onresult: ((ev: {
+    resultIndex: number;
+    results: ArrayLike<{ isFinal?: boolean; 0: { transcript: string } }>;
+  }) => void) | null;
 }
 
 export function speechRecognitionCtor(): SRCtor | null {
@@ -36,19 +39,28 @@ export function createRecognizer(opts: {
   rec.onerror = (ev) => {
     const err = ev.error || 'mic';
     if (err === 'aborted' || err === 'no-speech') return;
-    opts.onError?.(err === 'not-allowed' ? 'Microphone was blocked. You can keep typing instead.' : 'Voice input failed.');
+    opts.onError?.(
+      err === 'not-allowed'
+        ? 'Microphone was blocked. You can keep typing instead.'
+        : 'Voice input failed.',
+    );
   };
+  /**
+   * Continuous mode keeps ALL results from session start in ev.results.
+   * Only process from resultIndex and emit NEW finals — never concatenate history.
+   */
   rec.onresult = (ev) => {
     let interim = '';
-    let finals = '';
-    for (let i = 0; i < ev.results.length; i++) {
+    let newFinal = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
       const row = ev.results[i];
-      const text = row[0]?.transcript || '';
-      if ((row as { isFinal?: boolean }).isFinal) finals += text;
-      else interim += text;
+      const text = (row[0]?.transcript || '').trim();
+      if (!text) continue;
+      if ((row as { isFinal?: boolean }).isFinal) newFinal += (newFinal ? ' ' : '') + text;
+      else interim += (interim ? ' ' : '') + text;
     }
-    if (finals.trim()) opts.onFinal?.(finals.trim());
-    else if (interim.trim()) opts.onInterim?.(interim.trim());
+    if (newFinal) opts.onFinal?.(newFinal);
+    else if (interim) opts.onInterim?.(interim);
   };
   return rec;
 }
@@ -82,20 +94,32 @@ export function splitSpokenChunks(text: string): string[] {
     .replace(/\s+/g, ' ')
     .trim();
   if (!clean) return [];
-  const parts = clean.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  const parts = clean
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   return parts.length ? parts : [clean];
 }
 
 export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
-  if (!window.speechSynthesis) { hooks?.onEnd?.(); return; }
+  if (!window.speechSynthesis) {
+    hooks?.onEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
   const chunks = splitSpokenChunks(text).slice(0, 8);
-  if (!chunks.length) { hooks?.onEnd?.(); return; }
+  if (!chunks.length) {
+    hooks?.onEnd?.();
+    return;
+  }
   const voice = pickVoice();
   let i = 0;
   let started = false;
   const next = () => {
-    if (i >= chunks.length) { hooks?.onEnd?.(); return; }
+    if (i >= chunks.length) {
+      hooks?.onEnd?.();
+      return;
+    }
     const u = new SpeechSynthesisUtterance(chunks[i]);
     const wave = (i % 3) - 1;
     u.rate = 1.02 + wave * 0.04;
@@ -116,9 +140,15 @@ export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: 
     window.speechSynthesis.speak(u);
   };
   next();
-  window.setTimeout(() => { if (!started) hooks?.onStart?.(); }, 80);
+  window.setTimeout(() => {
+    if (!started) hooks?.onStart?.();
+  }, 80);
 }
 
 export function stopSpeech() {
-  try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    /* ignore */
+  }
 }

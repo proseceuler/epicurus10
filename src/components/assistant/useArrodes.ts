@@ -7,6 +7,7 @@ import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
 import { dispatchTool } from '@/lib/assistant/registry';
 import { undoLastWrite } from '@/lib/assistant/undo';
+import { harvestMemory } from '@/lib/assistant/memory';
 import { runTurn } from '@/lib/arrodes/turn';
 import { speak, stopSpeak, takeSentences } from '@/lib/arrodes/speak';
 import { getGroqKey, getOpenRouterKey } from '@/lib/apiKeys';
@@ -14,7 +15,9 @@ import { usePomodoro } from '@/context/PomodoroContext';
 import type { SubjectKey } from '@/lib/types';
 import { THINK_WORDS, newId, type Msg } from '@/components/assistant/arrodesBits';
 
-/** Clean Arrodes engine with tools, attachments, and web search. */
+const DRAFT_ID = '__voice_draft__';
+
+/** Clean Arrodes engine with tools, attachments, web search, live caption. */
 export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
   const pomodoro = usePomodoro();
   const [messages, setMessages] = useState<Msg[]>(() => loadHistory<Msg>([]));
@@ -39,10 +42,14 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
   const speakQueue = useRef<Promise<void>>(Promise.resolve());
   const searchOnRef = useRef(searchOn);
   const lastFinalRef = useRef('');
+  const messagesRef = useRef(messages);
   searchOnRef.current = searchOn;
+  messagesRef.current = messages;
 
   useEffect(() => {
-    saveHistory(messages.slice(-40));
+    // Persist full chat (session already caps safely)
+    const durable = messages.filter((m) => m.id !== DRAFT_ID);
+    saveHistory(durable.slice(-80));
   }, [messages]);
 
   useEffect(() => {
@@ -81,6 +88,16 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
     navigate?.('pomodoro');
   };
 
+  const pauseFocus = () => {
+    pomodoro.pause();
+  };
+
+  const toolCtx = {
+    startFocus: focus,
+    navigate: navigate as ((page: string) => void) | undefined,
+    pauseFocus,
+  };
+
   const interrupt = () => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -91,6 +108,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
     busyRef.current = false;
     setBusy(false);
     setInterim('');
+    setMessages((list) => list.filter((m) => m.id !== DRAFT_ID));
   };
 
   const enqueueSpeak = (sentence: string, signal: AbortSignal) => {
@@ -113,6 +131,20 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
     });
   };
 
+  /** Live chat bubble that grows word-by-word while the user speaks. */
+  const updateDraft = (text: string) => {
+    const t = text.trim();
+    setInterim(t);
+    if (!t) {
+      setMessages((list) => list.filter((m) => m.id !== DRAFT_ID));
+      return;
+    }
+    setMessages((list) => {
+      const without = list.filter((m) => m.id !== DRAFT_ID);
+      return [...without, { id: DRAFT_ID, role: 'user', content: t }];
+    });
+  };
+
   const startListen = () => {
     try {
       recRef.current?.abort?.();
@@ -124,7 +156,6 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       onStart: () => setListening(true),
       onEnd: () => {
         setListening(false);
-        // Restart only when idle in voice mode
         if (voiceOnRef.current && !busyRef.current && !speakingRef.current) {
           window.setTimeout(() => {
             if (voiceOnRef.current && !busyRef.current && !speakingRef.current) {
@@ -139,15 +170,15 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       },
       onError: (msg) => setError(msg),
       onInterim: (t) => {
-        if (!busyRef.current) setInterim(t);
+        if (!busyRef.current) updateDraft(t);
       },
       onFinal: (t) => {
         const text = t.trim();
         if (!text || busyRef.current || speakingRef.current) return;
-        // Dedupe identical back-to-back finals
         if (text === lastFinalRef.current) return;
         lastFinalRef.current = text;
         setInterim('');
+        // Finalize draft into a real send
         void send(text);
       },
     });
@@ -184,6 +215,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       stopSpeak();
       setSpeaking(false);
       setInterim('');
+      setMessages((list) => list.filter((m) => m.id !== DRAFT_ID));
       setVoiceLeaving(true);
       setVoiceOn(false);
       window.clearTimeout(leaveTimer.current);
@@ -229,22 +261,25 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       return;
     }
 
-    // Pause mic while we answer so it does not hear TTS / re-capture
     stopListen();
     stopSpeak();
     speakQueue.current = Promise.resolve();
     setError('');
     setInput('');
     setAttachments([]);
+    setInterim('');
 
+    // Replace draft bubble with permanent user message
     const user: Msg = {
       id: newId(),
       role: 'user',
       content: content || 'Please look at this attachment.',
       attachments: pendingAtt.length ? pendingAtt : undefined,
     };
-    const next = [...messages, user];
+    const base = messagesRef.current.filter((m) => m.id !== DRAFT_ID);
+    const next = [...base, user];
     setMessages(next);
+    messagesRef.current = next;
 
     abortRef.current?.abort();
     const ac = new AbortController();
@@ -267,7 +302,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
         })),
         voice,
         searchOn: searchOnRef.current,
-        ctx: { startFocus: focus },
+        ctx: toolCtx,
         signal: ac.signal,
         onFirstToken: () => {
           busyRef.current = false;
@@ -295,6 +330,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
             : m,
         ),
       );
+      harvestMemory(user.content, finalText);
 
       if (voice && finalText) {
         const { ready, rest } = takeSentences(finalText + ' ');
@@ -311,12 +347,9 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
       setError(msg);
-      // Keep a visible assistant line so voice mode is not a blank bubble
       setMessages((list) =>
         list.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: m.content || `Sorry — ${msg}` }
-            : m,
+          m.id === assistantId ? { ...m, content: m.content || `Sorry — ${msg}` } : m,
         ),
       );
     } finally {
@@ -325,7 +358,6 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       setBusy(false);
       speakingRef.current = false;
       setSpeaking(false);
-      // Resume listening after the turn
       if (voiceOnRef.current) {
         window.setTimeout(() => {
           if (voiceOnRef.current && !busyRef.current) startListen();
@@ -347,7 +379,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
     }
     setBusy(true);
     try {
-      await dispatchTool(msg.pending.name, msg.pending.args, { startFocus: focus });
+      await dispatchTool(msg.pending.name, msg.pending.args, toolCtx);
       setMessages((list) =>
         list.map((m, i) => (i === index ? { ...m, pending: { ...m.pending!, done: true } } : m)),
       );

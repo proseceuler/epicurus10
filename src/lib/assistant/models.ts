@@ -5,6 +5,26 @@ export const LAYER_MODELS = {
   data: 'nvidia/nemotron-3.5-lightning:free',
 } as const;
 
+/** Fastest free OpenRouter models for voice fallback. */
+export const VOICE_FAST_MODELS = [
+  'nvidia/nemotron-3.5-lightning:free',
+  'google/gemma-4-31b-it:free',
+  'qwen/qwen3-4b:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+] as const;
+
+/**
+ * Groq chat models — much lower TTFT than OpenRouter free tiers.
+ * Instant first, then versatile if needed.
+ */
+export const GROQ_VOICE_MODELS = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'gemma2-9b-it',
+] as const;
+
+export const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
 export const LAYER_FALLBACKS: Record<keyof typeof LAYER_MODELS, string[]> = {
   chat: [
     'google/gemma-4-31b-it:free',

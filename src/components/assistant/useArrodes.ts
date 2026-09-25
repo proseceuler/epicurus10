@@ -38,6 +38,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
   const leaveTimer = useRef(0);
   const speakQueue = useRef<Promise<void>>(Promise.resolve());
   const searchOnRef = useRef(searchOn);
+  const lastFinalRef = useRef('');
   searchOnRef.current = searchOn;
 
   useEffect(() => {
@@ -123,19 +124,31 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       onStart: () => setListening(true),
       onEnd: () => {
         setListening(false);
+        // Restart only when idle in voice mode
         if (voiceOnRef.current && !busyRef.current && !speakingRef.current) {
-          try {
-            rec?.start();
-          } catch {
-            /* */
-          }
+          window.setTimeout(() => {
+            if (voiceOnRef.current && !busyRef.current && !speakingRef.current) {
+              try {
+                rec?.start();
+              } catch {
+                /* */
+              }
+            }
+          }, 200);
         }
       },
       onError: (msg) => setError(msg),
-      onInterim: (t) => setInterim(t),
+      onInterim: (t) => {
+        if (!busyRef.current) setInterim(t);
+      },
       onFinal: (t) => {
+        const text = t.trim();
+        if (!text || busyRef.current || speakingRef.current) return;
+        // Dedupe identical back-to-back finals
+        if (text === lastFinalRef.current) return;
+        lastFinalRef.current = text;
         setInterim('');
-        if (t.trim()) void send(t);
+        void send(text);
       },
     });
     if (!rec) {
@@ -190,6 +203,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
     setVoiceOn(true);
     voiceOnRef.current = true;
     setError('');
+    lastFinalRef.current = '';
     startListen();
   };
 
@@ -215,6 +229,8 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       return;
     }
 
+    // Pause mic while we answer so it does not hear TTS / re-capture
+    stopListen();
     stopSpeak();
     speakQueue.current = Promise.resolve();
     setError('');
@@ -266,7 +282,7 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
 
       if (ac.signal.aborted) return;
 
-      const finalText = reply.content || 'Hey — what do you need?';
+      const finalText = (reply.content || '').trim() || 'Hey — what do you need?';
       setMessages((list) =>
         list.map((m) =>
           m.id === assistantId
@@ -293,12 +309,28 @@ export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
       }
     } catch (err) {
       if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-      setMessages((list) => list.filter((m) => m.id !== assistantId || m.content));
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      setError(msg);
+      // Keep a visible assistant line so voice mode is not a blank bubble
+      setMessages((list) =>
+        list.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: m.content || `Sorry — ${msg}` }
+            : m,
+        ),
+      );
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
       busyRef.current = false;
       setBusy(false);
+      speakingRef.current = false;
+      setSpeaking(false);
+      // Resume listening after the turn
+      if (voiceOnRef.current) {
+        window.setTimeout(() => {
+          if (voiceOnRef.current && !busyRef.current) startListen();
+        }, 350);
+      }
     }
   };
 

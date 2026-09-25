@@ -1,9 +1,5 @@
 import { getGroqKey, getOpenRouterKey } from '@/lib/apiKeys';
-
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
-const OR_MODEL = 'google/gemma-2-9b-it:free';
+import { GROQ_URL, OR_URL, GROQ_MODELS, OR_MODELS, orHeaders } from './models';
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -13,41 +9,52 @@ export type StreamHandlers = {
   signal?: AbortSignal;
 };
 
-/** Stream a completion. Prefer Groq; fall back to OpenRouter. */
+/** Stream a completion. Prefer Groq; fall back to OpenRouter. Tries several model IDs. */
 export async function streamChat(
   messages: ChatMessage[],
   opts: StreamHandlers & { maxTokens?: number; temperature?: number } = {},
 ): Promise<string> {
+  const errors: string[] = [];
   const groq = getGroqKey();
+
   if (groq) {
-    try {
-      return await streamOnce({
-        url: GROQ_URL,
-        key: groq,
-        model: GROQ_MODEL,
-        messages,
-        ...opts,
-      });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      // fall through
+    for (const model of GROQ_MODELS) {
+      try {
+        return await streamOnce({
+          url: GROQ_URL,
+          key: groq,
+          model,
+          messages,
+          ...opts,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        errors.push(`groq/${model}: ${err instanceof Error ? err.message : 'fail'}`);
+      }
     }
   }
 
   const orKey = getOpenRouterKey();
-  if (!orKey) throw new Error('Add a Groq or OpenRouter key in Settings.');
+  if (orKey) {
+    for (const model of OR_MODELS) {
+      try {
+        return await streamOnce({
+          url: OR_URL,
+          key: orKey,
+          model,
+          messages,
+          extraHeaders: orHeaders(),
+          ...opts,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        errors.push(`or/${model}: ${err instanceof Error ? err.message : 'fail'}`);
+      }
+    }
+  }
 
-  return streamOnce({
-    url: OR_URL,
-    key: orKey,
-    model: OR_MODEL,
-    messages,
-    extraHeaders: {
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://epicure.app',
-      'X-Title': 'epicure',
-    },
-    ...opts,
-  });
+  if (!groq && !orKey) throw new Error('Add a Groq or OpenRouter key in Settings.');
+  throw new Error(errors[0] || 'Chat failed. Check API keys and model access.');
 }
 
 async function streamOnce(opts: {
@@ -80,7 +87,15 @@ async function streamOnce(opts: {
   });
 
   if (!res.ok || !res.body) {
-    throw new Error(`Chat failed (${res.status}).`);
+    let detail = '';
+    try {
+      const body = await res.text();
+      const j = JSON.parse(body);
+      detail = j?.error?.message || j?.message || body.slice(0, 120);
+    } catch {
+      /* */
+    }
+    throw new Error(detail ? `Chat failed (${res.status}): ${detail}` : `Chat failed (${res.status}).`);
   }
 
   const reader = res.body.getReader();
@@ -91,7 +106,11 @@ async function streamOnce(opts: {
 
   while (true) {
     if (opts.signal?.aborted) {
-      try { await reader.cancel(); } catch { /* */ }
+      try {
+        await reader.cancel();
+      } catch {
+        /* */
+      }
       throw new DOMException('Aborted', 'AbortError');
     }
     const { done, value } = await reader.read();
@@ -115,7 +134,9 @@ async function streamOnce(opts: {
           full += delta;
           opts.onToken?.(full);
         }
-      } catch { /* partial */ }
+      } catch {
+        /* partial */
+      }
     }
   }
 

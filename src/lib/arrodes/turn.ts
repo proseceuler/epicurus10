@@ -10,11 +10,7 @@ import type { ToolContext } from '@/lib/aiTools';
 import type { PageId } from '@/components/AppLayout';
 import { systemPrompt } from './prompt';
 import { streamChat, type ChatMessage } from './client';
-
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
-const OR_MODEL = 'google/gemma-2-9b-it:free';
+import { GROQ_URL, OR_URL, GROQ_MODELS, OR_MODELS, orHeaders } from './models';
 
 export type TurnMessage = {
   role: 'user' | 'assistant';
@@ -79,17 +75,16 @@ async function completeWithTools(opts: {
   const groq = getGroqKey();
   const orKey = getOpenRouterKey();
   const attempts: Array<{ url: string; key: string; model: string; headers?: Record<string, string> }> = [];
-  if (groq) attempts.push({ url: GROQ_URL, key: groq, model: GROQ_MODEL });
+
+  if (groq) {
+    for (const model of GROQ_MODELS) {
+      attempts.push({ url: GROQ_URL, key: groq, model });
+    }
+  }
   if (orKey) {
-    attempts.push({
-      url: OR_URL,
-      key: orKey,
-      model: OR_MODEL,
-      headers: {
-        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://epicure.app',
-        'X-Title': 'epicure',
-      },
-    });
+    for (const model of OR_MODELS) {
+      attempts.push({ url: OR_URL, key: orKey, model, headers: orHeaders() });
+    }
   }
   if (!attempts.length) throw new Error('Add a Groq or OpenRouter key in Settings.');
 
@@ -113,7 +108,15 @@ async function completeWithTools(opts: {
       signal: opts.signal,
     });
     if (!res.ok) {
-      lastErr = `Chat failed (${res.status}).`;
+      let detail = '';
+      try {
+        const body = await res.text();
+        const j = JSON.parse(body);
+        detail = j?.error?.message || body.slice(0, 100);
+      } catch {
+        /* */
+      }
+      lastErr = detail ? `Chat failed (${res.status}): ${detail}` : `Chat failed (${res.status}).`;
       continue;
     }
     const data = await res.json();
@@ -188,9 +191,7 @@ async function runToolCalls(
   return { reads, pending: pending[0], sources, toolMsgs };
 }
 
-/**
- * One assistant turn: optional tool round, then streamed final answer.
- */
+/** One assistant turn: optional tool round, then streamed final answer. */
 export async function runTurn(opts: {
   page: PageId;
   history: TurnMessage[];
@@ -204,7 +205,6 @@ export async function runTurn(opts: {
   const tools = listToolDefs({ webSearch: opts.searchOn, writes: true });
   const messages = buildMessages(opts.history, opts.page, opts.voice, opts.searchOn);
 
-  // Round 1: tool selection (non-stream)
   const first = await completeWithTools({
     messages,
     tools,
@@ -215,34 +215,16 @@ export async function runTurn(opts: {
   let sources: { title: string; url: string }[] = [];
 
   if (first.tool_calls.length) {
-    const assistantToolMsg: ApiMsg = {
-      role: 'assistant',
-      content: first.content || null,
-      tool_calls: first.tool_calls.map((c) => ({
-        id: c.id,
-        type: 'function',
-        function: c.function,
-      })),
-    };
     const ran = await runToolCalls(first.tool_calls, opts.ctx);
     pending = ran.pending;
     sources = ran.sources;
 
-    const followMsgs: ApiMsg[] = [...messages, assistantToolMsg, ...ran.toolMsgs];
-    // Round 2: stream the spoken/typed answer
-    const streamMsgs: ChatMessage[] = followMsgs.map((m) => ({
-      role: (m.role === 'tool' ? 'user' : m.role) as ChatMessage['role'],
-      content:
-        m.role === 'tool'
-          ? `Tool ${m.name}: ${String(m.content)}`
-          : typeof m.content === 'string'
-            ? m.content
-            : JSON.stringify(m.content),
-    }));
-    // Keep system + compress tool results into one user note for stream path simplicity
     const compact: ChatMessage[] = [
       { role: 'system', content: systemPrompt(opts.page, opts.voice, opts.searchOn) },
-      ...opts.history.slice(-6).map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+      ...opts.history.slice(-6).map((h) => ({
+        role: h.role as 'user' | 'assistant',
+        content: h.content,
+      })),
       {
         role: 'user',
         content: [
@@ -271,7 +253,6 @@ export async function runTurn(opts: {
     };
   }
 
-  // No tools — if we already have content, use it; else stream a pure chat reply
   if (first.content) {
     opts.onFirstToken?.();
     opts.onToken?.(first.content);

@@ -17,11 +17,41 @@ interface ORMessage {
   content: unknown;
 }
 
-function stripReasoning(raw: string, fallback = '') {
+const LEAK_LINE =
+  /analyze user input|identify role|identify core intent|determine tool|system prompt|constraints?:|thinking process|chain of thought|internal monologue|persona of|as an ai|here'?s a thinking|step\s*\d+\s*:|additional instructions/i;
+
+/**
+ * Strip chain-of-thought / system leaks so the student never sees them.
+ * Matches the "1. Analyze User Input / 2. Identify Role / 3. Constraints" pattern.
+ */
+export function stripReasoning(raw: string, fallback = 'Hey — what do you need?') {
   let text = String(raw || '');
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
   text = text.replace(/<\/?think>/gi, '');
-  return text.trim() || fallback;
+  text = text.replace(/```(?:thinking|reasoning|analysis)[\s\S]*?```/gi, '');
+  text = text.replace(/^\s*(?:here'?s a thinking process|thinking process|internal monologue)\s*:?\s*/i, '');
+
+  // Drop numbered analysis blocks (1. Analyze... 2. Identify Role... 3. Constraints...)
+  text = text.replace(
+    /(?:^|\n)\s*(?:\d+\.?\s*)?\*{0,2}(?:Analyze User Input|Identify Role|Identify Core Intent|Determine Tool Sequence|Constraints|System prompt rule|Thinking|Reasoning)[^\n]*[\s\S]*?(?=(?:\n\s*(?:\d+\.?\s*)?[A-Z][^\n]{0,40}:)|$)/gi,
+    '\n',
+  );
+
+  // Line filter
+  const kept = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l && !LEAK_LINE.test(l) && !/^\d+\.\s*(Analyze|Identify|Constraints)/i.test(l));
+
+  text = kept.join(' ').replace(/\s{2,}/g, ' ').trim();
+
+  // If still mostly leak labels, fall back
+  if (!text || LEAK_LINE.test(text) || /analyze user input|identify role|constraints?:/i.test(text)) {
+    return fallback;
+  }
+  // Strip leading list markers left over
+  text = text.replace(/^(?:[-*]\s+|\d+\.\s+)/, '').trim();
+  return text || fallback;
 }
 
 function popSentences(buffer: string): { sentences: string[]; rest: string } {
@@ -31,7 +61,7 @@ function popSentences(buffer: string): { sentences: string[]; rest: string } {
   let m: RegExpExecArray | null;
   while ((m = re.exec(buffer)) !== null) {
     const s = m[1].trim();
-    if (s.length >= 8) {
+    if (s.length >= 6 && !LEAK_LINE.test(s)) {
       sentences.push(s);
       lastIndex = m.index + m[0].length;
     }
@@ -75,20 +105,22 @@ async function consumeSseStream(
             opts.hooks?.onFirstToken?.();
           }
           raw += delta;
-          opts.hooks?.onToken?.(stripReasoning(raw, ''));
+          const cleaned = stripReasoning(raw, '');
+          // Only push tokens to UI if strip left real content (avoids flashing CoT)
+          if (cleaned) opts.hooks?.onToken?.(cleaned);
           const { sentences, rest } = popSentences(spokenRest + delta);
           spokenRest = rest;
           for (const s of sentences) {
             const cs = stripReasoning(s, '').trim();
-            if (cs) opts.hooks?.onSentence?.(cs);
+            if (cs && !LEAK_LINE.test(cs)) opts.hooks?.onSentence?.(cs);
           }
         }
       } catch { /* */ }
     }
   }
   const tail = stripReasoning(spokenRest, '').trim();
-  if (tail.length >= 8) opts.hooks?.onSentence?.(tail);
-  return stripReasoning(raw, '');
+  if (tail.length >= 6 && !LEAK_LINE.test(tail)) opts.hooks?.onSentence?.(tail);
+  return stripReasoning(raw, 'Hey — what do you need?');
 }
 
 /** Groq-first streaming voice completion. */
@@ -104,8 +136,8 @@ export async function streamVoiceComplete(opts: {
   const groqKey = getGroqKey();
   const bodyBase = {
     messages: opts.messages,
-    temperature: opts.temperature ?? 0.55,
-    max_tokens: opts.maxTokens ?? 160,
+    temperature: opts.temperature ?? 0.4,
+    max_tokens: opts.maxTokens ?? 120,
     stream: true as const,
   };
 

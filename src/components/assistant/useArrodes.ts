@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PageId } from '@/components/AppLayout';
 import type { ArrodesVoiceMode } from '@/components/ArrodesVoiceMirror';
+import type { ChatAttachment } from '@/lib/assistant/media';
 import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '@/lib/assistant/session';
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
 import { streamChat, type ChatMessage } from '@/lib/arrodes/client';
@@ -16,7 +17,7 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [searchOn, setSearchOn] = useState(() => loadSearchEnabled());
-  const [attachments, setAttachments] = useState<Msg['attachments']>([] as never[] | undefined);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [voiceOn, setVoiceOn] = useState(false);
   const [voiceLeaving, setVoiceLeaving] = useState(false);
   const [listening, setListening] = useState(false);
@@ -212,7 +213,6 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
       })),
     ];
 
-    let spokenRest = '';
     const voice = voiceOnRef.current;
 
     try {
@@ -228,10 +228,6 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
           setMessages((list) =>
             list.map((m) => (m.id === assistantId ? { ...m, content: full } : m)),
           );
-          if (voice) {
-            const { ready, rest } = takeSentences(spokenRest + full.slice(spokenRest.length > 0 ? 0 : 0));
-            // Better: track only new text from last spoken offset
-          }
         },
       });
 
@@ -243,10 +239,10 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
       );
 
       if (voice && finalText) {
-        // Speak full reply in sentence chunks
         const { ready, rest } = takeSentences(finalText + ' ');
-        const chunks = ready.length ? ready : [finalText];
+        const chunks = [...ready];
         if (rest.trim()) chunks.push(rest.trim());
+        if (!chunks.length) chunks.push(finalText);
         for (const s of chunks) {
           if (ac.signal.aborted) break;
           enqueueSpeak(s, ac.signal);
@@ -263,9 +259,6 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
       setBusy(false);
     }
   };
-
-  // Fix sentence streaming during token updates — keep it simple: speak after full reply for reliability
-  // (early TTS can return in a follow-up if needed)
 
   const toggleSearch = () => {
     const n = !searchOn;
@@ -289,8 +282,8 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     error,
     searchOn,
     toggleSearch,
-    attachments: attachments ?? [],
-    setAttachments: setAttachments as (v: never[]) => void,
+    attachments,
+    setAttachments,
     voiceOn,
     voiceLeaving,
     listening,
@@ -303,10 +296,10 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
       : 'Start voice',
     thinkWord,
     send,
-    confirmWrite: async () => {},
-    revertWrite: async () => {},
+    confirmWrite: async (_index: number, _accept: boolean) => {},
+    revertWrite: async (_index: number) => {},
     toggleVoice,
-    pickFiles: async () => {},
+    pickFiles: async (_files: FileList | null) => {},
     stopGenerate: interrupt,
   };
 }

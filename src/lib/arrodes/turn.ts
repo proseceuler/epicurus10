@@ -45,7 +45,7 @@ function buildMessages(
   searchOn: boolean,
 ): ApiMsg[] {
   const out: ApiMsg[] = [{ role: 'system', content: systemPrompt(page, voice, searchOn) }];
-  for (const m of history.slice(-10)) {
+  for (const m of history.slice(-30)) {
     if (m.role === 'user' && m.attachments?.length) {
       const images = visionParts(m.attachments);
       const text = [m.content, attachmentPrompt(m.attachments)].filter(Boolean).join('\n');
@@ -102,8 +102,8 @@ async function completeWithTools(opts: {
         model: a.model,
         messages: opts.messages,
         tools: opts.tools.length ? opts.tools : undefined,
-        temperature: 0.3,
-        max_tokens: 600,
+        temperature: 0.35,
+        max_tokens: 800,
       }),
       signal: opts.signal,
     });
@@ -165,7 +165,7 @@ async function runToolCalls(
 
     try {
       const result = await dispatchTool(name, args, ctx);
-      const snippet = JSON.stringify(result).slice(0, 2000);
+      const snippet = JSON.stringify(result).slice(0, 2500);
       reads.push(`${name}: ${snippet}`);
       toolMsgs.push({
         role: 'tool',
@@ -191,7 +191,6 @@ async function runToolCalls(
   return { reads, pending: pending[0], sources, toolMsgs };
 }
 
-/** One assistant turn: optional tool round, then streamed final answer. */
 export async function runTurn(opts: {
   page: PageId;
   history: TurnMessage[];
@@ -221,7 +220,7 @@ export async function runTurn(opts: {
 
     const compact: ChatMessage[] = [
       { role: 'system', content: systemPrompt(opts.page, opts.voice, opts.searchOn) },
-      ...opts.history.slice(-6).map((h) => ({
+      ...opts.history.slice(-20).map((h) => ({
         role: h.role as 'user' | 'assistant',
         content: h.content,
       })),
@@ -231,7 +230,7 @@ export async function runTurn(opts: {
           'Tool results (use these facts; do not invent):',
           ran.reads.join('\n') || '(no read results)',
           pending ? `A write needs confirm: ${pending.name}. Tell the student briefly.` : '',
-          'Now answer the student.',
+          'Now answer the student clearly, using the conversation so far.',
         ]
           .filter(Boolean)
           .join('\n'),
@@ -240,7 +239,7 @@ export async function runTurn(opts: {
 
     const content = await streamChat(compact, {
       signal: opts.signal,
-      maxTokens: opts.voice ? 140 : 500,
+      maxTokens: opts.voice ? 160 : 700,
       temperature: 0.4,
       onToken: opts.onToken,
       onFirstToken: opts.onFirstToken,
@@ -266,7 +265,7 @@ export async function runTurn(opts: {
 
   const content = await streamChat(chatMsgs, {
     signal: opts.signal,
-    maxTokens: opts.voice ? 140 : 500,
+    maxTokens: opts.voice ? 160 : 700,
     temperature: opts.voice ? 0.45 : 0.5,
     onToken: opts.onToken,
     onFirstToken: opts.onFirstToken,

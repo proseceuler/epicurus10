@@ -5,6 +5,14 @@ export const LAYER_MODELS = {
   data: 'nvidia/nemotron-3.5-lightning:free',
 } as const;
 
+/** Fastest free models preferred for pure voice turns (latency over depth). */
+export const VOICE_FAST_MODELS = [
+  'nvidia/nemotron-3.5-lightning:free',
+  'google/gemma-4-31b-it:free',
+  'qwen/qwen3-4b:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+] as const;
+
 export const LAYER_FALLBACKS: Record<keyof typeof LAYER_MODELS, string[]> = {
   chat: [
     'google/gemma-4-31b-it:free',

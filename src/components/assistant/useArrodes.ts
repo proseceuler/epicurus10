@@ -2,16 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import type { PageId } from '@/components/AppLayout';
 import type { ArrodesVoiceMode } from '@/components/ArrodesVoiceMirror';
 import type { ChatAttachment } from '@/lib/assistant/media';
+import { fileToAttachment } from '@/lib/assistant/media';
 import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '@/lib/assistant/session';
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
-import { streamChat, type ChatMessage } from '@/lib/arrodes/client';
-import { systemPrompt } from '@/lib/arrodes/prompt';
+import { dispatchTool } from '@/lib/assistant/registry';
+import { undoLastWrite } from '@/lib/assistant/undo';
+import { runTurn } from '@/lib/arrodes/turn';
 import { speak, stopSpeak, takeSentences } from '@/lib/arrodes/speak';
 import { getGroqKey, getOpenRouterKey } from '@/lib/apiKeys';
+import { usePomodoro } from '@/context/PomodoroContext';
+import type { SubjectKey } from '@/lib/types';
 import { THINK_WORDS, newId, type Msg } from '@/components/assistant/arrodesBits';
 
-/** Clean Arrodes engine — one stream path, no multi-layer router. */
-export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
+/** Clean Arrodes engine with tools, attachments, and web search. */
+export function useArrodes(page: PageId, navigate?: (p: PageId) => void) {
+  const pomodoro = usePomodoro();
   const [messages, setMessages] = useState<Msg[]>(() => loadHistory<Msg>([]));
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,6 +37,8 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
   const recRef = useRef<ReturnType<typeof createRecognizer>>(null);
   const leaveTimer = useRef(0);
   const speakQueue = useRef<Promise<void>>(Promise.resolve());
+  const searchOnRef = useRef(searchOn);
+  searchOnRef.current = searchOn;
 
   useEffect(() => {
     saveHistory(messages.slice(-40));
@@ -65,6 +72,13 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     if (!busy) return;
     setThinkWord(THINK_WORDS[Math.floor(Math.random() * THINK_WORDS.length)]);
   }, [busy]);
+
+  const focus = (subject: string | null) => {
+    pomodoro.setSessionContext((subject as SubjectKey) ?? null, null);
+    pomodoro.switchType('focus');
+    pomodoro.start();
+    navigate?.('pomodoro');
+  };
 
   const interrupt = () => {
     abortRef.current?.abort();
@@ -179,9 +193,23 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     startListen();
   };
 
+  const pickFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const next: ChatAttachment[] = [];
+    for (const file of Array.from(files).slice(0, 4)) {
+      try {
+        next.push(await fileToAttachment(file));
+      } catch {
+        setError('Could not attach that file.');
+      }
+    }
+    setAttachments((cur) => [...cur, ...next].slice(0, 6));
+  };
+
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || busyRef.current) return;
+    const pendingAtt = attachments;
+    if ((!content && !pendingAtt.length) || busyRef.current) return;
     if (!getGroqKey() && !getOpenRouterKey()) {
       setError('Add a Groq or OpenRouter key in Settings.');
       return;
@@ -191,8 +219,14 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     speakQueue.current = Promise.resolve();
     setError('');
     setInput('');
+    setAttachments([]);
 
-    const user: Msg = { id: newId(), role: 'user', content };
+    const user: Msg = {
+      id: newId(),
+      role: 'user',
+      content: content || 'Please look at this attachment.',
+      attachments: pendingAtt.length ? pendingAtt : undefined,
+    };
     const next = [...messages, user];
     setMessages(next);
 
@@ -205,21 +239,20 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     const assistantId = newId();
     setMessages([...next, { id: assistantId, role: 'assistant', content: '' }]);
 
-    const history: ChatMessage[] = [
-      { role: 'system', content: systemPrompt(page, voiceOnRef.current) },
-      ...next.slice(-8).map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-    ];
-
     const voice = voiceOnRef.current;
 
     try {
-      const reply = await streamChat(history, {
+      const reply = await runTurn({
+        page,
+        history: next.map((m) => ({
+          role: m.role,
+          content: m.content,
+          attachments: m.attachments,
+        })),
+        voice,
+        searchOn: searchOnRef.current,
+        ctx: { startFocus: focus },
         signal: ac.signal,
-        maxTokens: voice ? 120 : 400,
-        temperature: voice ? 0.45 : 0.5,
         onFirstToken: () => {
           busyRef.current = false;
           setBusy(false);
@@ -233,9 +266,18 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
 
       if (ac.signal.aborted) return;
 
-      const finalText = reply || 'Hey — what do you need?';
+      const finalText = reply.content || 'Hey — what do you need?';
       setMessages((list) =>
-        list.map((m) => (m.id === assistantId ? { ...m, content: finalText } : m)),
+        list.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                content: finalText,
+                pending: reply.pending,
+                sources: reply.sources,
+              }
+            : m,
+        ),
       );
 
       if (voice && finalText) {
@@ -256,6 +298,58 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
       busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const confirmWrite = async (index: number, accept: boolean) => {
+    const msg = messages[index];
+    if (!msg?.pending || msg.pending.done) return;
+    if (!accept) {
+      setMessages((list) =>
+        list.map((m, i) =>
+          i === index ? { ...m, pending: undefined, content: `${m.content}\n\nCancelled.` } : m,
+        ),
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      await dispatchTool(msg.pending.name, msg.pending.args, { startFocus: focus });
+      setMessages((list) =>
+        list.map((m, i) => (i === index ? { ...m, pending: { ...m.pending!, done: true } } : m)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revertWrite = async (index: number) => {
+    const msg = messages[index];
+    if (!msg?.pending?.done) return;
+    setBusy(true);
+    try {
+      const result = await undoLastWrite();
+      if (!result.ok) {
+        setError(result.error || 'Nothing to undo.');
+        return;
+      }
+      setMessages((list) =>
+        list.map((m, i) =>
+          i === index
+            ? {
+                ...m,
+                pending: undefined,
+                content: `${m.content}\n\nUndid: ${result.summary ?? 'last change'}.`,
+              }
+            : m,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not undo that.');
+    } finally {
       setBusy(false);
     }
   };
@@ -290,16 +384,16 @@ export function useArrodes(page: PageId, _navigate?: (p: PageId) => void) {
     speaking,
     interim,
     voiceMode,
-    hasDraft: Boolean(input.trim()),
+    hasDraft: Boolean(input.trim() || attachments.length),
     voiceTitle: voiceOn
       ? 'Voice on — tap to stop. Tap while speaking to interrupt.'
       : 'Start voice',
     thinkWord,
     send,
-    confirmWrite: async (_index: number, _accept: boolean) => {},
-    revertWrite: async (_index: number) => {},
+    confirmWrite,
+    revertWrite,
     toggleVoice,
-    pickFiles: async (_files: FileList | null) => {},
+    pickFiles,
     stopGenerate: interrupt,
   };
 }

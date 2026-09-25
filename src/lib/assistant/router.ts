@@ -1,4 +1,11 @@
-import { OPENROUTER_URL, LAYER_MODELS, LAYER_FALLBACKS, VISION_MODELS, type AssistantLayer } from './models';
+import {
+  OPENROUTER_URL,
+  LAYER_MODELS,
+  LAYER_FALLBACKS,
+  VISION_MODELS,
+  VOICE_FAST_MODELS,
+  type AssistantLayer,
+} from './models';
 import { listToolDefs, isWriteTool, dispatchTool, AUTO_APPLY_WRITES } from './registry';
 import { attachmentPrompt, visionParts, type ChatAttachment } from './media';
 import { memoryBlock } from './memory';
@@ -24,11 +31,29 @@ export interface RouterReply {
   sources?: { title: string; url: string }[];
 }
 
+export interface StreamHooks {
+  /** Full accumulated text so far (stripped). */
+  onToken?: (fullText: string) => void;
+  /** A complete spoken sentence just closed. */
+  onSentence?: (sentence: string) => void;
+}
+
 const PAGE_LABEL: Record<string, string> = {
-  dashboard: 'Dashboard', grades: 'Grades', forecast: 'Grades', classhub: 'Class Hub',
-  todos: 'To-Do List', kanban: 'Kanban', calendar: 'Calendar', notes: 'Notes & Board',
-  pomodoro: 'Focus', analytics: 'Focus', habits: 'Habits', finance: 'Baon Tracker',
-  flashcards: 'Flashcards', settings: 'Settings', assistant: 'Dashboard',
+  dashboard: 'Dashboard',
+  grades: 'Grades',
+  forecast: 'Grades',
+  classhub: 'Class Hub',
+  todos: 'To-Do List',
+  kanban: 'Kanban',
+  calendar: 'Calendar',
+  notes: 'Notes & Board',
+  pomodoro: 'Focus',
+  analytics: 'Focus',
+  habits: 'Habits',
+  finance: 'Baon Tracker',
+  flashcards: 'Flashcards',
+  settings: 'Settings',
+  assistant: 'Dashboard',
 };
 
 function systemPrompt(page: PageId, search: boolean, voice = false) {
@@ -52,11 +77,16 @@ function systemPrompt(page: PageId, search: boolean, voice = false) {
     voice
       ? 'VOICE MODE: answer in 1-3 short spoken sentences. Contractions are fine. Varied rhythm. No numbered lists, no markdown headings, no robotic filler like "Certainly" or "As an AI".'
       : 'Reply in markdown. Use $...$ or $$...$$ for math. Keep answers concise.',
-    search ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.' : 'Web search is OFF unless they explicitly ask you to look something up.',
-  ].filter(Boolean).join(' ');
+    search
+      ? 'Web search is ON. Call web_search when the answer needs current or external facts, then cite titles.'
+      : 'Web search is OFF unless they explicitly ask you to look something up.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
-const LEAK_RE = /identify core intent|determine tool sequence|system prompt rule|call search_epicure|prefer search_epicure|must not mention model names|must answer concisely|additional instructions:|primary question:|thinking process|internal monologue|chain of thought|analyze user input|identify role\/?persona|persona of arrodes|i should call|i should use tools|i should prefer that over guessing|i need to stay on schoolwork|constraints:|tool sequence/i;
+const LEAK_RE =
+  /identify core intent|determine tool sequence|system prompt rule|call search_epicure|prefer search_epicure|must not mention model names|must answer concisely|additional instructions:|primary question:|thinking process|internal monologue|chain of thought|analyze user input|identify role\/?persona|persona of arrodes|i should call|i should use tools|i should prefer that over guessing|i need to stay on schoolwork|constraints:|tool sequence/i;
 
 /** Nemotron and other reasoning models dump CoT. Never show that to the student. */
 export function stripReasoning(raw: string, fallback = 'Hey — what do you need?') {
@@ -64,8 +94,14 @@ export function stripReasoning(raw: string, fallback = 'Hey — what do you need
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
   text = text.replace(/<\/?think>/gi, '');
   text = text.replace(/```(?:thinking|reasoning|analysis)[\s\S]*?```/gi, '');
-  text = text.replace(/^\s*(?:here'?s a thinking process|thinking process|internal monologue|chain of thought)\s*:?\s*/i, '');
-  text = text.replace(/(?:^|\n)\s*(?:\d+\.\s+)?\*{0,2}(?:Identify Core Intent|Determine Tool Sequence|Analyze User Input|Identify Role\/?Persona|System prompt rule)[^\n]*[\s\S]*?(?=(?:\n\s*(?:\d+\.\s+)?[A-Z][^\n]{0,40}:)|\s*$)/gi, '\n');
+  text = text.replace(
+    /^\s*(?:here'?s a thinking process|thinking process|internal monologue|chain of thought)\s*:?\s*/i,
+    '',
+  );
+  text = text.replace(
+    /(?:^|\n)\s*(?:\d+\.\s+)?\*{0,2}(?:Identify Core Intent|Determine Tool Sequence|Analyze User Input|Identify Role\/?Persona|System prompt rule)[^\n]*[\s\S]*?(?=(?:\n\s*(?:\d+\.\s+)?[A-Z][^\n]{0,40}:)|\s*$)/gi,
+    '\n',
+  );
   const parts = text.split(/\n+/);
   const kept = parts.filter((p) => !LEAK_RE.test(p));
   text = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -76,13 +112,24 @@ export function stripReasoning(raw: string, fallback = 'Hey — what do you need
 export function classifyIntent(text: string, hasMedia: boolean, searchOn: boolean): AssistantLayer[] {
   const t = text.toLowerCase();
   const layers = new Set<AssistantLayer>(['chat']);
-  const actionVerb = /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move|delete|remove|check|show|list|open)\b/.test(t);
-  const actionNoun = /\b(task|tasks|todo|todos|to-do|to do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(t);
-  const vault = /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(t);
-  const live = searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
+  const actionVerb =
+    /\b(add|create|make|schedule|log|mark|update|set|fill|record|start|complete|finish|save|edit|did|done|attend|attended|skip|skipped|move|delete|remove|check|show|list|open)\b/.test(
+      t,
+    );
+  const actionNoun =
+    /\b(task|tasks|todo|todos|to-do|to do|note|habit|event|calendar|flashcard|grade|assessment|expense|baon|allowance|savings?|goal|class|teacher|room|office hours|kanban|card|focus|pomodoro|link|worksheet|homework|assignment|reading|read|quiz|exam|score|attendance|period|column|board)\b/.test(
+      t,
+    );
+  const vault =
+    /\b(my notes?|vault|archive|what did i (write|save|note)|search my|from my (notes|projects?|history)|project history|how (does|do i)|where is|what is classhub|baon tracker)\b/.test(
+      t,
+    );
+  const live =
+    searchOn || /\b(search the web|look up|latest|current|according to|news|cite|source)\b/.test(t);
   if (actionVerb && actionNoun) layers.add('execute');
   if (/\b(attended|skipped|attend|skip)\b/.test(t)) layers.add('execute');
-  if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon|todos?|to-?dos?))\b/.test(t)) layers.add('data');
+  if (vault || /\b(my (grades|tasks|habits|schedule|timetable|spending|baon|todos?|to-?dos?))\b/.test(t))
+    layers.add('data');
   if (guessReadTools(t).length) layers.add('data');
   if (hasMedia) layers.add('chat');
   if (live) layers.add('chat');
@@ -93,8 +140,8 @@ function guessReadTools(text: string): Array<{ name: string; args: Record<string
   const t = text.toLowerCase();
   const tools: Array<{ name: string; args: Record<string, unknown> }> = [];
   if (
-    (/\b(to\s*do|to-do|todos?|todo list|task list|tasks?)\b/.test(t) || /\bstats?\b/.test(t))
-    && !/\b(add|create|make|complete|finish|edit)\b/.test(t)
+    (/\b(to\s*do|to-do|todos?|todo list|task list|tasks?)\b/.test(t) || /\bstats?\b/.test(t)) &&
+    !/\b(add|create|make|complete|finish|edit)\b/.test(t)
   ) {
     tools.push({ name: 'get_todos', args: { only_pending: false } });
   }
@@ -111,7 +158,10 @@ function guessReadTools(text: string): Array<{ name: string; args: Record<string
   if (/\b(flashcard|cards?|deck)\b/.test(t) && !/\b(add|create|delete|edit)\b/.test(t)) {
     tools.push({ name: 'get_flashcards', args: {} });
   }
-  if (/\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) && !/\b(log|set|add)\b/.test(t)) {
+  if (
+    /\b(baon|allowance|spent|spending|budget|expense|canteen)\b/.test(t) &&
+    !/\b(log|set|add)\b/.test(t)
+  ) {
     tools.push({ name: 'get_finance_summary', args: {} });
   }
   if (/\b(timetable|class hub|classhub|today'?s class)\b/.test(t)) {
@@ -136,6 +186,24 @@ interface ORMessage {
   tool_calls?: Array<{ id?: string; function: { name: string; arguments: string } }>;
 }
 
+/** Pull complete sentences from a growing buffer for early TTS. */
+function popSentences(buffer: string): { sentences: string[]; rest: string } {
+  const sentences: string[] = [];
+  let rest = buffer;
+  const re = /([^.!?\n]+[.!?]+)(?:\s+|\n+|$)/g;
+  let m: RegExpExecArray | null;
+  let lastIndex = 0;
+  while ((m = re.exec(buffer)) !== null) {
+    const s = m[1].trim();
+    if (s.length >= 8) {
+      sentences.push(s);
+      lastIndex = m.index + m[0].length;
+    }
+  }
+  rest = buffer.slice(lastIndex);
+  return { sentences, rest };
+}
+
 async function complete(opts: {
   key: string;
   layer: AssistantLayer;
@@ -144,14 +212,20 @@ async function complete(opts: {
   temperature?: number;
   preferVision?: boolean;
   maxTokens?: number;
+  signal?: AbortSignal;
+  /** Prefer the voice-fast model chain. */
+  voiceFast?: boolean;
 }): Promise<{ content: string; tool_calls: Array<{ function: { name: string; arguments: string } }>; model: string }> {
-  const chain = [
-    opts.preferVision ? VISION_MODELS[0] : LAYER_MODELS[opts.layer],
-    ...LAYER_FALLBACKS[opts.layer],
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  const chain = opts.voiceFast
+    ? [...VOICE_FAST_MODELS]
+    : [
+        opts.preferVision ? VISION_MODELS[0] : LAYER_MODELS[opts.layer],
+        ...LAYER_FALLBACKS[opts.layer],
+      ].filter((v, i, a) => a.indexOf(v) === i);
 
   let lastErr = 'Assistant request failed.';
   for (const model of chain) {
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const res = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
@@ -168,6 +242,7 @@ async function complete(opts: {
         max_tokens: opts.maxTokens ?? 700,
         reasoning: { exclude: true },
       }),
+      signal: opts.signal,
     });
     if (!res.ok) {
       lastErr = `Assistant request failed (${res.status}).`;
@@ -184,9 +259,103 @@ async function complete(opts: {
   throw new Error(lastErr);
 }
 
+/** Streaming completion for pure voice chat — emits tokens and sentences. */
+async function streamComplete(opts: {
+  key: string;
+  messages: ORMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  signal?: AbortSignal;
+  hooks?: StreamHooks;
+}): Promise<{ content: string; model: string }> {
+  const chain = [...VOICE_FAST_MODELS];
+  let lastErr = 'Assistant request failed.';
+
+  for (const model of chain) {
+    if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${opts.key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://epicure.app',
+        'X-Title': 'epicure assistant',
+      },
+      body: JSON.stringify({
+        model,
+        messages: opts.messages,
+        temperature: opts.temperature ?? 0.62,
+        max_tokens: opts.maxTokens ?? 220,
+        stream: true,
+        reasoning: { exclude: true },
+      }),
+      signal: opts.signal,
+    });
+    if (!res.ok || !res.body) {
+      lastErr = `Assistant request failed (${res.status}).`;
+      continue;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let raw = '';
+    let spokenRest = '';
+    let lineBuf = '';
+
+    while (true) {
+      if (opts.signal?.aborted) {
+        try {
+          await reader.cancel();
+        } catch {
+          /* ignore */
+        }
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      lineBuf += decoder.decode(value, { stream: true });
+      const lines = lineBuf.split('\n');
+      lineBuf = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta) {
+            raw += delta;
+            const cleaned = stripReasoning(raw, '');
+            opts.hooks?.onToken?.(cleaned);
+            const { sentences, rest } = popSentences(spokenRest + delta);
+            spokenRest = rest;
+            for (const s of sentences) {
+              const cs = stripReasoning(s, '').trim();
+              if (cs) opts.hooks?.onSentence?.(cs);
+            }
+          }
+        } catch {
+          /* ignore partial JSON */
+        }
+      }
+    }
+
+    // Flush any trailing clause without terminal punctuation
+    const tail = stripReasoning(spokenRest, '').trim();
+    if (tail.length >= 12) opts.hooks?.onSentence?.(tail);
+
+    const content = stripReasoning(raw, '');
+    if (content) return { content, model };
+    lastErr = 'Empty stream response.';
+  }
+  throw new Error(lastErr);
+}
+
 function toApiMessages(history: ChatTurn[], page: PageId, search: boolean, voice = false): ORMessage[] {
   const out: ORMessage[] = [{ role: 'system', content: systemPrompt(page, search, voice) }];
-  const keep = history.slice(-24);
+  // Voice: keep context short for lower latency
+  const keep = history.slice(voice ? -10 : -24);
   for (const m of keep) {
     if (m.role === 'user' && m.attachments?.length) {
       const images = visionParts(m.attachments);
@@ -215,7 +384,11 @@ async function runCalls(
   const sources: { title: string; url: string }[] = [];
   for (const call of calls) {
     let args: Record<string, unknown> = {};
-    try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* ignore */ }
+    try {
+      args = JSON.parse(call.function.arguments || '{}');
+    } catch {
+      /* ignore */
+    }
     if (isWriteTool(call.function.name) && !AUTO_APPLY_WRITES.has(call.function.name)) {
       writes.push({ name: call.function.name, args });
       continue;
@@ -228,7 +401,9 @@ async function runCalls(
     }
     if (call.function.name === 'search_epicure' && result && typeof result === 'object') {
       const rows = (result as { hits?: Array<{ title: string; page?: string }> }).hits || [];
-      sources.push(...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.page ? `/${r.page}` : '/notes' })));
+      sources.push(
+        ...rows.slice(0, 5).map((r) => ({ title: r.title, url: r.page ? `/${r.page}` : '/notes' })),
+      );
     }
   }
   return { reads, writes, sources };
@@ -241,11 +416,14 @@ export async function runAssistantTurn(opts: {
   searchEnabled: boolean;
   voice?: boolean;
   ctx: ToolContext;
+  signal?: AbortSignal;
+  stream?: StreamHooks;
 }): Promise<RouterReply> {
   const last = opts.history[opts.history.length - 1];
   const hasMedia = Boolean(last?.attachments?.length);
   const voice = Boolean(opts.voice);
   const layers = classifyIntent(last?.content || '', hasMedia, opts.searchEnabled);
+  // Pure voice chat: single fast layer, no tools unless execute is required
   if (voice && !layers.includes('execute') && !hasMedia) {
     layers.length = 0;
     layers.push('chat');
@@ -253,14 +431,37 @@ export async function runAssistantTurn(opts: {
   const usedLayers = [...layers];
   const apiMessages = toApiMessages(opts.history, opts.page, opts.searchEnabled, voice);
   const ctx = opts.ctx;
+  const signal = opts.signal;
 
   let retrieval = '';
   let pending: PendingWrite | undefined;
   const sources: { title: string; url: string }[] = [];
 
+  const pureVoiceChat =
+    voice && !layers.includes('execute') && !layers.includes('data') && !hasMedia;
+
+  // --- Fast path: pure voice conversational turn (stream) ---
+  if (pureVoiceChat) {
+    const chat = await streamComplete({
+      key: opts.key,
+      messages: apiMessages,
+      temperature: 0.62,
+      maxTokens: 220,
+      signal,
+      hooks: opts.stream,
+    });
+    return {
+      content: stripReasoning(
+        chat.content || 'I could not get a reply. Try asking again in a moment.',
+      ),
+      usedLayers,
+    };
+  }
+
   const guessed = voice && !layers.includes('execute') ? [] : guessReadTools(last?.content || '');
   if (guessed.length) {
     for (const call of guessed) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       try {
         const result = await dispatchTool(call.name, call.args, ctx);
         retrieval += `${call.name}: ${JSON.stringify(result).slice(0, 1600)}\n`;
@@ -277,10 +478,16 @@ export async function runAssistantTurn(opts: {
       layer: 'data',
       messages: [
         ...apiMessages,
-        { role: 'user', content: 'Search epicure help and the student vault for anything relevant. Prefer search_epicure, then summarize the raw facts only.' },
+        {
+          role: 'user',
+          content:
+            'Search epicure help and the student vault for anything relevant. Prefer search_epicure, then summarize the raw facts only.',
+        },
       ],
       tools: dataTools,
       temperature: 0.1,
+      signal,
+      voiceFast: voice,
     });
     if (data.tool_calls.length) {
       const ran = await runCalls(data.tool_calls, ctx);
@@ -302,6 +509,8 @@ export async function runAssistantTurn(opts: {
       ],
       tools: execTools,
       temperature: 0.15,
+      signal,
+      voiceFast: voice,
     });
     if (exec.tool_calls.length) {
       const ran = await runCalls(exec.tool_calls, ctx);
@@ -320,6 +529,27 @@ export async function runAssistantTurn(opts: {
     });
   }
 
+  // Voice + tools: still stream the final spoken answer when possible
+  if (voice && opts.stream) {
+    const chat = await streamComplete({
+      key: opts.key,
+      messages: chatMessages,
+      temperature: 0.55,
+      maxTokens: 220,
+      signal,
+      hooks: opts.stream,
+    });
+    return {
+      content: stripReasoning(
+        chat.content ||
+          (pending ? 'I can save this if you confirm.' : retrieval ? summarizeRetrieval(retrieval) : 'I could not get a reply.'),
+      ),
+      pending,
+      usedLayers,
+      sources: sources.length ? sources : undefined,
+    };
+  }
+
   const chat = await complete({
     key: opts.key,
     layer: 'chat',
@@ -328,6 +558,8 @@ export async function runAssistantTurn(opts: {
     temperature: voice ? 0.62 : 0.4,
     preferVision: hasMedia,
     maxTokens: voice ? 220 : 700,
+    signal,
+    voiceFast: voice,
   });
 
   if (chat.tool_calls.length) {
@@ -341,9 +573,13 @@ export async function runAssistantTurn(opts: {
         messages: [
           ...chatMessages,
           { role: 'assistant', content: chat.content || '' },
-          { role: 'user', content: `More tool results:\n${ran.reads.join('\n')}\nFinish the answer.` },
+          {
+            role: 'user',
+            content: `More tool results:\n${ran.reads.join('\n')}\nFinish the answer.`,
+          },
         ],
         temperature: 0.3,
+        signal,
       });
       return {
         content: stripReasoning(follow.content || chat.content || 'Here is what I found.'),
@@ -360,9 +596,13 @@ export async function runAssistantTurn(opts: {
       layer: 'chat',
       messages: [
         ...chatMessages,
-        { role: 'user', content: `Tool results:\n${retrieval.slice(0, 3500)}\nAnswer the student in a short list. Do not say you lack an answer.` },
+        {
+          role: 'user',
+          content: `Tool results:\n${retrieval.slice(0, 3500)}\nAnswer the student in a short list. Do not say you lack an answer.`,
+        },
       ],
       temperature: 0.2,
+      signal,
     });
     return {
       content: stripReasoning(follow.content || summarizeRetrieval(retrieval)),
@@ -373,7 +613,14 @@ export async function runAssistantTurn(opts: {
   }
 
   return {
-    content: stripReasoning(chat.content || (pending ? 'I can save this if you confirm.' : retrieval ? summarizeRetrieval(retrieval) : 'I could not get a reply. Try asking again in a moment.')),
+    content: stripReasoning(
+      chat.content ||
+        (pending
+          ? 'I can save this if you confirm.'
+          : retrieval
+            ? summarizeRetrieval(retrieval)
+            : 'I could not get a reply. Try asking again in a moment.'),
+    ),
     pending,
     usedLayers,
     sources: sources.length ? sources : undefined,

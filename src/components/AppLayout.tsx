@@ -14,6 +14,7 @@ import {
   Timer, CalendarHeart, StickyNote, Wallet, Menu, X,
   Layers, Bot, Settings as SettingsIcon, Columns3, Cloud,
 } from 'lucide-react';
+import { startWakeListener } from '@/lib/assistant/wakeWord';
 
 const GlobalAssistant = lazy(() => import('@/components/GlobalAssistant'));
 const AtaraxiaPanel = lazy(() => import('@/components/AtaraxiaPanel'));
@@ -208,6 +209,18 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
     };
   }, [navigate]);
 
+  // Always-on wake word: "hey Arrodes", "Arrodes?", etc. opens the panel
+  useEffect(() => {
+    if (assistantOpen) return;
+    const stop = startWakeListener(() => {
+      setAssistantReady(true);
+      setAssistantOpen(true);
+      setAssistantRail(false);
+      setLoopOpen(false);
+    });
+    return stop;
+  }, [assistantOpen]);
+
   return (
     <div className={`rice-shell relative flex h-screen overflow-hidden bg-[#f5f5f7] text-zinc-800 ${assistantOpen ? 'assistant-open' : ''} ${page === 'notes' ? 'rice-shell--notes' : 'rice-shell--mono'}`} style={{ ['--assistant-w' as string]: `${assistantWidth}px` }}>
       <div className="film-grain hidden xl:block" aria-hidden />
@@ -285,8 +298,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
                 <span className="block h-full rounded-full bg-zinc-800 transition-[width] duration-300" style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
               </span>
             </button>
-            <button type="button" onClick={() => { setAssistantReady(true); setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">
-              <Bot className={`h-4 w-4 transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} />
+            <button
+              type="button"
+              onClick={() => { setAssistantReady(true); setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }}
+              className={`flex h-9 w-9 items-center justify-center text-zinc-600 transition-colors duration-200 hover:text-zinc-900 ${assistantOpen ? 'text-zinc-900' : ''}`}
+              title="Arrodes — say hey Arrodes anytime"
+              aria-label="Toggle Arrodes"
+            >
+              <Bot className={`h-[18px] w-[18px] transition-transform duration-200 ${assistantOpen ? 'scale-110' : 'scale-100'}`} strokeWidth={1.75} />
             </button>
           </div>
         </header>

@@ -34,13 +34,47 @@ void main() {
   vec2 q = p;
   q.y *= 1.0 + splash * 0.62 * exp(-age * 1.15);
   q.x *= 1.0 - splash * 0.28 * exp(-age * 1.25);
+
+  // THINKING: mercury liquid mixed clockwise (viscous swirl, not a rigid spin)
+  float mixStrength = 0.0;
+  float armHighlight = 0.0;
   if (think > 0.01) {
-    q = rot(t * (0.85 + uMid * 0.55) * think) * q;
-    q += normalize(q + 0.0001) * (-0.08 * think * sin(t * 2.8 + length(q) * 9.0));
+    float rad0 = length(q);
+    float ang0 = atan(q.y, q.x);
+    // Clockwise = decreasing angle over time; faster near center like stirred fluid
+    float spinRate = 1.55 + uMid * 0.85;
+    float spin = t * spinRate * think;
+    float radialSpin = spin * (0.35 + 1.15 * smoothstep(0.48, 0.02, rad0));
+    float ang = ang0 - radialSpin;
+    float rad = rad0;
+    // Folded mercury streams (mixing ribbons)
+    float ribbons = sin(ang * 3.0 + rad * 11.0 - t * 2.4);
+    float ribbons2 = sin(ang * 5.0 - rad * 7.0 + t * 1.7);
+    rad += ribbons * 0.045 * think;
+    rad += ribbons2 * 0.022 * think;
+    // Secondary eddy for "mixing" rather than pure rotate
+    float eddy = sin(ang * 2.0 - rad * 4.0 - t * 1.9) * 0.035 * think;
+    vec2 polar = vec2(cos(ang), sin(ang)) * max(rad + eddy, 0.0);
+    // Viscous domain warp along the swirl
+    vec2 warp = vec2(
+      fbm(polar * 2.8 + vec2(t * 0.35, -t * 0.22)),
+      fbm(polar.yx * 2.8 - vec2(t * 0.28, t * 0.31))
+    );
+    q = polar + rot(-spin * 0.55) * (warp - 0.5) * (0.09 * think);
+    // Thin bright filaments of liquid being folded
+    mixStrength = think;
+    armHighlight = pow(0.5 + 0.5 * ribbons, 4.0) * think;
+    armHighlight += pow(0.5 + 0.5 * ribbons2, 6.0) * think * 0.55;
   }
+
   if (speak > 0.01) q *= 1.0 - 0.04 * speak * uAmp;
-  float flow = t * (0.14 + listen * 0.10 + speak * 0.24 + hover * 0.04);
-  vec2 field = q * (2.15 + uBass * 1.4 + speak * 0.7) + vec2(flow, -flow * 0.68);
+  float flow = t * (0.14 + listen * 0.10 + speak * 0.24 + hover * 0.04 + mixStrength * 0.08);
+  vec2 field = q * (2.15 + uBass * 1.4 + speak * 0.7 + mixStrength * 0.55) + vec2(flow, -flow * 0.68);
+  // Extra swirl advection while thinking
+  if (mixStrength > 0.01) {
+    field = rot(-t * 0.55 * mixStrength) * field;
+    field += vec2(fbm(field * 1.4 + t * 0.4), fbm(field.yx * 1.4 - t * 0.35)) * (0.22 * mixStrength);
+  }
   field += vec2(fbm(field + t * 0.16), fbm(field.yx - t * 0.13)) * (0.32 + uMid * 0.42);
   float n = fbm(field);
   float n2 = fbm(field * 2.35 - vec2(t * 0.22, t * 0.31));
@@ -48,6 +82,8 @@ void main() {
   float rip = sin((q.y * 11.0 + q.x * 3.2) - t * (1.5 + uBass * 4.2) + n * 6.0);
   float rings = sin(length(q) * (13.0 + uBass * 16.0) - t * (2.1 + uBass * 3.6)) * 0.5 + 0.5;
   float h = n * 0.55 + n2 * 0.26 + rip * (0.05 + uBass * 0.09 + speak * 0.07) + uAmp * 0.14;
+  h += armHighlight * 0.22;
+  h += mixStrength * sheet * 0.12;
   vec2 so = uSplashOrigin;
   float dSplash = distance(uv, so);
   float wave = sin((dSplash - age * 0.55) * 38.0) * exp(-dSplash * 2.2) * splash;
@@ -62,31 +98,38 @@ void main() {
   vec3 mercury = vec3(0.66, 0.68, 0.70);
   vec3 silver = vec3(0.80, 0.81, 0.83);
   vec3 gleam = vec3(0.90, 0.91, 0.92);
+  // Slightly cooler, wetter mercury while thinking
+  vec3 thinkMerc = mix(mercury, vec3(0.72, 0.74, 0.76), mixStrength * 0.55);
+  vec3 thinkSilver = mix(silver, vec3(0.88, 0.89, 0.91), mixStrength * 0.4);
   vec3 pane = mix(slate, steel, smoothstep(0.18, 0.55, h));
-  pane = mix(pane, mercury, smoothstep(0.42, 0.78, h + sheet * 0.12));
-  pane = mix(pane, silver, smoothstep(0.62, 0.92, h));
-  pane = mix(pane, gleam, pow(smoothstep(0.74, 1.08, h + speak * 0.08 + hover * 0.04), 1.7));
+  pane = mix(pane, thinkMerc, smoothstep(0.42, 0.78, h + sheet * 0.12));
+  pane = mix(pane, thinkSilver, smoothstep(0.62, 0.92, h));
+  pane = mix(pane, gleam, pow(smoothstep(0.74, 1.08, h + speak * 0.08 + hover * 0.04 + mixStrength * 0.06), 1.7));
   float spec = pow(max(0.0, 1.0 - abs(h - 0.76 - uAmp * 0.1)), 10.0);
   spec += pow(max(0.0, sin(uv.x * 7.0 + n * 5.0 - t * 0.9) * 0.5 + 0.5), 14.0) * 0.22;
   spec += hover * pow(max(0.0, 1.0 - abs(uv.x - ho.x)), 8.0) * 0.12;
-  pane += gleam * spec * (0.16 + speak * 0.12 + listen * 0.06 + hover * 0.08);
+  // Liquid-metal specular folds along mix arms
+  spec += armHighlight * 0.55;
+  pane += gleam * spec * (0.16 + speak * 0.12 + listen * 0.06 + hover * 0.08 + mixStrength * 0.10);
   pane += gleam * (gleamBand + gleamSweep);
   pane += gleam * abs(wave) * 0.55;
+  pane += thinkSilver * armHighlight * 0.18;
   float radius = 0.34 + 0.05 * listen + 0.04 * think + 0.07 * speak + uAmp * 0.09 + uBass * 0.035;
   radius += splash * 0.22 * exp(-age * 1.15);
-  float disp = (n - 0.5) * (0.05 + uMid * 0.07 + think * 0.04) + (n2 - 0.5) * (0.02 + uTreble * 0.035) + (rings - 0.5) * (0.014 + uBass * 0.025) + wave * 0.045;
+  float disp = (n - 0.5) * (0.05 + uMid * 0.07 + think * 0.06) + (n2 - 0.5) * (0.02 + uTreble * 0.035) + (rings - 0.5) * (0.014 + uBass * 0.025) + wave * 0.045;
+  disp += (armHighlight - 0.3) * 0.03 * mixStrength;
   float d = length(p * vec2(1.0 - splash * 0.22, 1.0 + splash * 0.38)) - radius - disp;
   float glow = exp(-2.6 * max(d + 0.20, 0.0));
   float core = smoothstep(0.10, -0.05, d);
   float rim = smoothstep(0.065, 0.0, abs(d) - 0.014);
-  vec3 orb = mix(slate, mercury, 0.40 + 0.55 * n);
-  orb = mix(orb, silver, 0.20 + 0.32 * sheet + 0.18 * n2 + hover * 0.04);
-  orb = mix(orb, gleam, 0.16 * speak * uAmp + 0.10 * rings + hover * 0.03);
+  vec3 orb = mix(slate, thinkMerc, 0.40 + 0.55 * n);
+  orb = mix(orb, thinkSilver, 0.20 + 0.32 * sheet + 0.18 * n2 + hover * 0.04 + armHighlight * 0.12);
+  orb = mix(orb, gleam, 0.16 * speak * uAmp + 0.10 * rings + hover * 0.03 + mixStrength * 0.08);
   vec3 col = pane;
   col = mix(col, orb, core * 0.92);
-  col += gleam * rim * (0.18 + 0.28 * speak + hover * 0.05);
-  col += mercury * glow * (0.18 + 0.16 * (1.0 - speak));
-  col += gleam * pow(glow, 2.15) * (0.06 + 0.16 * speak * uAmp + splash * 0.14);
+  col += gleam * rim * (0.18 + 0.28 * speak + hover * 0.05 + mixStrength * 0.06);
+  col += thinkMerc * glow * (0.18 + 0.16 * (1.0 - speak) + mixStrength * 0.08);
+  col += gleam * pow(glow, 2.15) * (0.06 + 0.16 * speak * uAmp + splash * 0.14 + armHighlight * 0.08);
   float vignette = smoothstep(1.05, 0.28, length((uv - 0.5) * vec2(1.05, 1.18)));
   col *= 0.78 + 0.22 * vignette;
   gl_FragColor = vec4(col, 1.0);

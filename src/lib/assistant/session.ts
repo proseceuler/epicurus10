@@ -52,36 +52,65 @@ export function saveHistory<T>(messages: T[]) {
   cache = keep as unknown[];
   const write = (payload: string) => {
     localStorage.setItem(historyKey(), payload);
-    try { sessionStorage.setItem(historyKey(), payload); } catch { /* ignore */ }
+    try {
+      sessionStorage.setItem(historyKey(), payload);
+    } catch {
+      /* ignore */
+    }
   };
   try {
     write(JSON.stringify(compact(keep)));
     return;
-  } catch { /* quota */ }
+  } catch {
+    /* quota */
+  }
   try {
-    write(JSON.stringify(keep.map((m: any) => ({
-      id: m?.id,
-      role: m?.role,
-      content: String(m?.content || ''),
-      pending: m?.pending,
-      sources: m?.sources,
-    }))));
+    write(
+      JSON.stringify(
+        keep.map((m: any) => ({
+          id: m?.id,
+          role: m?.role,
+          content: String(m?.content || ''),
+          pending: m?.pending,
+          sources: m?.sources,
+        })),
+      ),
+    );
     return;
-  } catch { /* still too big */ }
+  } catch {
+    /* still too big */
+  }
   let shrink = keep;
   while (shrink.length > 8) {
     shrink = shrink.slice(2);
     try {
-      write(JSON.stringify(shrink.map((m: any) => ({ id: m?.id, role: m?.role, content: String(m?.content || '') }))));
+      write(
+        JSON.stringify(
+          shrink.map((m: any) => ({ id: m?.id, role: m?.role, content: String(m?.content || '') })),
+        ),
+      );
       return;
-    } catch { /* keep shrinking */ }
+    } catch {
+      /* keep shrinking */
+    }
   }
 }
 
+/** Web search defaults ON for Jarvis-style current facts (unset key → true). */
 export function loadSearchEnabled(): boolean {
-  try { return localStorage.getItem(SEARCH_KEY) === '1'; } catch { return false; }
+  try {
+    const v = localStorage.getItem(SEARCH_KEY);
+    if (v === null) return true;
+    return v === '1';
+  } catch {
+    return true;
+  }
 }
 
 export function saveSearchEnabled(on: boolean) {
-  try { localStorage.setItem(SEARCH_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(SEARCH_KEY, on ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
 }

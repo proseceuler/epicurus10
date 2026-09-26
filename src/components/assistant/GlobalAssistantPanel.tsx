@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe } from 'lucide-react';
+import { X, Send, Check, Ban, Mic, AudioLines, ExternalLink, Undo2, Paperclip, Globe, Square } from 'lucide-react';
 import Markdown from '@/components/Markdown';
 import type { PageId } from '@/components/AppLayout';
 import { writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import ArrodesVoiceMirror from '@/components/ArrodesVoiceMirror';
-import { SUGGESTS, MirrorIcon, ArrodesMark, AttachmentChip } from '@/components/assistant/arrodesBits';
-import { useArrodesEngine } from '@/components/assistant/useArrodesEngine';
+import { SUGGESTS, MirrorIcon, AttachmentChip } from '@/components/assistant/arrodesBits';
+import { useArrodes } from '@/components/assistant/useArrodes';
 
 export default function GlobalAssistant({
   open, rail, page, width, onWidth, onClose, navigate,
@@ -14,7 +14,7 @@ export default function GlobalAssistant({
   onWidth: (n: number) => void; onClose: () => void; onRail: () => void;
   navigate?: (p: PageId) => void;
 }) {
-  const e = useArrodesEngine(page, navigate);
+  const e = useArrodes(page, navigate);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPos = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,8 +52,8 @@ export default function GlobalAssistant({
         <div className="absolute inset-y-0 left-0 hidden w-1.5 cursor-ew-resize xl:block" onPointerDown={startDrag} />
         <div className="assistant-chrome flex items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white ${e.listening || e.speaking ? 'ring-2 ring-zinc-400 ring-offset-2' : ''}`}>
-              <MirrorIcon className="h-3.5 w-3.5" />
+            <div className={`flex h-7 w-7 items-center justify-center text-zinc-800 ${e.listening || e.speaking ? 'ring-2 ring-zinc-400 ring-offset-2 rounded-full' : ''}`}>
+              <MirrorIcon className="h-4 w-4" />
             </div>
             <p className="text-sm font-semibold text-zinc-800">Arrodes</p>
           </div>
@@ -78,7 +78,11 @@ export default function GlobalAssistant({
           )}
           {e.messages.map((m, i) => (
             <div key={m.id || i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-2'}>
-              {m.role === 'assistant' && (<div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"><MirrorIcon className="h-3 w-3" /></div>)}
+              {m.role === 'assistant' && (
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-zinc-600">
+                  <MirrorIcon className="h-3.5 w-3.5" />
+                </div>
+              )}
               <div className={m.role === 'user' ? 'max-w-[85%] rounded-2xl bg-zinc-900 px-3 py-2 text-sm text-white' : 'max-w-[90%] text-sm leading-relaxed text-zinc-800'}>
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -117,7 +121,7 @@ export default function GlobalAssistant({
           ))}
           {e.busy && !e.voiceOn && (
             <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <ArrodesMark className="h-4 w-4 shrink-0 animate-pulse" />
+              <MirrorIcon className="h-4 w-4 shrink-0 text-zinc-600" />
               <span className="italic tracking-wide">{e.thinkWord}…</span>
             </div>
           )}
@@ -151,8 +155,14 @@ export default function GlobalAssistant({
               className="max-h-24 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-zinc-800 outline-none"
             />
             {e.busy ? (
-              <button type="button" onClick={e.stopGenerate} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full" title="Stop generating" aria-label="Stop generating">
-                <ArrodesMark className="h-8 w-8" />
+              <button
+                type="button"
+                onClick={e.stopGenerate}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white hover:bg-zinc-800"
+                title="Stop generating"
+                aria-label="Stop generating"
+              >
+                <Square className="h-3 w-3 fill-current" />
               </button>
             ) : e.hasDraft ? (
               <button type="submit" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white" title="Send">

@@ -91,7 +91,8 @@
 }
 @media (min-width: 1280px) {
   .rice-main { padding-left: 4.75rem; transition: padding-left 280ms ease, padding-right 280ms ease; }
-  .rice-shell.assistant-open .rice-main { padding-right: var(--assistant-w, 340px); }
+  /* Overlay panel — do not compress main content */
+  .rice-shell.assistant-open .rice-main { padding-right: 0; }
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 1280px) {
   .rice-sidebar.rice-sidebar-collapsed:hover { width: 14rem; }

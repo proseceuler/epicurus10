@@ -195,8 +195,8 @@ export const DATA_TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'mark_habit',
-      description: 'Mark a habit as done for a date (defaults to today).',
-      parameters: obj({ name: str('Habit name or part of it'), date: str('Date YYYY-MM-DD') }, ['name']),
+      description: 'Check or uncheck a habit checkbox for any date (Tracker or Home). Defaults to today. Set done=false to uncheck.',
+      parameters: obj({ name: str('Habit name or part of it'), date: str('Date YYYY-MM-DD'), done: { type: 'boolean', description: 'true=check, false=uncheck, default true' } }, ['name']),
     },
   },
   {
@@ -235,8 +235,14 @@ export const DATA_TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'get_habits',
-      description: 'Read habits and which ones are done today.',
-      parameters: obj({}),
+      description: 'Read the full Habit Tracker across all subtabs: Home (today checkboxes), Tracker (month day grid), Dashboard & Insights (streaks, last 7/30). Optional: view=home|track|dash|insights|all, year, month (1-12), from, to (YYYY-MM-DD).',
+      parameters: obj({
+          view: str('Subtab: home, track, dash, insights, or all'),
+          year: num('Year for Tracker month grid'),
+          month: num('Month 1-12 for Tracker grid'),
+          from: str('Range start YYYY-MM-DD'),
+          to: str('Range end YYYY-MM-DD'),
+        }),
     },
   },
   {
@@ -286,6 +292,8 @@ export const SEARCH_TOOL: ToolDef = {
 export interface ToolContext {
   startFocus: (subject: string | null) => void;
   onSearch?: (response: SearchResponse) => void;
+  navigate?: (page: string) => void;
+  pauseFocus?: () => void;
 }
 
 const today = () => new Date().toLocaleDateString('en-CA');
@@ -486,11 +494,21 @@ export async function runTool(name: string, args: Args, ctx: ToolContext): Promi
         const match = habits?.find((h: any) => h.name.toLowerCase().includes(String(args.name).toLowerCase()));
         if (!match) return { ok: false, error: `No habit matching "${args.name}".`, habits: habits?.map((h: any) => h.name) };
         const date = args.date ?? today();
+        const done = args.done === false || args.done === 'false' ? false : true;
+        if (done) {
+          const { error } = await supabase
+            .from('habit_completions')
+            .upsert({ habit_id: match.id, completion_date: date }, { onConflict: 'habit_id,completion_date' });
+          if (error) throw error;
+          return { ok: true, habit: match.name, date, done: true };
+        }
         const { error } = await supabase
           .from('habit_completions')
-          .insert({ habit_id: match.id, completion_date: date });
+          .delete()
+          .eq('habit_id', match.id)
+          .eq('completion_date', date);
         if (error) throw error;
-        return { ok: true, habit: match.name, date };
+        return { ok: true, habit: match.name, date, done: false };
       }
       case 'get_todos': {
         let q = supabase.from('todos').select('*').order('due_date', { ascending: true });
@@ -540,13 +558,96 @@ export async function runTool(name: string, args: Args, ctx: ToolContext): Promi
         return { notes: data ?? [] };
       }
       case 'get_habits': {
-        const [{ data: habits }, { data: done }] = await Promise.all([
-          supabase.from('habits').select('*'),
-          supabase.from('habit_completions').select('*').eq('completion_date', today()),
+        const view = String(args.view || args.scope || 'all').toLowerCase();
+        const now = new Date();
+        const year = Number(args.year) || now.getFullYear();
+        const month = args.month != null ? Number(args.month) : now.getMonth() + 1;
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        const monthEndDay = new Date(year, month, 0).getDate();
+        const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(monthEndDay).padStart(2, '0')}`;
+        const rangeFrom = args.from ? String(args.from) : view === 'home' ? today() : monthStart;
+        const rangeTo = args.to ? String(args.to) : view === 'home' ? today() : monthEnd;
+        const wide = new Date();
+        wide.setDate(wide.getDate() - 60);
+        const wideFrom = view === 'home' ? today() : wide.toLocaleDateString('en-CA');
+        const todayStr = today();
+        const endCap = rangeTo > todayStr ? rangeTo : todayStr;
+
+        const [{ data: habits }, { data: completions }] = await Promise.all([
+          supabase.from('habits').select('*').order('created_at', { ascending: true }),
+          supabase
+            .from('habit_completions')
+            .select('habit_id,completion_date')
+            .gte('completion_date', wideFrom)
+            .lte('completion_date', endCap),
         ]);
-        const doneIds = new Set((done ?? []).map((d: any) => d.habit_id));
+
+        const list = habits ?? [];
+        const comps = completions ?? [];
+        const byHabit = new Map<string, string[]>();
+        for (const c of comps as Array<{ habit_id: string; completion_date: string }>) {
+          const id = String(c.habit_id);
+          if (!byHabit.has(id)) byHabit.set(id, []);
+          byHabit.get(id)!.push(String(c.completion_date));
+        }
+
+        const last7Start = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toLocaleDateString('en-CA'); })();
+        const last30Start = (() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toLocaleDateString('en-CA'); })();
+
+        const enriched = list.map((h: any) => {
+          const dates = (byHabit.get(h.id) || []).slice().sort();
+          const doneToday = dates.includes(todayStr);
+          let streak = 0;
+          const cursor = new Date(`${todayStr}T00:00:00`);
+          if (!doneToday) cursor.setDate(cursor.getDate() - 1);
+          while (true) {
+            const ds = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+            if (!dates.includes(ds)) break;
+            streak += 1;
+            cursor.setDate(cursor.getDate() - 1);
+          }
+          const trackerDays: Record<string, boolean> = {};
+          for (const ds of dates) {
+            if (ds >= rangeFrom && ds <= rangeTo) trackerDays[ds] = true;
+          }
+          return {
+            id: h.id,
+            name: h.name,
+            emoji: h.emoji ?? null,
+            goal_target: h.goal_target ?? null,
+            done_today: doneToday,
+            streak,
+            completions_in_range: Object.keys(trackerDays).length,
+            tracker_days: trackerDays,
+            last_7: dates.filter((d) => d >= last7Start).length,
+            last_30: dates.filter((d) => d >= last30Start).length,
+          };
+        });
+
         return {
-          habits: (habits ?? []).map((h: any) => ({ id: h.id, name: h.name, done_today: doneIds.has(h.id) })),
+          view: view || 'all',
+          today: todayStr,
+          range: { from: rangeFrom, to: rangeTo, year, month },
+          home: enriched.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji, done_today: h.done_today })),
+          tracker: enriched.map((h) => ({
+            id: h.id,
+            name: h.name,
+            emoji: h.emoji,
+            goal_target: h.goal_target,
+            days: h.tracker_days,
+            completed_count: h.completions_in_range,
+          })),
+          dashboard: enriched.map((h) => ({
+            id: h.id,
+            name: h.name,
+            emoji: h.emoji,
+            streak: h.streak,
+            last_7: h.last_7,
+            last_30: h.last_30,
+            goal_target: h.goal_target,
+            done_today: h.done_today,
+          })),
+          habits: enriched,
         };
       }
       case 'get_finance_summary': {
@@ -582,26 +683,22 @@ export async function runTool(name: string, args: Args, ctx: ToolContext): Promi
         const ids = filtered.map((d: any) => d.id);
         const { data: cards } = ids.length
           ? await supabase.from('flashcards').select('*').in('deck_id', ids)
-          : { data: [] as any[] };
-        return {
-          decks: filtered,
-          cards: cards ?? [],
-          due_today: (cards ?? []).filter((c: any) => c.due_date <= today()).length,
-        };
+          : { data: [] };
+        return { decks: filtered, cards: cards ?? [] };
       }
       case 'get_timetable': {
-        const { data } = await supabase.from('timetable_entries').select('*').order('day_of_week');
-        return { timetable: data ?? [] };
+        const { data } = await supabase.from('timetable_slots').select('*');
+        return { slots: data ?? [] };
       }
       case 'web_search': {
-        const response = await tavilySearch(args.query, args.max_results ?? 5);
-        ctx.onSearch?.(response);
-        return response;
+        const res = await tavilySearch(String(args.query || ''), Number(args.max_results) || 5);
+        ctx.onSearch?.(res);
+        return res;
       }
       default:
         return { ok: false, error: `Unknown tool: ${name}` };
     }
-  } catch (e) {
-    return { ok: false, error: (e as Error).message || 'Tool failed.' };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

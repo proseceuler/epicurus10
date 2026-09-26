@@ -1,21 +1,32 @@
-/** Live model IDs — Groq deprecated llama-3.1-8b-instant for free/dev (Aug 2026). */
+/** Live model IDs — prefer fast + smart free options (Sep 2026). */
 
 export const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-/** Try in order until one accepts the key. */
+/**
+ * Groq free tier (very fast LPU):
+ *   qwen3.8-27b — stronger reasoning
+ *   gpt-oss-20b — ~1000 tok/s, tool-friendly
+ *   gpt-oss-120b — smarter, still free-tier eligible
+ */
 export const GROQ_MODELS = [
+  'qwen/qwen3.8-27b',
   'openai/gpt-oss-20b',
-  'llama-3.3-70b-versatile',
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'llama-3.1-8b-instant', // legacy if still enabled on the account
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.6-27b',
 ] as const;
 
+/**
+ * OpenRouter :free — quality then speed fallbacks.
+ * Qwen3.8 27B and Gemma 4 lead free quality lists; Ling Flash is low-latency.
+ */
 export const OR_MODELS = [
-  'openrouter/free',
+  'qwen/qwen3.8-27b:free',
   'google/gemma-4-31b-it:free',
-  'google/gemma-2-9b-it:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'inclusionai/ling-3.0-flash-fin:free',
+  'openrouter/free',
+  'google/gemma-4-26b-a4b-it:free',
 ] as const;
 
 export function orHeaders(): Record<string, string> {

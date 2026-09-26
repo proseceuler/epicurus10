@@ -1,95 +1,119 @@
-type SRCtor = new () => SpeechRecognitionLike;
-interface SpeechRecognitionLike {
+/** Browser STT (SpeechRecognition) + TTS helpers used by Arrodes voice. */
+
+type SpeechRecognitionCtor = new () => {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
+  onresult: ((ev: unknown) => void) | null;
+  onerror: ((ev: unknown) => void) | null;
+  onend: (() => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((ev: { error?: string }) => void) | null;
-  onresult: ((ev: {
-    resultIndex: number;
-    results: ArrayLike<{ isFinal?: boolean; 0: { transcript: string } }>;
-  }) => void) | null;
-}
+};
 
-export function speechRecognitionCtor(): SRCtor | null {
-  const w = window as unknown as { SpeechRecognition?: SRCtor; webkitSpeechRecognition?: SRCtor };
+export function speechRecognitionCtor(): SpeechRecognitionCtor | null {
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export function createRecognizer(opts: {
-  continuous?: boolean;
-  onStart?: () => void;
-  onEnd?: () => void;
-  onError?: (msg: string) => void;
+export type RecognizerHooks = {
   onFinal?: (text: string) => void;
   onInterim?: (text: string) => void;
-}) {
+  onEnd?: () => void;
+  onError?: (msg: string) => void;
+};
+
+/** Continuous recognizer with resultIndex debouncing (no transcript snowball). */
+export function createRecognizer(hooks: RecognizerHooks) {
   const Ctor = speechRecognitionCtor();
   if (!Ctor) return null;
   const rec = new Ctor();
   rec.lang = 'en-US';
-  rec.continuous = Boolean(opts.continuous);
+  rec.continuous = true;
   rec.interimResults = true;
-  rec.onstart = () => opts.onStart?.();
-  rec.onend = () => opts.onEnd?.();
-  rec.onerror = (ev) => {
-    const err = ev.error || 'mic';
-    if (err === 'aborted' || err === 'no-speech') return;
-    opts.onError?.(
-      err === 'not-allowed'
-        ? 'Microphone was blocked. You can keep typing instead.'
-        : 'Voice input failed.',
-    );
-  };
-  /**
-   * Continuous mode keeps ALL results from session start in ev.results.
-   * Only process from resultIndex and emit NEW finals — never concatenate history.
-   */
-  rec.onresult = (ev) => {
-    let interim = '';
+  let lastFinalIndex = 0;
+
+  rec.onresult = (ev: unknown) => {
+    const e = ev as {
+      resultIndex: number;
+      results: ArrayLike<{ isFinal?: boolean; 0: { transcript: string } }>;
+    };
     let newFinal = '';
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const row = ev.results[i];
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const row = e.results[i];
       const text = (row[0]?.transcript || '').trim();
       if (!text) continue;
       if ((row as { isFinal?: boolean }).isFinal) newFinal += (newFinal ? ' ' : '') + text;
       else interim += (interim ? ' ' : '') + text;
     }
-    if (newFinal) opts.onFinal?.(newFinal);
-    else if (interim) opts.onInterim?.(interim);
+    if (newFinal) {
+      lastFinalIndex = e.resultIndex;
+      hooks.onFinal?.(newFinal.trim());
+    }
+    if (interim) hooks.onInterim?.(interim.trim());
   };
-  return rec;
+
+  rec.onerror = (ev: unknown) => {
+    const err = (ev as { error?: string })?.error || 'speech error';
+    if (err === 'aborted' || err === 'no-speech') return;
+    hooks.onError?.(err);
+  };
+
+  rec.onend = () => hooks.onEnd?.();
+
+  return {
+    start: () => {
+      try {
+        rec.start();
+      } catch {
+        /* already started */
+      }
+    },
+    stop: () => {
+      try {
+        rec.stop();
+      } catch {
+        /* */
+      }
+    },
+    abort: () => {
+      try {
+        rec.abort();
+      } catch {
+        /* */
+      }
+    },
+  };
 }
 
-function pickVoice() {
-  const voices = window.speechSynthesis.getVoices();
-  const prefer = [
-    'Google UK English Male',
-    'Google US English',
-    'Samantha',
-    'Daniel',
-    'Alex',
-    'Microsoft David',
-  ];
-  for (const name of prefer) {
-    const match = voices.find((v) => v.name.includes(name));
-    if (match) return match;
+function pickVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis?.getVoices?.() || [];
+  if (!voices.length) return null;
+  const prefer = [/google.*english/i, /samantha/i, /daniel/i, /en-us/i, /en-gb/i];
+  for (const re of prefer) {
+    const v = voices.find((x) => re.test(x.name) || re.test(x.lang));
+    if (v) return v;
   }
-  return (
-    voices.find((v) => v.lang.startsWith('en') && /male|daniel|alex|david/i.test(v.name)) ||
-    voices.find((v) => v.lang.startsWith('en')) ||
-    voices[0] ||
-    null
-  );
+  return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null;
 }
 
 export function splitSpokenChunks(text: string): string[] {
   const clean = text
-    .replace(/[#*_`>~]/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/[*_~`#|>]+/g, ' ')
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -120,35 +144,30 @@ export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: 
       hooks?.onEnd?.();
       return;
     }
-    const u = new SpeechSynthesisUtterance(chunks[i]);
-    const wave = (i % 3) - 1;
-    u.rate = 1.02 + wave * 0.04;
-    u.pitch = 0.96 + wave * 0.05;
-    u.voice = voice;
-    if (i === 0) {
-      u.onstart = () => {
+    const u = new SpeechSynthesisUtterance(chunks[i++]);
+    if (voice) u.voice = voice;
+    u.rate = 1.05;
+    u.onstart = () => {
+      if (!started) {
         started = true;
         hooks?.onStart?.();
-      };
-    }
-    u.onend = () => {
-      i += 1;
-      if (i < chunks.length) window.setTimeout(next, 90 + (i % 2) * 70);
-      else hooks?.onEnd?.();
+      }
     };
-    u.onerror = () => hooks?.onEnd?.();
+    u.onend = next;
+    u.onerror = next;
     window.speechSynthesis.speak(u);
   };
-  next();
-  window.setTimeout(() => {
-    if (!started) hooks?.onStart?.();
-  }, 80);
+  if (window.speechSynthesis.getVoices().length) next();
+  else {
+    window.speechSynthesis.onvoiceschanged = () => next();
+    setTimeout(next, 120);
+  }
 }
 
 export function stopSpeech() {
   try {
-    window.speechSynthesis?.cancel();
+    window.speechSynthesis.cancel();
   } catch {
-    /* ignore */
+    /* */
   }
 }

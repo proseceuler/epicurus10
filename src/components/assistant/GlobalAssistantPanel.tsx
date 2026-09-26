@@ -5,7 +5,7 @@ import type { PageId } from '@/components/AppLayout';
 import { writeSummary, PAGE_FOR_WRITE } from '@/lib/assistant/registry';
 import ArrodesVoiceMirror from '@/components/ArrodesVoiceMirror';
 import { SUGGESTS, MirrorIcon, ArrodesMark, AttachmentChip } from '@/components/assistant/arrodesBits';
-import { useArrodesEngine } from '@/components/assistant/useArrodesEngine';
+import { useArrodes } from '@/components/assistant/useArrodes';
 
 export default function GlobalAssistant({
   open, rail, page, width, onWidth, onClose, navigate,
@@ -14,7 +14,7 @@ export default function GlobalAssistant({
   onWidth: (n: number) => void; onClose: () => void; onRail: () => void;
   navigate?: (p: PageId) => void;
 }) {
-  const e = useArrodesEngine(page, navigate);
+  const e = useArrodes(page, navigate);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPos = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);

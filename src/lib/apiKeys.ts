@@ -69,8 +69,9 @@ export const getKokoroUrl = () =>
 export const getKokoroKey = () =>
   keyFrom('VITE_KOKORO_API_KEY', KOKORO_KEY);
 
+/** Default Kokoro: British male "George" — closest free smart UK gentleman. */
 export const getKokoroVoice = () =>
-  keyFrom('VITE_KOKORO_VOICE', KOKORO_VOICE) || 'af_heart';
+  keyFrom('VITE_KOKORO_VOICE', KOKORO_VOICE) || 'bm_george';
 
 export const getTtsEngine = (): TtsEngine => {
   const raw = keyFrom('VITE_TTS_ENGINE', TTS_ENGINE) || 'auto';

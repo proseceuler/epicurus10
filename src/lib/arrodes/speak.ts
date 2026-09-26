@@ -1,4 +1,4 @@
-/** Minimal TTS: browser speechSynthesis. Fast, no network. */
+/** Browser TTS with British-male preference and measured prosody (phase 3). */
 
 let current: SpeechSynthesisUtterance | null = null;
 
@@ -26,15 +26,51 @@ export function stripMarkdownForSpeech(text: string): string {
     .trim();
 }
 
-function pickVoice(): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis.getVoices();
+/** Prefer a smart British (older) male voice when the OS/browser provides one. */
+export function pickBritishMaleVoice(): SpeechSynthesisVoice | null {
+  const voices = typeof window !== 'undefined' ? window.speechSynthesis?.getVoices?.() || [] : [];
   if (!voices.length) return null;
-  const prefer = [/google.*english/i, /samantha/i, /daniel/i, /en-us/i, /en-gb/i];
-  for (const re of prefer) {
-    const v = voices.find((x) => re.test(x.name) || re.test(x.lang));
-    if (v) return v;
-  }
-  return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null;
+
+  const score = (v: SpeechSynthesisVoice): number => {
+    const n = `${v.name} ${v.lang}`;
+    let s = 0;
+    if (/en-GB|en_GB|British|UK English/i.test(n)) s += 40;
+    else if (/en-AU|en-IE|en-ZA/i.test(n)) s += 15;
+    else if (/^en/i.test(v.lang)) s += 5;
+    if (/male|daniel|george|arthur|thomas|oliver|james|brian|albert|fred|rishi/i.test(n)) s += 35;
+    if (/google uk english male/i.test(n)) s += 50;
+    if (/microsoft (george|ryan|thomas)/i.test(n)) s += 30;
+    if (/female|samantha|karen|moira|tessa|fiona|victoria|zira/i.test(n)) s -= 40;
+    if (/novelty|whisper|zarvox|bad news|good news|pipes|trinoids/i.test(n)) s -= 80;
+    return s;
+  };
+
+  const ranked = [...voices].sort((a, b) => score(b) - score(a));
+  return ranked[0] && score(ranked[0]) > 0 ? ranked[0] : voices.find((v) => v.lang.startsWith('en')) || voices[0] || null;
+}
+
+/** Prosody tuned for a composed older British gentleman (phase 3 only). */
+export const ARRODES_PROSODY = {
+  /** Slightly unhurried — not sluggish. */
+  rate: 0.92,
+  /** A touch lower for gravitas. */
+  pitch: 0.88,
+  volume: 1,
+  /** Gap between clause chunks (ms). */
+  clausePauseMs: 140,
+  /** Gap after sentence end (ms). */
+  sentencePauseMs: 280,
+} as const;
+
+/** Split into speakable clauses so we can insert natural pauses. */
+export function prosodyChunks(text: string): string[] {
+  const clean = stripMarkdownForSpeech(text);
+  if (!clean) return [];
+  const parts = clean
+    .split(/(?<=[.!?;:—–])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return parts.length ? parts.slice(0, 12) : [clean];
 }
 
 export function stopSpeak() {
@@ -44,62 +80,96 @@ export function stopSpeak() {
   current = null;
 }
 
+function speakOne(
+  text: string,
+  voice: SpeechSynthesisVoice | null,
+  hooks?: { onStart?: () => void },
+): Promise<void> {
+  return new Promise((resolve) => {
+    const u = new SpeechSynthesisUtterance(text);
+    current = u;
+    u.rate = ARRODES_PROSODY.rate;
+    u.pitch = ARRODES_PROSODY.pitch;
+    u.volume = ARRODES_PROSODY.volume;
+    u.lang = voice?.lang || 'en-GB';
+    if (voice) u.voice = voice;
+    u.onstart = () => hooks?.onStart?.();
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    window.speechSynthesis.speak(u);
+  });
+}
+
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const t = window.setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(t);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
 export function speak(
   text: string,
   hooks?: { onStart?: () => void; onEnd?: () => void },
   signal?: AbortSignal,
 ): Promise<void> {
-  return new Promise((resolve) => {
-    const clean = stripMarkdownForSpeech(text).slice(0, 500);
-    if (!clean || typeof window === 'undefined' || !window.speechSynthesis) {
+  return (async () => {
+    const chunks = prosodyChunks(text);
+    if (!chunks.length || typeof window === 'undefined' || !window.speechSynthesis) {
       hooks?.onEnd?.();
-      resolve();
       return;
     }
 
     stopSpeak();
-    const u = new SpeechSynthesisUtterance(clean);
-    current = u;
-    u.rate = 1.05;
-    u.pitch = 1;
-    const voice = pickVoice();
-    if (voice) u.voice = voice;
 
-    const done = () => {
-      if (current === u) current = null;
-      hooks?.onEnd?.();
-      resolve();
-    };
+    let voice = pickBritishMaleVoice();
+    if (!voice && !window.speechSynthesis.getVoices().length) {
+      await new Promise<void>((r) => {
+        const done = () => r();
+        window.speechSynthesis.onvoiceschanged = done;
+        setTimeout(done, 200);
+      });
+      voice = pickBritishMaleVoice();
+    }
 
-    u.onstart = () => hooks?.onStart?.();
-    u.onend = done;
-    u.onerror = done;
-
-    if (signal) {
-      if (signal.aborted) {
-        done();
-        return;
+    let started = false;
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        if (signal?.aborted) break;
+        const piece = chunks[i];
+        await speakOne(piece, voice, {
+          onStart: () => {
+            if (!started) {
+              started = true;
+              hooks?.onStart?.();
+            }
+          },
+        });
+        if (signal?.aborted || i >= chunks.length - 1) break;
+        const endPunct = /[.!?]$/.test(piece);
+        await pause(
+          endPunct ? ARRODES_PROSODY.sentencePauseMs : ARRODES_PROSODY.clausePauseMs,
+          signal,
+        );
       }
-      signal.addEventListener('abort', () => {
-        stopSpeak();
-        done();
-      }, { once: true });
+    } finally {
+      current = null;
+      hooks?.onEnd?.();
     }
-
-    const go = () => window.speechSynthesis.speak(u);
-    if (window.speechSynthesis.getVoices().length) go();
-    else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        const v = pickVoice();
-        if (v) u.voice = v;
-        go();
-      };
-      setTimeout(go, 120);
-    }
-  });
+  })();
 }
 
-/** Split on sentence boundaries for early speak. */
+/** Split on sentence boundaries for early speak (already prosody-cleaned). */
 export function takeSentences(buffer: string): { ready: string[]; rest: string } {
   const ready: string[] = [];
   const re = /([^.!?]+[.!?]+)(?:\s+|$)/g;
@@ -112,6 +182,5 @@ export function takeSentences(buffer: string): { ready: string[]; rest: string }
       last = m.index + m[0].length;
     }
   }
-  const rest = buffer.slice(last);
-  return { ready, rest };
+  return { ready, rest: buffer.slice(last) };
 }

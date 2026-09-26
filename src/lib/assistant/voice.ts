@@ -1,5 +1,12 @@
 /** Browser STT (SpeechRecognition) + TTS helpers used by Arrodes voice. */
 
+import {
+  pickBritishMaleVoice,
+  ARRODES_PROSODY,
+  stripMarkdownForSpeech,
+  prosodyChunks,
+} from '@/lib/arrodes/speak';
+
 type SpeechRecognitionCtor = new () => {
   lang: string;
   continuous: boolean;
@@ -35,7 +42,6 @@ export function createRecognizer(hooks: RecognizerHooks) {
   rec.lang = 'en-US';
   rec.continuous = true;
   rec.interimResults = true;
-  let lastFinalIndex = 0;
 
   rec.onresult = (ev: unknown) => {
     const e = ev as {
@@ -51,10 +57,7 @@ export function createRecognizer(hooks: RecognizerHooks) {
       if ((row as { isFinal?: boolean }).isFinal) newFinal += (newFinal ? ' ' : '') + text;
       else interim += (interim ? ' ' : '') + text;
     }
-    if (newFinal) {
-      lastFinalIndex = e.resultIndex;
-      hooks.onFinal?.(newFinal.trim());
-    }
+    if (newFinal) hooks.onFinal?.(newFinal.trim());
     if (interim) hooks.onInterim?.(interim.trim());
   };
 
@@ -91,38 +94,8 @@ export function createRecognizer(hooks: RecognizerHooks) {
   };
 }
 
-function pickVoice(): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis?.getVoices?.() || [];
-  if (!voices.length) return null;
-  const prefer = [/google.*english/i, /samantha/i, /daniel/i, /en-us/i, /en-gb/i];
-  for (const re of prefer) {
-    const v = voices.find((x) => re.test(x.name) || re.test(x.lang));
-    if (v) return v;
-  }
-  return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null;
-}
-
 export function splitSpokenChunks(text: string): string[] {
-  const clean = text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/^\s*\d+\.\s+/gm, '')
-    .replace(/[*_~`#|>]+/g, ' ')
-    .replace(/https?:\/\/\S+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!clean) return [];
-  const parts = clean
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return parts.length ? parts : [clean];
+  return prosodyChunks(text);
 }
 
 export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: () => void }) {
@@ -131,12 +104,12 @@ export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: 
     return;
   }
   window.speechSynthesis.cancel();
-  const chunks = splitSpokenChunks(text).slice(0, 8);
+  const chunks = prosodyChunks(text).slice(0, 12);
   if (!chunks.length) {
     hooks?.onEnd?.();
     return;
   }
-  const voice = pickVoice();
+  const voice = pickBritishMaleVoice();
   let i = 0;
   let started = false;
   const next = () => {
@@ -144,16 +117,28 @@ export function speakText(text: string, hooks?: { onStart?: () => void; onEnd?: 
       hooks?.onEnd?.();
       return;
     }
-    const u = new SpeechSynthesisUtterance(chunks[i++]);
+    const piece = chunks[i++];
+    const u = new SpeechSynthesisUtterance(piece);
     if (voice) u.voice = voice;
-    u.rate = 1.05;
+    u.lang = voice?.lang || 'en-GB';
+    u.rate = ARRODES_PROSODY.rate;
+    u.pitch = ARRODES_PROSODY.pitch;
+    u.volume = ARRODES_PROSODY.volume;
     u.onstart = () => {
       if (!started) {
         started = true;
         hooks?.onStart?.();
       }
     };
-    u.onend = next;
+    u.onend = () => {
+      const endPunct = /[.!?]$/.test(piece);
+      const gap = endPunct ? ARRODES_PROSODY.sentencePauseMs : ARRODES_PROSODY.clausePauseMs;
+      if (i >= chunks.length) {
+        hooks?.onEnd?.();
+        return;
+      }
+      window.setTimeout(next, gap);
+    };
     u.onerror = next;
     window.speechSynthesis.speak(u);
   };
@@ -171,3 +156,5 @@ export function stopSpeech() {
     /* */
   }
 }
+
+export { stripMarkdownForSpeech, pickBritishMaleVoice, ARRODES_PROSODY };

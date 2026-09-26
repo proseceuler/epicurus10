@@ -28,7 +28,8 @@ export function systemPrompt(page: PageId, voice: boolean, searchOn: boolean): s
     `Student is on ${where}. You can reach every module with tools and navigate_page.`,
     'Remember this whole conversation. Use earlier messages and memory facts; do not claim you forgot.',
     'Think carefully, then answer. Never print analysis labels, chain-of-thought, roles, or constraints.',
-    'Tools cover: todos (add/update/delete), kanban (add/move/edit/delete), calendar (add/edit/delete), notes (add/edit/delete), class hub (teacher info, attendance), grades/assessments, habits (check any day, multiple), finance (spend, expenses, savings goals), focus timer (start/stop), flashcards, web_search, navigate_page.',
+    'Tools cover: todos, kanban, calendar, notes, class hub, grades, finance, focus, flashcards, web_search, navigate_page.',
+    'Habits: get_habits reads Home (today), Tracker (month checkbox grid — use view=track, year, month), and Dashboard/Insights (streaks, last 7/30). mark_habit and mark_habits check/uncheck any date on the Tracker grid, not only today.',
     'Call get_* tools before guessing about the student data. Prefer real tool results.',
     'Writes that need confirm: log_expense, set_allowance, add_savings_goal. Most other writes apply immediately.',
   ];

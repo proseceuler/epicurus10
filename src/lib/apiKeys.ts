@@ -15,54 +15,71 @@ export const ARRODES_FRAME_PNG = 'epicure-arrodes-frame-png';
 
 export type TtsEngine = 'auto' | 'kokoro' | 'fish' | 'browser';
 
-function read(key: string, fallback = '') {
-  if (typeof window === 'undefined') return fallback;
-  return localStorage.getItem(key) || fallback;
+function env(name: string, ...alts: string[]): string {
+  const meta = import.meta.env as Record<string, string | undefined>;
+  for (const n of [name, ...alts]) {
+    const v = meta[n];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  return '';
+}
+
+function readLocal(key: string): string {
+  if (typeof window === 'undefined') return '';
+  return (localStorage.getItem(key) || '').trim();
+}
+
+/** Vercel / Vite env wins when set; Settings localStorage is optional override only if env empty. */
+function keyFrom(envName: string, localKey: string, ...envAlts: string[]): string {
+  return env(envName, ...envAlts) || readLocal(localKey);
 }
 
 export const getOpenRouterKey = () =>
-  read(OPENROUTER_KEY, import.meta.env.VITE_OPENROUTER_API_KEY || '');
+  keyFrom('VITE_OPENROUTER_API_KEY', OPENROUTER_KEY, 'VITE_OPENROUTER_KEY');
 
 export const getMwKey = () =>
-  read(MW_KEY, import.meta.env.VITE_MW_DICTIONARY_API_KEY || '');
+  keyFrom(
+    'VITE_MW_DICTIONARY_API_KEY',
+    MW_KEY,
+    'VITE_MW_API_KEY',
+    'VITE_MERRIAM_WEBSTER_KEY',
+  );
 
 export const getTavilyKey = () =>
-  read(TAVILY_KEY, import.meta.env.VITE_TAVILY_API_KEY || '');
+  keyFrom('VITE_TAVILY_API_KEY', TAVILY_KEY, 'VITE_TAVILY_KEY');
 
 export const getSaplingKey = () =>
-  (typeof window !== 'undefined' ? localStorage.getItem(SAPLING_KEY) : null) ||
-  import.meta.env.VITE_SAPLING_API_KEY ||
-  '';
+  keyFrom('VITE_SAPLING_API_KEY', SAPLING_KEY);
 
 export const getPineconeKey = () =>
-  read(PINECONE_KEY, import.meta.env.VITE_PINECONE_API_KEY || '');
+  keyFrom('VITE_PINECONE_API_KEY', PINECONE_KEY);
 
 export const getPineconeHost = () =>
-  read(PINECONE_HOST, import.meta.env.VITE_PINECONE_HOST || '');
+  keyFrom('VITE_PINECONE_HOST', PINECONE_HOST);
 
 export const getGroqKey = () =>
-  read(GROQ_KEY, import.meta.env.VITE_GROQ_API_KEY || '');
+  keyFrom('VITE_GROQ_API_KEY', GROQ_KEY, 'VITE_GROQ_KEY');
 
 export const getFishKey = () =>
-  read(FISH_KEY, import.meta.env.VITE_FISH_API_KEY || '');
+  keyFrom('VITE_FISH_API_KEY', FISH_KEY);
 
 export const getKokoroUrl = () =>
-  read(KOKORO_URL, import.meta.env.VITE_KOKORO_URL || '');
+  keyFrom('VITE_KOKORO_URL', KOKORO_URL);
 
 export const getKokoroKey = () =>
-  read(KOKORO_KEY, import.meta.env.VITE_KOKORO_API_KEY || '');
+  keyFrom('VITE_KOKORO_API_KEY', KOKORO_KEY);
 
 export const getKokoroVoice = () =>
-  read(KOKORO_VOICE, import.meta.env.VITE_KOKORO_VOICE || 'af_heart') || 'af_heart';
+  keyFrom('VITE_KOKORO_VOICE', KOKORO_VOICE) || 'af_heart';
 
 export const getTtsEngine = (): TtsEngine => {
-  const raw = read(TTS_ENGINE, import.meta.env.VITE_TTS_ENGINE || 'auto');
+  const raw = keyFrom('VITE_TTS_ENGINE', TTS_ENGINE) || 'auto';
   return raw === 'kokoro' || raw === 'fish' || raw === 'browser' || raw === 'auto' ? raw : 'auto';
 };
 
-export const getDefaultModel = () => read(MODEL_KEY);
+export const getDefaultModel = () => readLocal(MODEL_KEY);
 
-export const getArrodesFramePng = () => read(ARRODES_FRAME_PNG);
+export const getArrodesFramePng = () => readLocal(ARRODES_FRAME_PNG);
 
 export function saveKey(key: string, value: string) {
   if (typeof window === 'undefined') return;

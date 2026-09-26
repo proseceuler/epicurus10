@@ -2,6 +2,30 @@
 
 let current: SpeechSynthesisUtterance | null = null;
 
+/** Strip markdown / symbols so TTS does not say "asterisk", "hash", etc. */
+export function stripMarkdownForSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/\*+/g, ' ')
+    .replace(/_+/g, ' ')
+    .replace(/~+/g, ' ')
+    .replace(/`+/g, ' ')
+    .replace(/#+/g, ' ')
+    .replace(/\|+/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function pickVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
@@ -26,7 +50,7 @@ export function speak(
   signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve) => {
-    const clean = text.replace(/\s+/g, ' ').trim().slice(0, 500);
+    const clean = stripMarkdownForSpeech(text).slice(0, 500);
     if (!clean || typeof window === 'undefined' || !window.speechSynthesis) {
       hooks?.onEnd?.();
       resolve();
@@ -62,7 +86,6 @@ export function speak(
       }, { once: true });
     }
 
-    // Chrome sometimes needs voices loaded first
     const go = () => window.speechSynthesis.speak(u);
     if (window.speechSynthesis.getVoices().length) go();
     else {
@@ -71,7 +94,6 @@ export function speak(
         if (v) u.voice = v;
         go();
       };
-      // fallback if event never fires
       setTimeout(go, 120);
     }
   });
@@ -80,17 +102,16 @@ export function speak(
 /** Split on sentence boundaries for early speak. */
 export function takeSentences(buffer: string): { ready: string[]; rest: string } {
   const ready: string[] = [];
-  let rest = buffer;
   const re = /([^.!?]+[.!?]+)(?:\s+|$)/g;
   let m: RegExpExecArray | null;
   let last = 0;
   while ((m = re.exec(buffer)) !== null) {
-    const s = m[1].trim();
+    const s = stripMarkdownForSpeech(m[1]);
     if (s.length >= 4) {
       ready.push(s);
       last = m.index + m[0].length;
     }
   }
-  rest = buffer.slice(last);
+  const rest = buffer.slice(last);
   return { ready, rest };
 }

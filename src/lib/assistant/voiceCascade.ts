@@ -33,7 +33,8 @@ export async function transcribeAudio(blob: Blob): Promise<{ text: string; error
   const file = new File([blob], `speech.${ext}`, { type: blob.type || 'audio/webm' });
   const body = new FormData();
   body.append('file', file);
-  body.append('model', 'whisper-large-v3');
+  // turbo is much faster; fall back path still works if unavailable
+  body.append('model', 'whisper-large-v3-turbo');
   body.append('response_format', 'json');
   body.append('temperature', '0');
   body.append('language', 'en');
@@ -43,8 +44,24 @@ export async function transcribeAudio(blob: Blob): Promise<{ text: string; error
     body,
   });
   if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    return { text: '', error: `Whisper failed (${res.status}) ${detail.slice(0, 160)}` };
+    // retry once with full large model
+    const body2 = new FormData();
+    body2.append('file', file);
+    body2.append('model', 'whisper-large-v3');
+    body2.append('response_format', 'json');
+    body2.append('temperature', '0');
+    body2.append('language', 'en');
+    const res2 = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: body2,
+    });
+    if (!res2.ok) {
+      const detail = await res2.text().catch(() => '');
+      return { text: '', error: `Whisper failed (${res2.status}) ${detail.slice(0, 160)}` };
+    }
+    const data2 = await res2.json();
+    return { text: String(data2.text || '').trim() };
   }
   const data = await res.json();
   return { text: String(data.text || '').trim() };
@@ -56,6 +73,13 @@ export interface VoiceLoop {
   stop: () => void;
 }
 
+/** Silence after speech ends the turn (ms). Lower = snappier turns. */
+const SILENCE_END_MS = 850;
+/** How long continuous voice before we count the user as speaking. */
+const VOICED_CONFIRM_MS = 120;
+/** Max listen window without speech. */
+const MAX_LISTEN_MS = 18_000;
+
 export function startVoiceLoop(opts: {
   onListening?: (on: boolean) => void;
   onStatus?: (status: VoiceStatus) => void;
@@ -63,7 +87,11 @@ export function startVoiceLoop(opts: {
   onCaption?: (text: string) => void;
   onTranscript: (text: string) => void | Promise<void>;
   onError?: (msg: string) => void;
+  /** When true, keep the mic open even while the assistant is speaking (barge-in). */
+  onBargeIn?: () => void;
   shouldContinue: () => boolean;
+  /** Return true while assistant audio is playing so we can detect interruption. */
+  isSpeaking?: () => boolean;
 }): VoiceLoop {
   let stopped = false;
   let ctx: AudioContext | null = null;
@@ -75,7 +103,11 @@ export function startVoiceLoop(opts: {
     cancelAnimationFrame(raf);
     opts.onListening?.(false);
     opts.onStatus?.('idle');
-    try { ctx?.close(); } catch { /* ignore */ }
+    try {
+      ctx?.close();
+    } catch {
+      /* ignore */
+    }
     stream?.getTracks().forEach((t) => t.stop());
     ctx = null;
     stream = null;
@@ -83,7 +115,11 @@ export function startVoiceLoop(opts: {
 
   const waitUntilReady = async () => {
     while (!stopped && opts.shouldContinue() === false) {
-      await new Promise((r) => setTimeout(r, 120));
+      // While speaking, still sample mic for barge-in
+      if (opts.isSpeaking?.() && stream && ctx) {
+        // handled in barge monitor below; just wait
+      }
+      await new Promise((r) => setTimeout(r, 80));
     }
   };
 
@@ -109,24 +145,32 @@ export function startVoiceLoop(opts: {
 
     const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined;
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : undefined;
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     const chunks: Blob[] = [];
-    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.ondataavailable = (e) => {
+      if (e.data.size) chunks.push(e.data);
+    };
 
     let heard = false;
     let voicedMs = 0;
     let silentMs = 0;
     let last = performance.now();
     const startedAt = last;
-    rec.start(250);
+    rec.start(200);
     opts.onListening?.(true);
     opts.onStatus?.('listening');
 
     await new Promise<void>((resolve) => {
       const tick = () => {
         if (stopped || !opts.shouldContinue()) {
-          try { rec.stop(); } catch { /* ignore */ }
+          try {
+            rec.stop();
+          } catch {
+            /* ignore */
+          }
           resolve();
           return;
         }
@@ -136,20 +180,34 @@ export function startVoiceLoop(opts: {
         const now = performance.now();
         const dt = now - last;
         last = now;
-        const gate = heard ? 0.05 : 0.072;
+
+        // Barge-in: user speaks while assistant is talking
+        if (opts.isSpeaking?.() && level > 0.08 && voicedMs > 80) {
+          opts.onBargeIn?.();
+        }
+
+        const gate = heard ? 0.045 : 0.065;
         if (level > gate) {
           voicedMs += dt;
           silentMs = 0;
-          if (voicedMs > 160) heard = true;
+          if (voicedMs > VOICED_CONFIRM_MS) heard = true;
         } else if (heard) {
           silentMs += dt;
-          if (silentMs > 2000) {
-            try { rec.stop(); } catch { /* ignore */ }
+          if (silentMs > SILENCE_END_MS) {
+            try {
+              rec.stop();
+            } catch {
+              /* ignore */
+            }
             resolve();
             return;
           }
-        } else if (now - startedAt > 20_000) {
-          try { rec.stop(); } catch { /* ignore */ }
+        } else if (now - startedAt > MAX_LISTEN_MS) {
+          try {
+            rec.stop();
+          } catch {
+            /* ignore */
+          }
           resolve();
           return;
         }
@@ -160,11 +218,15 @@ export function startVoiceLoop(opts: {
     });
 
     opts.onListening?.(false);
-    try { source.disconnect(); } catch { /* ignore */ }
+    try {
+      source.disconnect();
+    } catch {
+      /* ignore */
+    }
 
     if (stopped || !chunks.length) return;
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-    if (blob.size < 5000) {
+    if (blob.size < 4000) {
       if (!stopped) void listenOnce();
       return;
     }

@@ -4,7 +4,15 @@ import type { PageId } from '@/components/AppLayout';
 import { loadHistory, saveHistory, loadSearchEnabled, saveSearchEnabled } from '@/lib/assistant/session';
 import { fileToAttachment, isAudioFile, type ChatAttachment } from '@/lib/assistant/media';
 import { createRecognizer, speechRecognitionCtor } from '@/lib/assistant/voice';
-import { groqConfigured, startVoiceLoop, speakReply, stopReply, transcribeAudio, type VoiceLoop } from '@/lib/assistant/voiceCascade';
+import {
+  groqConfigured,
+  startVoiceLoop,
+  speakReply,
+  stopReply,
+  transcribeAudio,
+  type VoiceLoop,
+} from '@/lib/assistant/voiceCascade';
+import { StreamingSpeaker } from '@/lib/assistant/tts';
 import { runAssistantTurn } from '@/lib/assistant/router';
 import { harvestMemory } from '@/lib/assistant/memory';
 import { dispatchTool } from '@/lib/assistant/registry';
@@ -35,19 +43,32 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   const busyRef = useRef(false);
   const speakingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const streamSpeakerRef = useRef<StreamingSpeaker | null>(null);
 
   useEffect(() => {
     const slim = messages.map((m, i) => {
       if (i >= messages.length - 6) return m;
       if (!m.attachments?.length) return m;
-      return { ...m, attachments: m.attachments.map((a) => ({ ...a, dataUrl: a.kind === 'image' ? '' : a.dataUrl.slice(0, 32), posterUrl: undefined })) };
+      return {
+        ...m,
+        attachments: m.attachments.map((a) => ({
+          ...a,
+          dataUrl: a.kind === 'image' ? '' : a.dataUrl.slice(0, 32),
+          posterUrl: undefined,
+        })),
+      };
     });
     saveHistory(slim);
   }, [messages]);
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
   useEffect(() => { busyRef.current = busy; }, [busy]);
   useEffect(() => { speakingRef.current = speaking; }, [speaking]);
-  useEffect(() => () => { loopRef.current?.stop(); stopReply(); abortRef.current?.abort(); window.clearTimeout(voiceLeaveTimer.current); }, []);
+  useEffect(() => () => {
+    loopRef.current?.stop();
+    stopReply();
+    abortRef.current?.abort();
+    window.clearTimeout(voiceLeaveTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!busy) return;
@@ -61,14 +82,27 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     navigate?.('pomodoro');
   };
 
+  const interruptVoice = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    stopReply();
+    streamSpeakerRef.current = null;
+    speakingRef.current = false;
+    setSpeaking(false);
+    busyRef.current = false;
+    setBusy(false);
+    setInterim('Interrupted — still listening');
+  };
+
   const speak = async (text: string) => {
     if (!voiceOnRef.current) return;
     speakingRef.current = true;
     setSpeaking(true);
+    const ac = abortRef.current;
     await speakReply(text, {
       onStart: () => { speakingRef.current = true; setSpeaking(true); },
       onEnd: () => { speakingRef.current = false; setSpeaking(false); },
-    });
+    }, ac?.signal);
     speakingRef.current = false;
     setSpeaking(false);
   };
@@ -81,7 +115,7 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
       onEnd: () => {
         setListening(false);
         if (voiceOnRef.current && continuous && !busyRef.current && !speakingRef.current) {
-          try { rec?.start(); } catch { /* ignore */ }
+          try { rec?.start(); } catch { /* */ }
         }
       },
       onError: (msg) => setError(msg),
@@ -97,7 +131,7 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   };
 
   const stopListen = () => {
-    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+    try { recognitionRef.current?.stop(); } catch { /* */ }
     setListening(false);
     setInterim('');
   };
@@ -110,15 +144,16 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
       onTranscript: (text) => send(text),
       onError: setError,
       shouldContinue: () => voiceOnRef.current && !busyRef.current && !speakingRef.current,
+      isSpeaking: () => speakingRef.current,
+      onBargeIn: () => {
+        if (speakingRef.current || busyRef.current) interruptVoice();
+      },
     });
   };
 
   const toggleVoice = () => {
-    if (voiceOn && (speakingRef.current || speaking)) {
-      stopReply();
-      speakingRef.current = false;
-      setSpeaking(false);
-      setInterim('Interrupted — still listening');
+    if (voiceOn && (speakingRef.current || speaking || busyRef.current)) {
+      interruptVoice();
       return;
     }
     if (voiceOn) {
@@ -145,8 +180,14 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     setVoiceOn(true);
     voiceOnRef.current = true;
     setError('');
-    if (groqConfigured()) startCascade();
-    else startListen(true);
+    // Web Speech = zero upload latency; Whisper cascade is fallback
+    if (speechRecognitionCtor()) startListen(true);
+    else if (groqConfigured()) startCascade();
+    else {
+      setError('Voice input is not available. Add a Groq key or use Chrome/Edge.');
+      setVoiceOn(false);
+      voiceOnRef.current = false;
+    }
   };
 
   const pickFiles = async (files: FileList | null) => {
@@ -160,11 +201,7 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
   };
 
   const stopGenerate = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    stopReply();
-    busyRef.current = false;
-    setBusy(false);
+    interruptVoice();
     setInterim('');
   };
 
@@ -195,9 +232,15 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     }
     if ((!content && !pendingAtt.length) || busyRef.current) return;
     const key = getOpenRouterKey();
-    if (!key) { setError('Add an OpenRouter key in Settings first.'); return; }
+    const hasGroq = groqConfigured();
+    if (!key && !(voiceOnRef.current && hasGroq)) {
+      setError('Add an OpenRouter key in Settings (or a Groq key for voice).');
+      return;
+    }
     stopReply();
-    setError(''); setInput('');
+    streamSpeakerRef.current = null;
+    setError('');
+    setInput('');
     const user: Msg = {
       id: newId(),
       role: 'user',
@@ -212,24 +255,80 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     abortRef.current = ac;
     busyRef.current = true;
     setBusy(true);
+
+    const assistantId = newId();
+    const useStream = voiceOnRef.current;
+    if (useStream) {
+      setMessages([...next, { id: assistantId, role: 'assistant', content: '' }]);
+      const speaker = new StreamingSpeaker({
+        onStart: () => { speakingRef.current = true; setSpeaking(true); },
+        onEnd: () => { speakingRef.current = false; setSpeaking(false); },
+      }, ac.signal);
+      streamSpeakerRef.current = speaker;
+    }
+
     try {
       const reply = await runAssistantTurn({
-        key, page, history: next, searchEnabled: searchOn, voice: voiceOnRef.current,
+        key: key || '',
+        page,
+        history: next,
+        searchEnabled: searchOn,
+        voice: voiceOnRef.current,
         ctx: { startFocus: focus },
         signal: ac.signal,
+        stream: useStream ? {
+          onFirstToken: () => {
+            busyRef.current = false;
+            setBusy(false);
+          },
+          onToken: (full) => {
+            setMessages((list) => list.map((m) => (m.id === assistantId ? { ...m, content: full } : m)));
+          },
+          onSentence: (sentence) => {
+            streamSpeakerRef.current?.enqueue(sentence);
+          },
+        } : undefined,
       });
       if (ac.signal.aborted) return;
-      const assistant: Msg = { id: newId(), role: 'assistant', content: reply.content, pending: reply.pending, sources: reply.sources };
-      harvestMemory(user.content, reply.content);
-      setMessages([...next, assistant]);
-      if (voiceOnRef.current && reply.content) await speak(reply.content);
+
+      if (useStream) {
+        const speaker = streamSpeakerRef.current;
+        speaker?.finish();
+        setMessages((list) => list.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: reply.content, pending: reply.pending, sources: reply.sources }
+            : m,
+        ));
+        harvestMemory(user.content, reply.content);
+        if (reply.content && !speakingRef.current && speaker) {
+          speaker.enqueue(reply.content);
+          speaker.finish();
+        } else if (reply.content && !speaker) {
+          await speak(reply.content);
+        }
+      } else {
+        const assistant: Msg = {
+          id: assistantId,
+          role: 'assistant',
+          content: reply.content,
+          pending: reply.pending,
+          sources: reply.sources,
+        };
+        harvestMemory(user.content, reply.content);
+        setMessages([...next, assistant]);
+        if (voiceOnRef.current && reply.content) await speak(reply.content);
+      }
     } catch (err) {
       if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
       setError(err instanceof Error ? err.message : 'Something went wrong.');
+      if (useStream) {
+        setMessages((list) => list.filter((m) => m.id !== assistantId || m.content));
+      }
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
       busyRef.current = false;
       setBusy(false);
+      streamSpeakerRef.current = null;
     }
   };
 
@@ -237,13 +336,17 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     const msg = messages[index];
     if (!msg?.pending || msg.pending.done) return;
     if (!accept) {
-      setMessages((list) => list.map((m, i) => (i === index ? { ...m, pending: undefined, content: `${m.content}\n\nCancelled.` } : m)));
+      setMessages((list) => list.map((m, i) =>
+        i === index ? { ...m, pending: undefined, content: `${m.content}\n\nCancelled.` } : m,
+      ));
       return;
     }
     setBusy(true);
     try {
       await dispatchTool(msg.pending.name, msg.pending.args, { startFocus: focus });
-      setMessages((list) => list.map((m, i) => (i === index ? { ...m, pending: { ...m.pending!, done: true } } : m)));
+      setMessages((list) => list.map((m, i) =>
+        i === index ? { ...m, pending: { ...m.pending!, done: true } } : m,
+      ));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that.');
     } finally {
@@ -258,9 +361,11 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     try {
       const result = await undoLastWrite();
       if (!result.ok) { setError(result.error || 'Nothing to undo.'); return; }
-      setMessages((list) => list.map((m, i) => (
-        i === index ? { ...m, pending: undefined, content: `${m.content}\n\nUndid: ${result.summary ?? 'last change'}.` } : m
-      )));
+      setMessages((list) => list.map((m, i) =>
+        i === index
+          ? { ...m, pending: undefined, content: `${m.content}\n\nUndid: ${result.summary ?? 'last change'}.` }
+          : m,
+      ));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not undo that.');
     } finally {
@@ -274,7 +379,13 @@ export function useArrodesEngine(page: PageId, navigate?: (p: PageId) => void) {
     saveSearchEnabled(next);
   };
 
-  const voiceMode: ArrodesVoiceMode = speaking ? 'speaking' : busy ? 'thinking' : listening ? 'listening' : 'idle';
+  const voiceMode: ArrodesVoiceMode = speaking
+    ? 'speaking'
+    : busy
+      ? 'thinking'
+      : listening
+        ? 'listening'
+        : 'idle';
   const hasDraft = Boolean(input.trim() || attachments.length);
   const voiceTitle = voiceOn
     ? 'Voice is on — tap to stop. Tap while speaking to interrupt.'

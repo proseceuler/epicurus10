@@ -10,6 +10,7 @@ import { onDataChanged } from '@/lib/assistant/sync';
 import { Card, PageHeader, Button, Input, Select, EmptyState, SubjectBadge } from '@/components/kit';
 import { MotionOverlay } from '@/components/MotionUI';
 import { CheckSquare, Plus, Trash2, Check, Circle, AlertCircle, Flag, Pencil } from 'lucide-react';
+import { triggerEpicAccent } from '@/lib/epicAccent';
 
 const PRIORITY_CONFIG = {
   urgent_important: { label: 'Urgent & Important', short: 'Do First', tone: 'high' as const, quadrant: 1 },
@@ -178,7 +179,7 @@ export default function TodosPage() {
                 transition={motionTransition(reduceMotion, 0.18)}
               >
               <Card className={`flex items-center gap-3 p-3 group transition-opacity duration-200 ${todo.completed ? 'opacity-50' : ''}`}>
-                <button onClick={() => toggleTodo(todo)} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors duration-150 ${todo.completed ? 'border-zinc-900 bg-zinc-900' : 'border-zinc-300'}`}>{todo.completed && <Check className="h-3 w-3 text-white" />}</button>
+                <button type="button" onClick={(e) => { triggerEpicAccent(e.currentTarget); void toggleTodo(todo); }} className={`epic-accent-host flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors duration-150 ${todo.completed ? 'border-zinc-900 bg-zinc-900' : 'border-zinc-300'}`}><span className="epic-accent-ring" aria-hidden /><span className="relative z-[2]">{todo.completed && <Check className="h-3 w-3 text-white" />}</span></button>
                 <div className="min-w-0 flex-1">
                   <span className={`text-sm font-medium transition-colors duration-150 ${todo.completed ? 'text-zinc-400 line-through' : 'text-zinc-700'}`}>{todo.title}</span>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">

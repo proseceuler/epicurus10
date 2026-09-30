@@ -29,7 +29,7 @@ export function Button({
   disabled = false,
 }: {
   children: ReactNode;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md';
   type?: 'button' | 'submit';
@@ -48,7 +48,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[color,background-color,box-shadow,transform,opacity] duration-150 ease-out ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : 'epic-press'} ${className}`}
+      className={`relative inline-flex items-center justify-center gap-1.5 overflow-hidden rounded-lg font-medium transition-[color,background-color,box-shadow,transform,opacity] duration-150 ease-out ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : 'epic-press'} ${className}`}
     >
       {children}
     </button>

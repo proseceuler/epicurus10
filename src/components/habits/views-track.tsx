@@ -3,6 +3,7 @@ import type { Habit } from '@/lib/types';
 import BlackHole from '@/components/habits/BlackHole';
 import { AreaChart, Spark, rateOn } from '@/components/habits/widgets';
 import { MONTHS, WEEKDAYS, isDone, lastNDays, type DayCell } from '@/lib/habit-stats';
+import { triggerEpicAccent } from '@/lib/epicAccent';
 
 function weekPct(habits: Habit[], week: DayCell[], done: Set<string>) {
   if (!habits.length || !week.length) return 0;
@@ -115,7 +116,7 @@ export function TrackView({
                     const isToday = cell.dateStr === today;
                     return (
                       <div key={cell.dateStr} className="flex items-center justify-center py-1">
-                        <button type="button" onClick={() => onToggle(h.id, cell.dateStr)} className={`inline-block h-[12px] w-[12px] transition-colors duration-200 ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`} />
+                        <button type="button" onClick={(e) => { triggerEpicAccent(e.currentTarget); onToggle(h.id, cell.dateStr); }} className={`epic-accent-host epic-accent-sm relative inline-block h-[12px] w-[12px] overflow-visible transition-colors duration-200 ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`}><span className="epic-accent-ring" aria-hidden /></button>
                       </div>
                     );
                   })}

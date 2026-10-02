@@ -207,18 +207,15 @@ export default function PomodoroPage() {
 
             <div className="flex items-center gap-3 mb-6">
               <Button
-                onClick={(e) => {
-                  triggerEpicAccent(e.currentTarget);
+                onClick={() => {
+                  triggerEpicAccent();
                   if (pomo.isRunning) pomo.pause();
                   else pomo.start();
                 }}
-                className="epic-accent-host px-8"
+                className="px-8"
               >
-                <span className="epic-accent-ring" aria-hidden />
-                <span className="relative z-[2] inline-flex items-center gap-1.5">
-                  {pomo.isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  {pomo.isRunning ? 'Pause' : 'Start'}
-                </span>
+                {pomo.isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                {pomo.isRunning ? 'Pause' : 'Start'}
               </Button>
               <Button variant="secondary" onClick={pomo.reset}>
                 <RotateCcw className="w-4 h-4" /> Reset

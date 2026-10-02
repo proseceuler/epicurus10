@@ -1,4 +1,4 @@
-/** Flash a grey rectangular ring around the whole app body edge. */
+/** Soft grey edge aura around the app shell (behind UI). */
 export function triggerEpicAccent() {
   if (typeof window === 'undefined') return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;

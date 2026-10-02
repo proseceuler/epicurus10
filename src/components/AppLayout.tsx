@@ -5,6 +5,7 @@ import GlobalSearch from '@/components/GlobalSearch';
 import { motionTransition, overlayPresence } from '@/lib/motion';
 import { OverlayScrim } from '@/components/MotionUI';
 import { xpForNextLevel, XP_CHANGED } from '@/lib/xp';
+import { triggerEpicLevelUp } from '@/lib/epicAccent';
 import { announcePage, refreshInboxFromData } from '@/lib/inboxRefresh';
 import { getShortcuts, matchShortcut, type ShortcutMap } from '@/lib/shortcuts';
 import { supabase } from '@/lib/supabase';
@@ -136,10 +137,14 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
   }, [page]);
 
   useEffect(() => {
-    const onXp = () => {
+    const onXp = (e: Event) => {
+      const detail = (e as CustomEvent<{ leveledUp?: boolean }>).detail;
       setXpProgress(xpForNextLevel());
       setXpFlash(true);
-      window.setTimeout(() => setXpFlash(false), 900);
+      window.setTimeout(() => setXpFlash(false), 950);
+      if (detail?.leveledUp) {
+        triggerEpicLevelUp();
+      }
     };
     window.addEventListener(XP_CHANGED, onXp);
     return () => window.removeEventListener(XP_CHANGED, onXp);
@@ -282,8 +287,11 @@ export default function AppLayout({ page, navigate, children }: { page: PageId; 
               onClick={() => { setLoopReady(true); setLoopOpen((v) => !v); setAssistantOpen(false); setAssistantRail(false); }}
               className="relative flex h-10 items-center"
             >
-              <span className={`block h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80 ${xpFlash ? 'ring-1 ring-zinc-400/60' : ''}`}>
-                <span className="block h-full rounded-full bg-zinc-800 transition-[width] duration-300" style={{ width: `${Math.round(xpProgress.progress * 100)}%` }} />
+              <span className={`epic-xp-track block h-1 w-16 overflow-hidden rounded-full bg-zinc-200/80 ${xpFlash ? 'epic-xp-active' : ''}`}>
+                <span
+                  className={`epic-xp-fill block h-full rounded-full bg-zinc-800 ${xpFlash ? 'epic-xp-level' : ''}`}
+                  style={{ width: `${Math.round(xpProgress.progress * 100)}%` }}
+                />
               </span>
             </button>
             <button type="button" onClick={() => { setAssistantReady(true); setAssistantOpen((v) => !v); setAssistantRail(false); setLoopOpen(false); }} className={`flex h-10 w-10 items-center justify-center rounded-full glass transition-colors duration-200 ${assistantOpen ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white/80'}`} title="Arrodes" aria-label="Toggle Arrodes">

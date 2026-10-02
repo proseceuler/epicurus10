@@ -1,69 +1,50 @@
-/* Completion accent — grey ring expands from center (tasks, habits, attend, timer) */
-.epic-accent-host {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.epic-accent-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  margin-top: -5px;
-  border-radius: 9999px;
+/* Body-edge accent — grey rectangular ring around the whole app shell */
+.epic-body-frame {
   pointer-events: none;
-  background: transparent;
-  box-shadow: 0 0 0 0 rgba(24, 24, 27, 0.28);
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  border-radius: 0;
   opacity: 0;
-  z-index: 1;
+  /* outer + soft inner glow along the rectangular edge */
+  box-shadow:
+    inset 0 0 0 0 rgba(24, 24, 27, 0),
+    inset 0 0 0 0 rgba(24, 24, 27, 0);
 }
 
-.epic-accent-host.epic-accent-burst .epic-accent-ring {
-  animation: epicAccentBurst 520ms var(--epic-ease, cubic-bezier(0.32, 0.72, 0, 1)) forwards;
+.epic-body-frame.epic-accent-burst {
+  animation: epicBodyEdge 720ms var(--epic-ease, cubic-bezier(0.32, 0.72, 0, 1)) forwards;
 }
 
-.epic-accent-host.epic-accent-sm {
-  overflow: visible;
-}
-
-.epic-accent-host.epic-accent-sm.epic-accent-burst .epic-accent-ring {
-  animation-name: epicAccentBurstSm;
-}
-
-@keyframes epicAccentBurst {
+@keyframes epicBodyEdge {
   0% {
-    opacity: 0.55;
-    box-shadow: 0 0 0 0 rgba(24, 24, 27, 0.32);
-    transform: scale(0.35);
+    opacity: 0;
+    box-shadow:
+      inset 0 0 0 0 rgba(24, 24, 27, 0),
+      inset 0 0 0 0 rgba(24, 24, 27, 0);
+  }
+  12% {
+    opacity: 1;
+    box-shadow:
+      inset 0 0 0 2px rgba(24, 24, 27, 0.42),
+      inset 0 0 28px 0 rgba(24, 24, 27, 0.06);
   }
   35% {
-    opacity: 0.32;
+    opacity: 0.85;
+    box-shadow:
+      inset 0 0 0 2px rgba(24, 24, 27, 0.28),
+      inset 0 0 36px 0 rgba(24, 24, 27, 0.05);
   }
   100% {
     opacity: 0;
-    box-shadow: 0 0 0 26px rgba(24, 24, 27, 0);
-    transform: scale(1);
-  }
-}
-
-@keyframes epicAccentBurstSm {
-  0% {
-    opacity: 0.5;
-    box-shadow: 0 0 0 0 rgba(24, 24, 27, 0.36);
-    transform: scale(0.3);
-  }
-  100% {
-    opacity: 0;
-    box-shadow: 0 0 0 14px rgba(24, 24, 27, 0);
-    transform: scale(1);
+    box-shadow:
+      inset 0 0 0 3px rgba(24, 24, 27, 0),
+      inset 0 0 48px 0 rgba(24, 24, 27, 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .epic-accent-host.epic-accent-burst .epic-accent-ring {
+  .epic-body-frame.epic-accent-burst {
     animation: none;
   }
 }

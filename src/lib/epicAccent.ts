@@ -1,19 +1,20 @@
-/** Trigger a grey outward accent burst on completion-style controls. */
-export function triggerEpicAccent(el: HTMLElement | null | undefined) {
-  if (!el) return;
-  if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return;
-  }
-  el.classList.remove('epic-accent-burst');
-  // Force reflow so the animation retriggers on rapid clicks
-  void el.offsetWidth;
-  el.classList.add('epic-accent-burst');
-  const onEnd = (e: AnimationEvent) => {
-    if (e.target !== el.querySelector('.epic-accent-ring') && e.animationName !== 'epicAccentBurst' && e.animationName !== 'epicAccentBurstSm') {
-      // still clear host class on any accent animation end on this host
-    }
-    el.classList.remove('epic-accent-burst');
-    el.removeEventListener('animationend', onEnd);
+/** Flash a grey rectangular ring around the whole app body edge. */
+export function triggerEpicAccent() {
+  if (typeof window === 'undefined') return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const frame =
+    document.getElementById('epic-body-frame') ??
+    document.querySelector<HTMLElement>('.epic-body-frame');
+  if (!frame) return;
+
+  frame.classList.remove('epic-accent-burst');
+  void frame.offsetWidth; // reflow so rapid triggers replay
+  frame.classList.add('epic-accent-burst');
+
+  const onEnd = () => {
+    frame.classList.remove('epic-accent-burst');
+    frame.removeEventListener('animationend', onEnd);
   };
-  el.addEventListener('animationend', onEnd);
+  frame.addEventListener('animationend', onEnd);
 }

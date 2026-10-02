@@ -202,7 +202,7 @@ export function TimetableTab() {
                           </div>
                           <p className="mb-2 text-xs text-zinc-400">{entry.start_time} — {entry.end_time}</p>
                           <div className="flex items-center gap-1">
-                            <button type="button" onClick={(e) => { triggerEpicAccent(e.currentTarget); void markAttendance(entry.id, date, 'attended'); }} className={`epic-accent-host flex flex-1 items-center justify-center gap-1 rounded-lg py-1 text-xs font-medium ${att?.status === 'attended' ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-emerald-50'}`}><span className="epic-accent-ring" aria-hidden /><Check className="relative z-[2] w-3 h-3" /> <span className="relative z-[2]">Attended</span></button>
+                            <button type="button" onClick={() => { triggerEpicAccent(); void markAttendance(entry.id, date, 'attended'); }} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-1 text-xs font-medium ${att?.status === 'attended' ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-emerald-50'}`}><Check className="w-3 h-3" /> Attended</button>
                             <button onClick={() => markAttendance(entry.id, date, 'skipped')} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-1 text-xs font-medium ${att?.status === 'skipped' ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-red-50'}`}><X className="w-3 h-3" /> Skipped</button>
                           </div>
                           <button onClick={() => setEditingEntry(entry)} className="mt-1.5 w-full text-xs text-zinc-400 hover:text-zinc-600">Edit</button>

@@ -116,7 +116,7 @@ export function TrackView({
                     const isToday = cell.dateStr === today;
                     return (
                       <div key={cell.dateStr} className="flex items-center justify-center py-1">
-                        <button type="button" onClick={(e) => { triggerEpicAccent(e.currentTarget); onToggle(h.id, cell.dateStr); }} className={`epic-accent-host epic-accent-sm relative inline-block h-[12px] w-[12px] overflow-visible transition-colors duration-200 ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`}><span className="epic-accent-ring" aria-hidden /></button>
+                        <button type="button" onClick={() => { if (!on) triggerEpicAccent(); onToggle(h.id, cell.dateStr); }} className={`inline-block h-[12px] w-[12px] transition-colors duration-200 ${isToday ? 'ring-1 ring-zinc-600' : ''}`} style={{ background: on ? '#3f3f46' : 'transparent', border: '1px solid #71717a' }} aria-label={`${h.name} ${cell.dateStr}`} />
                       </div>
                     );
                   })}
@@ -147,7 +147,7 @@ export function TrackView({
       <div className="overflow-x-auto">
         <div style={grid} className="items-start">
           <div className="px-2 pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Lifetime Progress</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Life Progress</p>
             <div className="mx-auto mt-1 w-[176px] overflow-visible"><BlackHole variant="track" className="aspect-square w-full bg-transparent" /></div>
             <p className="mt-1 text-center text-[22px] font-semibold tabular-nums text-zinc-800 transition-all duration-300">{life.toFixed(2)}%</p>
             <div className="mx-auto mt-1 flex h-8 w-[176px] items-end gap-px">

@@ -8,8 +8,8 @@
     "@tanstack/start-server-core": ">=1.169.39"
   },
   "scripts": {
-    "dev": "npm run extract:bklit && node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
-    "build": "npm run extract:bklit && node scripts/with-app-env.mjs vite build && npm run db:migrate",
+    "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
+    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -19,8 +19,7 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "extract:bklit": "node scripts/extract-bklit-charts.mjs"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.787.0",
@@ -84,20 +83,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "@visx/curve": "4.0.1-alpha.0",
-    "@visx/event": "4.0.1-alpha.0",
-    "@visx/gradient": "4.0.1-alpha.0",
-    "@visx/grid": "4.0.1-alpha.0",
-    "@visx/group": "4.0.1-alpha.0",
-    "@visx/heatmap": "4.0.1-alpha.0",
-    "@visx/pattern": "4.0.1-alpha.0",
-    "@visx/responsive": "4.0.1-alpha.0",
-    "@visx/scale": "4.0.1-alpha.0",
-    "@visx/shape": "4.0.1-alpha.0",
-    "@number-flow/react": "^0.5.0",
-    "d3-array": "^3.2.4",
-    "d3-shape": "^3.2.0"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

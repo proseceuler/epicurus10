@@ -10,7 +10,7 @@ if (!existsSync(partsDir)) {
   process.exit(0);
 }
 const parts = [];
-for (let i = 0; i < 32; i++) {
+for (let i = 0; i < 64; i++) {
   const p = join(partsDir, `part${i}.b64`);
   if (!existsSync(p)) break;
   parts.push(readFileSync(p, 'utf8').replace(/\s+/g, ''));
@@ -19,4 +19,4 @@ if (!parts.length) process.exit(0);
 const out = join(root, '.bklit-charts.tgz');
 writeFileSync(out, Buffer.from(parts.join(''), 'base64'));
 execSync(`tar -xzf "${out}" -C "${root}"`, { stdio: 'inherit' });
-console.log('[bklit] charts extracted');
+console.log('[bklit] charts extracted to src/charts');

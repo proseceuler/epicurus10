@@ -5,36 +5,16 @@ import { Card, PageHeader, EmptyState } from '@/components/kit';
 import { MotionSwap } from '@/components/MotionUI';
 import { onDataChanged } from '@/lib/assistant/sync';
 import { BarChart3, Clock, Flame, Target } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-} from 'recharts';
+import { BarChart } from '@/charts/bar-chart';
+import { Bar } from '@/charts/bar';
+import { BarXAxis } from '@/charts/bar-x-axis';
+import { Grid } from '@/charts/grid';
+import { ChartTooltip } from '@/charts/tooltip';
+import { AreaChart, Area } from '@/charts/area-chart';
+import { XAxis } from '@/charts/x-axis';
 
 function isoFromDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function FocusTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: { value?: number }[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const mins = Number(payload[0]?.value ?? 0);
-  return (
-    <div className="rounded-xl border border-zinc-200/80 bg-white/95 px-3 py-2 text-xs shadow-sm backdrop-blur">
-      <p className="font-medium text-zinc-800">{label}</p>
-      <p className="mt-0.5 tabular-nums text-zinc-500">{mins > 0 ? `${mins} min focus` : 'No sessions'}</p>
-    </div>
-  );
 }
 
 export default function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
@@ -76,18 +56,11 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
       const label = range === 'week'
         ? d.toLocaleDateString('en-US', { weekday: 'short' })
         : String(d.getDate());
-      return {
-        iso,
-        label,
-        full: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        minutes,
-        isToday: iso === todayIso,
-      };
+      return { iso, name: label, date: d, minutes, isToday: iso === todayIso };
     });
   }, [focusSessions, days, range, startDate, now]);
 
-  const dayValues = chartRows.map((r) => r.minutes);
-  const totalMinutes = dayValues.reduce((sum, v) => sum + v, 0);
+  const totalMinutes = chartRows.reduce((sum, r) => sum + r.minutes, 0);
   const totalSessions = focusSessions.filter((s) => new Date(s.completed_at) >= startDate).length;
 
   const bySubject: Record<string, number> = {};
@@ -97,7 +70,6 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
       const key = s.subject_key ?? 'general';
       bySubject[key] = (bySubject[key] ?? 0) + s.duration_minutes;
     });
-
   const subjectEntries = Object.entries(bySubject).sort((a, b) => b[1] - a[1]);
   const totalSubjectMinutes = subjectEntries.reduce((sum, [, v]) => sum + v, 0);
 
@@ -126,75 +98,31 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
       {!embedded && <PageHeader title="Focus Analytics" />}
       <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-1 rounded-xl p-1 glass">
-          <button
-            type="button"
-            onClick={() => setChartMode('bar')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium ${
-              chartMode === 'bar' ? 'bg-zinc-900 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Bars
-          </button>
-          <button
-            type="button"
-            onClick={() => setChartMode('area')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium ${
-              chartMode === 'area' ? 'bg-zinc-900 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Trend
-          </button>
+          <button type="button" onClick={() => setChartMode('bar')} className={`rounded-lg px-3 py-1 text-sm font-medium ${chartMode === 'bar' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}>Bars</button>
+          <button type="button" onClick={() => setChartMode('area')} className={`rounded-lg px-3 py-1 text-sm font-medium ${chartMode === 'area' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}>Trend</button>
         </div>
         <div className="flex gap-1 rounded-xl p-1 glass">
-          <button
-            type="button"
-            onClick={() => setRange('week')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium ${
-              range === 'week' ? 'bg-zinc-900 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Week
-          </button>
-          <button
-            type="button"
-            onClick={() => setRange('month')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium ${
-              range === 'month' ? 'bg-zinc-900 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Month
-          </button>
+          <button type="button" onClick={() => setRange('week')} className={`rounded-lg px-3 py-1 text-sm font-medium ${range === 'week' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}>Week</button>
+          <button type="button" onClick={() => setRange('month')} className={`rounded-lg px-3 py-1 text-sm font-medium ${range === 'month' ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}>Month</button>
         </div>
       </div>
 
       <MotionSwap id={`${range}-${chartMode}`}>
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Card className="p-4">
-            <div className="mb-1 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-zinc-500" />
-              <span className="text-xs text-zinc-500">Total Focus Time</span>
-            </div>
+            <div className="mb-1 flex items-center gap-2"><Clock className="h-4 w-4 text-zinc-500" /><span className="text-xs text-zinc-500">Total Focus Time</span></div>
             <div className="text-2xl font-bold text-zinc-800">{Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m</div>
           </Card>
           <Card className="p-4">
-            <div className="mb-1 flex items-center gap-2">
-              <Target className="h-4 w-4 text-zinc-500" />
-              <span className="text-xs text-zinc-500">Focus Sessions</span>
-            </div>
+            <div className="mb-1 flex items-center gap-2"><Target className="h-4 w-4 text-zinc-500" /><span className="text-xs text-zinc-500">Focus Sessions</span></div>
             <div className="text-2xl font-bold text-zinc-800">{totalSessions}</div>
           </Card>
           <Card className="p-4">
-            <div className="mb-1 flex items-center gap-2">
-              <Flame className="h-4 w-4 text-zinc-500" />
-              <span className="text-xs text-zinc-500">Day Streak</span>
-            </div>
+            <div className="mb-1 flex items-center gap-2"><Flame className="h-4 w-4 text-zinc-500" /><span className="text-xs text-zinc-500">Day Streak</span></div>
             <div className="text-2xl font-bold text-zinc-800">{streak}</div>
           </Card>
           <Card className="p-4">
-            <div className="mb-1 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-zinc-500" />
-              <span className="text-xs text-zinc-500">Daily Average</span>
-            </div>
+            <div className="mb-1 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-zinc-500" /><span className="text-xs text-zinc-500">Daily Average</span></div>
             <div className="text-2xl font-bold text-zinc-800">{Math.round(totalMinutes / days)}m</div>
           </Card>
         </div>
@@ -206,48 +134,22 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
               {totalMinutes === 0 ? (
                 <EmptyState icon={BarChart3} title="No focus data yet" subtitle="Complete a pomodoro session to see your analytics here." />
               ) : chartMode === 'bar' ? (
-                <div className="h-52 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartRows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                      <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={36} unit="m" />
-                      <Tooltip content={<FocusTooltip />} cursor={{ fill: 'rgba(24,24,27,0.04)' }} />
-                      <Bar dataKey="minutes" radius={[6, 6, 2, 2]} maxBarSize={range === 'week' ? 36 : 18}>
-                        {chartRows.map((row) => (
-                          <Cell
-                            key={row.iso}
-                            fill={row.isToday ? '#18181b' : row.minutes === 0 ? '#e4e4e7' : '#3f3f46'}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="w-full">
+                  <BarChart data={chartRows} xDataKey="name" aspectRatio="2 / 1" margin={{ top: 16, right: 12, bottom: 28, left: 12 }} animationDuration={900} barWidth={range === 'week' ? 28 : 12}>
+                    <Grid horizontal fadeHorizontal />
+                    <Bar dataKey="minutes" fill="var(--chart-line-primary)" lineCap="round" />
+                    <BarXAxis />
+                    <ChartTooltip rows={(point) => [{ label: 'Focus', value: `${Number(point.minutes ?? 0)}m`, color: 'var(--chart-line-primary)' }]} />
+                  </BarChart>
                 </div>
               ) : (
-                <div className="h-52 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartRows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="focusAreaFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#18181b" stopOpacity={0.28} />
-                          <stop offset="100%" stopColor="#18181b" stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={36} unit="m" />
-                      <Tooltip content={<FocusTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="minutes"
-                        stroke="#18181b"
-                        strokeWidth={2}
-                        fill="url(#focusAreaFill)"
-                        activeDot={{ r: 4, fill: '#18181b', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                <div className="w-full">
+                  <AreaChart data={chartRows} xDataKey="date" aspectRatio="2 / 1" margin={{ top: 16, right: 12, bottom: 28, left: 12 }} animationDuration={900}>
+                    <Grid horizontal />
+                    <Area dataKey="minutes" fill="var(--chart-line-primary)" fillOpacity={0.32} stroke="var(--chart-line-primary)" strokeWidth={2} fadeEdges />
+                    <XAxis numTicks={range === 'week' ? 7 : 6} />
+                    <ChartTooltip rows={(point) => [{ label: 'Focus', value: `${Number(point.minutes ?? 0)}m`, color: 'var(--chart-line-primary)' }]} />
+                  </AreaChart>
                 </div>
               )}
             </Card>
@@ -269,10 +171,7 @@ export default function AnalyticsPage({ embedded = false }: { embedded?: boolean
                         <span className="text-xs tabular-nums text-zinc-400">{minutes}m</span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-zinc-200/50">
-                        <div
-                          className="h-full rounded-full bg-zinc-900 transition-[width] duration-300"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-full rounded-full bg-zinc-900 transition-[width] duration-300" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );

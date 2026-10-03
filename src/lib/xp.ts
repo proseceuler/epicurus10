@@ -133,14 +133,19 @@ function readLedger(): LedgerEntry[] {
   }
 }
 
-function writeLedger(list: LedgerEntry[]) {
+function writeLedger(list: LedgerEntry[], prevLevel?: number) {
   if (!isBrowser()) return;
   const trimmed = list.slice(-400);
   localStorage.setItem(LEDGER_KEY, JSON.stringify(trimmed));
   const xp = trimmed.reduce((s, e) => s + e.delta, 0);
   const { level } = levelFromXp(xp);
   localStorage.setItem(STATE_KEY, JSON.stringify({ xp, level }));
-  window.dispatchEvent(new CustomEvent(XP_CHANGED, { detail: { xp, level } }));
+  const leveledUp = typeof prevLevel === 'number' ? level > prevLevel : false;
+  window.dispatchEvent(
+    new CustomEvent(XP_CHANGED, {
+      detail: { xp, level, prevLevel: prevLevel ?? level, leveledUp },
+    }),
+  );
 }
 
 export function getXP(): XPState {
@@ -248,7 +253,7 @@ export function awardXP(req: AwardRequest | XPEvent): AwardResult {
     minutes: type === 'focus_session' ? minutes : undefined,
     intensity,
   };
-  writeLedger([...ledger, entry]);
+  writeLedger([...ledger, entry], cur.level);
   const next = getXP();
   return {
     awarded: true,

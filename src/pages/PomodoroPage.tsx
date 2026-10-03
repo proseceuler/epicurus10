@@ -7,6 +7,7 @@ import AnalyticsPage from '@/pages/AnalyticsPage';
 import { MotionCollapse, MotionSwap } from '@/components/MotionUI';
 import { AmbientMixer, AMBIENT_LIBRARY, clearCustomAmbient, hasCustomAmbient, setCustomAmbient, type AmbientId } from '@/lib/ambientSounds';
 import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, Coffee, Brain, BarChart3, Layers, CloudRain, AudioLines, Music, Trees, Waves, Flame, CloudLightning, BookOpen, House, Plus, X } from 'lucide-react';
+import { triggerEpicAccent } from '@/lib/epicAccent';
 
 const SOUND_ICONS: Record<AmbientId, typeof CloudRain> = {
   rain: CloudRain,
@@ -205,7 +206,14 @@ export default function PomodoroPage() {
             </div>
 
             <div className="flex items-center gap-3 mb-6">
-              <Button onClick={() => pomo.isRunning ? pomo.pause() : pomo.start()} className="px-8">
+              <Button
+                onClick={() => {
+                  triggerEpicAccent();
+                  if (pomo.isRunning) pomo.pause();
+                  else pomo.start();
+                }}
+                className="px-8"
+              >
                 {pomo.isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                 {pomo.isRunning ? 'Pause' : 'Start'}
               </Button>

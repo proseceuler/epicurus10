@@ -8,6 +8,7 @@ import { motionTransition, pageMotion } from '@/lib/motion';
 import './rice.css';
 import './styles.css';
 import './motion.css';
+import './epic-accent.css';
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const GradesPage = lazy(() => import('@/pages/GradesPage'));

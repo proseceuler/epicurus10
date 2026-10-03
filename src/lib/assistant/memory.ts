@@ -19,6 +19,10 @@ export function loadMemory(): string[] {
   return read();
 }
 
+export function clearMemory() {
+  try { localStorage.removeItem(KEY); } catch { /* */ }
+}
+
 export function memoryBlock(): string {
   const facts = read();
   if (!facts.length) return '';

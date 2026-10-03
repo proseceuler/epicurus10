@@ -9,6 +9,7 @@ import './rice.css';
 import './styles.css';
 import './motion.css';
 import './epic-accent.css';
+import './charts/chart-tokens.css';
 import { initPrefs } from '@/lib/prefs';
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));

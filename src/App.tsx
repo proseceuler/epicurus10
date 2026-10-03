@@ -9,6 +9,7 @@ import './rice.css';
 import './styles.css';
 import './motion.css';
 import './epic-accent.css';
+import { initPrefs } from '@/lib/prefs';
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const GradesPage = lazy(() => import('@/pages/GradesPage'));
@@ -32,6 +33,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 
 if (typeof window !== 'undefined') {
   startDbSync();
+  initPrefs();
 }
 
 function useCompactUi() {

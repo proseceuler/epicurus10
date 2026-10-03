@@ -1,0 +1,32 @@
+/* Bklit chart tokens — zinc / rice-shell */
+:root {
+  --chart-background: transparent;
+  --chart-foreground: #3f3f46;
+  --chart-foreground-muted: #a1a1aa;
+  --chart-label: #71717a;
+  --chart-line-primary: #18181b;
+  --chart-line-secondary: #52525b;
+  --chart-crosshair: #a1a1aa;
+  --chart-grid: #e4e4e7;
+  --chart-indicator-color: #18181b;
+  --chart-indicator-secondary-color: #71717a;
+  --chart-marker-background: #ffffff;
+  --chart-marker-border: #18181b;
+  --chart-marker-foreground: #18181b;
+  --chart-marker-badge-background: #18181b;
+  --chart-marker-badge-foreground: #ffffff;
+  --chart-1: #18181b;
+  --chart-2: #3f3f46;
+  --chart-3: #52525b;
+  --chart-4: #71717a;
+  --chart-5: #a1a1aa;
+  --chart-scale-01: #f4f4f5;
+  --chart-scale-02: #d4d4d8;
+  --chart-scale-03: #a1a1aa;
+  --chart-scale-04: #52525b;
+  --chart-scale-05: #18181b;
+  --chart-scale-pattern-color: #e4e4e7;
+  --border: #e4e4e7;
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+}

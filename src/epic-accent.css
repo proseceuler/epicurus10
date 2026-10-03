@@ -194,3 +194,15 @@
     transition: none;
   }
 }
+
+/* User override from Settings → Motion */
+html.epic-reduce-motion .epic-body-frame.epic-accent-burst,
+html.epic-reduce-motion .epic-body-frame.epic-level-up,
+html.epic-reduce-motion .epic-body-frame.epic-level-up::after,
+html.epic-reduce-motion .epic-xp-track.epic-xp-active,
+html.epic-reduce-motion .epic-xp-fill.epic-xp-level {
+  animation: none;
+}
+html.epic-reduce-motion .epic-xp-fill {
+  transition: none;
+}

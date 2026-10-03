@@ -78,6 +78,14 @@ export function saveHistory<T>(messages: T[]) {
   }
 }
 
+export function clearHistory() {
+  cache = null;
+  try {
+    localStorage.removeItem(historyKey());
+    sessionStorage.removeItem(historyKey());
+  } catch { /* */ }
+}
+
 export function loadSearchEnabled(): boolean {
   try { return localStorage.getItem(SEARCH_KEY) === '1'; } catch { return false; }
 }

@@ -18,6 +18,7 @@ import {
 } from '@/lib/praxis';
 import { motionTransition, overlayPresence, sheetMotion } from '@/lib/motion';
 import { BodyPortal, OverlayScrim } from '@/components/MotionUI';
+import { PraxisHeatmap } from '@/components/PraxisHeatmap';
 import { X } from 'lucide-react';
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -190,6 +191,10 @@ export default function AtaraxiaPanel({
                   {praxis.prefs.vigilsEnabled && (
                     <p className="mt-1 text-[11px] text-zinc-500">Vigil {vigil.closed} / {vigil.goal} closed days this week.</p>
                   )}
+                </div>
+
+                <div className="border-t border-zinc-200/50 px-5 py-4">
+                  <PraxisHeatmap loop={loop} />
                 </div>
 
                 <div className="border-t border-zinc-200/50 px-5 py-4">
